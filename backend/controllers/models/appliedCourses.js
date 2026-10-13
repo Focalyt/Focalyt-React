@@ -67,6 +67,13 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       ref: "B2cMilestone",
     },
+    // Reached milestones stay here. Moving forward appends the next step and does not drop earlier ones.
+    milestoneHistory: [{
+      milestone: { type: ObjectId, ref: "B2cMilestone", required: true },
+      title: { type: String, trim: true, default: '' },
+      reachedAt: { type: Date, default: Date.now },
+      reachedBy: { type: ObjectId, ref: "User" },
+    }],
     // Testing-only AI copy of lead status. VoiceX writes here while AI_LEAD_STATUS_TESTING is on.
     // Flip that env to false (or stop using these fields) when AI should own the real status.
     _aiLeadStatus: {

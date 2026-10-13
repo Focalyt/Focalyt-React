@@ -3943,6 +3943,7 @@ const CRMDashboard = () => {
   const [aiStatusCounts, setAiStatusCounts] = useState({});
   const [activeAiPerformanceId, setActiveAiPerformanceId] = useState(null);
   const [leadMilestones, setLeadMilestones] = useState([]);
+  const [reachedMilestoneLeadCount, setReachedMilestoneLeadCount] = useState(0);
   const [activeMilestoneId, setActiveMilestoneId] = useState(null);
   const aiPerformanceFilters = useMemo(
     () => performanceFilters.map((filter) => ({
@@ -4218,6 +4219,7 @@ const CRMDashboard = () => {
       });
       if (response.data.success) {
         setLeadMilestones(response.data.data || []);
+        setReachedMilestoneLeadCount(Number(response.data.reachedLeadCount) || 0);
       }
     } catch (error) {
       console.error('Error fetching milestones:', error);
@@ -5431,6 +5433,8 @@ console.log('API Response:', response.data);
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
       ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
       ...(filters.milestoneTitle && { milestoneTitle: filters.milestoneTitle }),
+      ...(filters.milestoneId && { milestoneId: filters.milestoneId }),
+      ...(filters.reachedMilestone && { reachedMilestone: filters.reachedMilestone }),
       ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
@@ -5445,8 +5449,11 @@ console.log('API Response:', response.data);
     });
 
     let listEndpoint = 'appliedCandidates';
+    const filteringSavedMilestone = Boolean(filters.milestoneId) || filters.reachedMilestone === 'true';
 
-    if (milestoneFilter === 'kycDone') {
+    if (filteringSavedMilestone) {
+      listEndpoint = 'admission-list';
+    } else if (milestoneFilter === 'kycDone') {
       listEndpoint = 'kycCandidates';
       queryParams.set('kyc', 'true');
     } else if (milestoneFilter === 'admission') {
@@ -6429,6 +6436,8 @@ console.log('API Response:', response.data);
     newFilterData.followupStatus = '';
     delete newFilterData.kyc;
     delete newFilterData.milestoneTitle;
+    delete newFilterData.milestoneId;
+    delete newFilterData.reachedMilestone;
     setSelectedFollowupBucket('');
     setSelectedApprovalFilter(null);
     setSelectedKycFilter(null);
@@ -6453,10 +6462,13 @@ console.log('API Response:', response.data);
     const newFilterData = { ...filterData, followupStatus: '' };
     delete newFilterData.leadStatus;
     delete newFilterData.kyc;
+    delete newFilterData.milestoneTitle;
     if (milestone?._id) {
-      newFilterData.milestoneTitle = milestone.title;
+      newFilterData.milestoneId = milestone._id;
+      delete newFilterData.reachedMilestone;
     } else {
-      delete newFilterData.milestoneTitle;
+      delete newFilterData.milestoneId;
+      newFilterData.reachedMilestone = 'true';
     }
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1);
@@ -7383,17 +7395,11 @@ console.log('API Response:', response.data);
     if (!id || id === 'all') return null;
     return id;
   })();
-  const normalizeMilestoneTitle = (value) => String(value || '').trim().toLowerCase();
   const milestonePerformanceChips = leadMilestones.map((milestone) => ({
     ...milestone,
-    count: performanceFilters
-      .filter((filter) => normalizeMilestoneTitle(filter.milestone) === normalizeMilestoneTitle(milestone.title))
-      .reduce((sum, filter) => sum + (Number(filter.count) || 0), 0),
+    count: Number(milestone.leadCount) || 0,
   }));
-  const milestonePerformanceTotal = milestonePerformanceChips.reduce(
-    (sum, milestone) => sum + (Number(milestone.count) || 0),
-    0
-  );
+  const milestonePerformanceTotal = reachedMilestoneLeadCount;
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action, AI Call)
   useEffect(() => {
@@ -7702,14 +7708,27 @@ console.log('API Response:', response.data);
 
   const getProfileMilestoneId = (profile) => idOf(profile?._milestone);
 
-  const getMilestoneTrail = (profile) => (
-    (Array.isArray(profile?.milestoneTrail) ? profile.milestoneTrail : [])
+  const getMilestoneTrail = (profile) => {
+    const history = Array.isArray(profile?.milestoneHistory) ? profile.milestoneHistory : [];
+    const trail = Array.isArray(profile?.milestoneTrail) ? profile.milestoneTrail : [];
+    const source = history.length ? history : trail;
+    return source
       .map((step) => ({
         id: idOf(step?.milestone || step?._id),
         title: step?.title || '',
       }))
-      .filter((step) => step.title || step.id)
-  );
+      .filter((step) => step.title || step.id);
+  };
+
+  const getNextMilestone = (profile, rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const reachedIds = new Set(getMilestoneTrail(profile).map((step) => step.id).filter(Boolean));
+    const currentId = getProfileMilestoneId(profile) || [...reachedIds].pop() || '';
+    if (!currentId) return list[0] || null;
+    const currentPos = list.findIndex((item) => String(item._id) === String(currentId));
+    if (currentPos >= 0) return list[currentPos + 1] || null;
+    return list.find((item) => !reachedIds.has(String(item._id))) || null;
+  };
 
   const getCurrentMilestone = (profile) => {
     const trail = getMilestoneTrail(profile);
@@ -7724,46 +7743,66 @@ console.log('API Response:', response.data);
     };
   };
 
-  const submitLeadMilestoneForm = (profile) => {
-    if (!profile?._id || leadMilestoneSavingId) return;
-    const milestone = leadMilestoneRows.find((item) => String(item._id) === String(leadMilestoneForm.milestoneId));
-    if (!milestone) {
-      setLeadMilestoneError('Select a milestone');
-      return;
-    }
-    setLeadMilestoneError('');
-    const current = getCurrentMilestone(profile);
-    const step = {
-      milestone: milestone._id,
-      title: milestone.title,
-    };
-    const previousTrail = getMilestoneTrail(profile).map((item) => ({
-      milestone: item.id,
-      title: item.title,
-    }));
-    const sameAsCurrent = current.id && current.id === String(milestone._id);
-    const milestoneTrail = sameAsCurrent && previousTrail.length
-      ? [...previousTrail.slice(0, -1), { ...previousTrail[previousTrail.length - 1], ...step }]
-      : [...previousTrail, step];
-    const saved = {
-      _id: milestone._id,
-      title: milestone.title,
-      description: milestone.description || '',
-    };
-    const nextProfile = { ...profile, _milestone: saved, milestoneTrail };
+  const applySavedLeadMilestone = (profile, saved, milestoneHistory) => {
+    const nextProfile = { ...profile, _milestone: saved, milestoneHistory };
     setAllProfiles((prev) => prev.map((item) => (
-      String(item._id) === String(profile._id) ? { ...item, _milestone: saved, milestoneTrail } : item
+      String(item._id) === String(profile._id) ? { ...item, _milestone: saved, milestoneHistory } : item
     )));
     setCrossSaleCache((prev) => {
       const next = { ...prev };
       Object.keys(next).forEach((rootId) => {
         next[rootId] = (next[rootId] || []).map((item) => (
-          String(item._id) === String(profile._id) ? { ...item, _milestone: saved, milestoneTrail } : item
+          String(item._id) === String(profile._id) ? { ...item, _milestone: saved, milestoneHistory } : item
         ));
       });
       return next;
     });
     setLeadMilestoneProfile(nextProfile);
+    const following = getNextMilestone(nextProfile, leadMilestoneRows);
+    setLeadMilestoneForm({ milestoneId: following?._id || '' });
+  };
+
+  const submitLeadMilestoneForm = async (profile) => {
+    if (!profile?._id || leadMilestoneSavingId) return;
+    const milestone = leadMilestoneRows.find((item) => String(item._id) === String(leadMilestoneForm.milestoneId));
+    if (!milestone) {
+      setLeadMilestoneError('Select the next milestone');
+      return;
+    }
+    const next = getNextMilestone(profile, leadMilestoneRows);
+    if (!next) {
+      setLeadMilestoneError('This lead is already on the last milestone');
+      return;
+    }
+    if (String(next._id) !== String(milestone._id)) {
+      setLeadMilestoneError(`Move only to the next milestone: ${next.title}. Earlier milestones stay reached.`);
+      return;
+    }
+    setLeadMilestoneError('');
+    setLeadMilestoneSavingId(milestone._id);
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/lead/milestone_change/${profile._id}`,
+        { _milestone: milestone._id },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!response.data?.success) {
+        setLeadMilestoneError(response.data?.message || 'Failed to save milestone');
+        return;
+      }
+      const saved = response.data.data?._milestone || {
+        _id: milestone._id,
+        title: milestone.title,
+        description: milestone.description || '',
+      };
+      applySavedLeadMilestone(profile, saved, response.data.data?.milestoneHistory || []);
+      fetchLeadMilestones();
+    } catch (error) {
+      console.error('Error saving lead milestone:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to save milestone');
+    } finally {
+      setLeadMilestoneSavingId(null);
+    }
   };
 
   const openLeadMilestones = async (profile) => {
@@ -7787,10 +7826,18 @@ console.log('API Response:', response.data);
       const rows = Array.isArray(response.data.data) ? response.data.data : [];
       setLeadMilestones(rows);
       const projectId = getProfileProject(profile).id;
+      const projectPosition = (item) => {
+        const position = Number(item.projectPositions?.[projectId]);
+        return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+      };
       const matched = projectId
-        ? rows.filter((item) => (item.assignedProjects || []).map(String).includes(projectId))
+        ? rows
+          .filter((item) => (item.assignedProjects || []).map(String).includes(projectId))
+          .sort((a, b) => projectPosition(a) - projectPosition(b))
         : rows;
       setLeadMilestoneRows(matched);
+      const following = getNextMilestone(profile, matched);
+      setLeadMilestoneForm({ milestoneId: following?._id || '' });
     } catch (error) {
       console.error('Error fetching B2C milestones:', error);
       setLeadMilestoneError(error.response?.data?.message || 'Failed to fetch milestones');
@@ -18518,7 +18565,7 @@ useEffect(() => {
                           className="form-select border-0 bgcolor"
                           id="leadMilestoneSelect"
                           value={leadMilestoneForm.milestoneId}
-                          disabled={leadMilestoneLoading}
+                          disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId)}
                           style={{
                             height: '42px',
                             paddingTop: '8px',
@@ -18531,10 +18578,25 @@ useEffect(() => {
                             setLeadMilestoneForm((prev) => ({ ...prev, milestoneId: event.target.value }));
                           }}
                         >
-                          <option value="">{leadMilestoneLoading ? 'Loading milestones...' : 'Select Milestone'}</option>
-                          {leadMilestoneRows.map((milestone) => (
-                            <option key={milestone._id} value={milestone._id}>{milestone.title}</option>
-                          ))}
+                          <option value="">
+                            {leadMilestoneLoading
+                              ? 'Loading milestones...'
+                              : getNextMilestone(leadMilestoneProfile, leadMilestoneRows)
+                                ? 'Select next milestone'
+                                : 'Last milestone reached'}
+                          </option>
+                          {leadMilestoneRows.map((milestone) => {
+                            const reachedIds = new Set(getMilestoneTrail(leadMilestoneProfile).map((step) => step.id));
+                            const next = getNextMilestone(leadMilestoneProfile, leadMilestoneRows);
+                            const reached = reachedIds.has(String(milestone._id));
+                            const isNext = next && String(next._id) === String(milestone._id);
+                            const suffix = reached ? ' — reached' : isNext ? '' : ' — later';
+                            return (
+                              <option key={milestone._id} value={milestone._id} disabled={!isNext}>
+                                {milestone.title}{suffix}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                       {leadMilestoneError ? (
@@ -18555,10 +18617,10 @@ useEffect(() => {
                         <button
                           type="submit"
                           className="btn text-white"
-                          disabled={leadMilestoneLoading}
+                          disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId) || !getNextMilestone(leadMilestoneProfile, leadMilestoneRows)}
                           style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
                         >
-                          SUBMIT
+                          {leadMilestoneSavingId ? 'SAVING...' : 'SUBMIT'}
                         </button>
                       </div>
                     </form>
