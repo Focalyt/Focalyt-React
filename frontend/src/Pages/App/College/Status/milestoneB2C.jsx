@@ -16,6 +16,8 @@ const ShiftTargetModal = ({
   const [selectedProjectIdsByDepartment, setSelectedProjectIdsByDepartment] = useState({});
   const [loadingProjectsByDepartment, setLoadingProjectsByDepartment] = useState({});
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState([]);
+  const [positionByDepartment, setPositionByDepartment] = useState({});
+  const [positionByProject, setPositionByProject] = useState({});
   const loadedDepartmentsRef = useRef({});
 
   useEffect(() => {
@@ -26,6 +28,8 @@ const ShiftTargetModal = ({
     setLoadingProjectsByDepartment({});
     loadedDepartmentsRef.current = {};
     setSelectedMilestoneIds((selection?.milestones || []).map((item) => item._id));
+    setPositionByDepartment({});
+    setPositionByProject({});
   }, [isOpen, selection]);
 
   useEffect(() => {
@@ -77,12 +81,25 @@ const ShiftTargetModal = ({
         delete next[deptId];
         return next;
       });
+      setPositionByDepartment((prev) => {
+        const next = { ...prev };
+        delete next[deptId];
+        return next;
+      });
+      setPositionByProject((prev) => {
+        const next = { ...prev };
+        (projectsByDepartment[deptId] || []).forEach((project) => {
+          delete next[project._id];
+        });
+        return next;
+      });
       return;
     }
     setSelectedDepartmentIds((prev) => [...prev, deptId]);
   };
 
   const toggleProject = (deptId, projId) => {
+    const removing = (selectedProjectIdsByDepartment[deptId] || []).includes(projId);
     setSelectedProjectIdsByDepartment((prev) => {
       const current = prev[deptId] || [];
       return {
@@ -90,6 +107,23 @@ const ShiftTargetModal = ({
         [deptId]: current.includes(projId) ? current.filter((id) => id !== projId) : [...current, projId],
       };
     });
+    if (removing) {
+      setPositionByProject((positions) => {
+        const next = { ...positions };
+        delete next[projId];
+        return next;
+      });
+    }
+  };
+
+  const keepDigits = (value) => String(value || '').replace(/[^\d]/g, '');
+
+  const readPosition = (value) => {
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+    const number = Number(text);
+    if (!Number.isInteger(number) || number < 1) return Number.NaN;
+    return number;
   };
 
   const toggleMilestone = (milestoneId) => {
@@ -100,19 +134,49 @@ const ShiftTargetModal = ({
 
   const handleConfirm = () => {
     const targets = [];
-    selectedDepartmentIds.forEach((deptId) => {
+    for (const deptId of selectedDepartmentIds) {
+      if (loadingProjectsByDepartment[deptId]) {
+        alert('Wait for projects to finish loading');
+        return;
+      }
       const departmentName = departments.find((item) => item._id === deptId)?.name || 'Department';
-      (selectedProjectIdsByDepartment[deptId] || []).forEach((projId) => {
+      const departmentPosition = readPosition(positionByDepartment[deptId]);
+      if (Number.isNaN(departmentPosition)) {
+        alert(`Enter a whole position of 1 or more for ${departmentName}`);
+        return;
+      }
+      const selectedIds = selectedProjectIdsByDepartment[deptId] || [];
+      const departmentProjects = projectsByDepartment[deptId] || [];
+      const chosenProjects = selectedIds.length
+        ? selectedIds.map((projId) => departmentProjects.find((item) => item._id === projId)).filter(Boolean)
+        : departmentProjects;
+      if (!chosenProjects.length) {
+        alert(departmentProjects.length ? `Select a project in ${departmentName}` : `${departmentName} has no projects`);
+        return;
+      }
+      for (const project of chosenProjects) {
+        const projectPosition = readPosition(positionByProject[project._id]);
+        if (Number.isNaN(projectPosition)) {
+          alert(`Enter a whole position of 1 or more for ${project.name}`);
+          return;
+        }
+        const position = projectPosition || departmentPosition;
+        if (!position) {
+          alert(`Enter a position for ${departmentName}`);
+          return;
+        }
         targets.push({
           departmentId: deptId,
-          projectId: projId,
+          projectId: project._id,
           departmentName,
-          projectName: (projectsByDepartment[deptId] || []).find((item) => item._id === projId)?.name || 'Project',
+          projectName: project.name,
+          position,
+          customOrder: projectPosition != null && projectPosition !== departmentPosition,
         });
-      });
-    });
+      }
+    }
     if (!targets.length) {
-      alert('Select at least one project');
+      alert('Select a department');
       return;
     }
     const chosen = milestoneList.filter((item) => selectedMilestoneIds.includes(item._id));
@@ -139,14 +203,14 @@ const ShiftTargetModal = ({
       padding: '40px 16px',
     }}
     >
-      <div style={{ background: 'white', padding: 24, borderRadius: 8, width: 440, maxWidth: '100%', margin: 'auto 0' }}>
+      <div style={{ background: 'white', padding: 24, borderRadius: 8, width: 480, maxWidth: '100%', margin: 'auto 0' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600 }}>
           {isSingle ? 'Switch milestone' : 'Shift all milestones'}
         </h3>
         <p style={{ margin: '0 0 16px', fontSize: 13, color: '#4a5568', lineHeight: 1.5 }}>
           {isSingle
-            ? `Add "${milestoneList[0]?.title || 'this milestone'}" to one or more departments and projects.`
-            : 'Select the milestones and add them to one or more departments and projects.'}
+            ? `Add "${milestoneList[0]?.title || 'this milestone'}" and set its position. A project position overrides the department.`
+            : 'Select the milestones, then set the position for each department or project. They are placed in list order starting at that position.'}
         </p>
         <div style={{
           marginBottom: 16,
@@ -191,8 +255,11 @@ const ShiftTargetModal = ({
           ))}
         </div>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Departments and projects</label>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 220, overflowY: 'auto', padding: '8px 12px' }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Departments and projects</label>
+          <div style={{ marginBottom: 8, fontSize: 12, color: '#718096' }}>
+            Position 1 is first. Leave projects unticked to use every project in the department.
+          </div>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 280, overflowY: 'auto', padding: '8px 12px' }}>
             {loadingDepartments ? (
               <div style={{ fontSize: 13, color: '#718096' }}>Loading departments...</div>
             ) : departments.length === 0 ? (
@@ -203,33 +270,65 @@ const ShiftTargetModal = ({
               const selectedProjects = selectedProjectIdsByDepartment[department._id] || [];
               return (
                 <div key={department._id} style={{ marginBottom: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={departmentChecked}
-                      onChange={() => toggleDepartment(department._id)}
-                    />
-                    <span>{department.name}</span>
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={departmentChecked}
+                        onChange={() => toggleDepartment(department._id)}
+                      />
+                      <span>{department.name}</span>
+                    </label>
+                    {departmentChecked && (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={positionByDepartment[department._id] || ''}
+                        onChange={(event) => setPositionByDepartment((prev) => ({
+                          ...prev,
+                          [department._id]: keepDigits(event.target.value),
+                        }))}
+                        placeholder="Position"
+                        aria-label={`Position for ${department.name}`}
+                        style={{ width: 84, height: 28, padding: '0 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 }}
+                      />
+                    )}
+                  </div>
                   {departmentChecked && (
                     <div style={{ marginLeft: 24, marginTop: 4 }}>
                       {loadingProjectsByDepartment[department._id] ? (
                         <div style={{ fontSize: 12, color: '#718096' }}>Loading projects...</div>
                       ) : departmentProjects.length === 0 ? (
                         <div style={{ fontSize: 12, color: '#a0aec0' }}>No projects</div>
-                      ) : departmentProjects.map((project) => (
-                        <label
-                          key={project._id}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4, cursor: 'pointer' }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedProjects.includes(project._id)}
-                            onChange={() => toggleProject(department._id, project._id)}
-                          />
-                          <span>{project.name}</span>
-                        </label>
-                      ))}
+                      ) : departmentProjects.map((project) => {
+                        const projectChecked = selectedProjects.includes(project._id);
+                        return (
+                          <div key={project._id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={projectChecked}
+                                onChange={() => toggleProject(department._id, project._id)}
+                              />
+                              <span>{project.name}</span>
+                            </label>
+                            {projectChecked && (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={positionByProject[project._id] || ''}
+                                onChange={(event) => setPositionByProject((prev) => ({
+                                  ...prev,
+                                  [project._id]: keepDigits(event.target.value),
+                                }))}
+                                placeholder="Position"
+                                aria-label={`Position for ${project.name}`}
+                                style={{ width: 84, height: 28, padding: '0 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -285,11 +384,12 @@ const MilestoneB2C = () => {
       if (response.data.success) {
         setMilestones((response.data.data || []).map((item) => ({
           _id: item._id,
-          id: item.index + 1,
           title: item.title,
           description: item.description,
           assignedDepartments: (item.assignedDepartments || []).map(String),
           assignedProjects: (item.assignedProjects || []).map(String),
+          projectPositions: item.projectPositions || {},
+          departmentPositions: item.departmentPositions || {},
         })));
       }
     } catch (error) {
@@ -382,9 +482,19 @@ const MilestoneB2C = () => {
     setAppliedProjectId('');
   };
 
+  const scopePosition = (item) => {
+    const raw = appliedProjectId
+      ? item.projectPositions?.[appliedProjectId]
+      : item.departmentPositions?.[appliedDepartmentId];
+    const position = Number(raw);
+    return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+  };
+
   const filteredMilestones = filterActive
-    ? milestones.filter((item) => item.assignedDepartments.includes(appliedDepartmentId)
-      && (!appliedProjectId || item.assignedProjects.includes(appliedProjectId)))
+    ? milestones
+      .filter((item) => item.assignedDepartments.includes(appliedDepartmentId)
+        && (!appliedProjectId || item.assignedProjects.includes(appliedProjectId)))
+      .sort((a, b) => scopePosition(a) - scopePosition(b))
     : milestones;
 
   const appliedDepartmentName = departments.find((item) => item._id === appliedDepartmentId)?.name || '';
@@ -412,7 +522,11 @@ const MilestoneB2C = () => {
     try {
       const response = await axios.post(`${backendUrl}/college/milestone/assign`, {
         milestoneIds: chosen.map((item) => item._id),
-        projects: targets.map((target) => target.projectId),
+        placements: targets.map((target) => ({
+          projectId: target.projectId,
+          position: target.position,
+          customOrder: target.customOrder,
+        })),
       }, { headers: { 'x-auth': token } });
       if (!response.data.success) {
         alert(response.data.message || 'Failed to assign milestone');
@@ -435,51 +549,63 @@ const MilestoneB2C = () => {
     fetchMilestones();
   };
 
-  const persistOrder = async (nextMilestones) => {
-    const milestoneOrder = nextMilestones.map((item, index) => ({
+  const persistOrder = async (ordered, scope) => {
+    const milestoneOrder = ordered.map((item, index) => ({
       _id: item._id,
       index,
     }));
     try {
-      const response = await axios.put(`${backendUrl}/college/milestone/reorder`, { milestoneOrder }, {
+      const response = await axios.put(`${backendUrl}/college/milestone/reorder`, {
+        milestoneOrder,
+        departmentId: scope.departmentId,
+        projectId: scope.projectId || undefined,
+      }, {
         headers: { 'x-auth': token },
       });
-      if (!response.data.success) fetchMilestones();
+      if (response.data.success) {
+        fetchMilestones();
+        return;
+      }
+      fetchMilestones();
     } catch (error) {
       console.error('Error reordering milestone:', error);
       fetchMilestones();
     }
   };
 
+  const reorderWithinScope = (fromIndex, toIndex) => {
+    if (!filterActive) return;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= filteredMilestones.length || toIndex >= filteredMilestones.length) return;
+    if (fromIndex === toIndex) return;
+    const next = [...filteredMilestones];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const scopeId = appliedProjectId || appliedDepartmentId;
+    const positionKey = appliedProjectId ? 'projectPositions' : 'departmentPositions';
+    setMilestones((current) => current.map((item) => {
+      const at = next.findIndex((row) => row._id === item._id);
+      if (at < 0) return item;
+      return {
+        ...item,
+        [positionKey]: { ...(item[positionKey] || {}), [scopeId]: at },
+      };
+    }));
+    persistOrder(next, { departmentId: appliedDepartmentId, projectId: appliedProjectId });
+  };
+
   const handleMoveLeft = (currentIndex) => {
-    if (currentIndex <= 0) return;
-    const next = [...milestones];
-    const moved = next[currentIndex];
-    next[currentIndex] = next[currentIndex - 1];
-    next[currentIndex - 1] = moved;
-    setMilestones(next);
-    persistOrder(next);
+    reorderWithinScope(currentIndex, currentIndex - 1);
   };
 
   const handleMoveRight = (currentIndex) => {
-    if (currentIndex >= milestones.length - 1) return;
-    const next = [...milestones];
-    const moved = next[currentIndex];
-    next[currentIndex] = next[currentIndex + 1];
-    next[currentIndex + 1] = moved;
-    setMilestones(next);
-    persistOrder(next);
+    reorderWithinScope(currentIndex, currentIndex + 1);
   };
 
-  const handleDrop = async (event, targetIndex) => {
+  const handleDrop = (event, targetIndex) => {
     event.preventDefault();
     if (draggedItem === null || draggedItem === targetIndex) return;
-    const next = [...milestones];
-    const [moved] = next.splice(draggedItem, 1);
-    next.splice(targetIndex, 0, moved);
-    setMilestones(next);
+    reorderWithinScope(draggedItem, targetIndex);
     setDraggedItem(null);
-    persistOrder(next);
   };
 
   const handleEditMilestone = (milestone) => {
@@ -720,6 +846,7 @@ const MilestoneB2C = () => {
               Showing milestones for <strong>{appliedDepartmentName || 'Department'}</strong>
               {' / '}
               <strong>{appliedProjectId ? (appliedProjectName || 'Project') : 'All projects'}</strong>
+              . Drag a card to set the order for this {appliedProjectId ? 'project' : 'department'}.
             </div>
           )}
           {filteredMilestones.length > 0 && (
@@ -733,7 +860,7 @@ const MilestoneB2C = () => {
                     _id={milestone._id}
                     description={milestone.description}
                     assignmentLabel={assignmentLabelFor(milestone)}
-                    reorderDisabled={filterActive}
+                    reorderDisabled={!filterActive}
                     onDragStart={() => setDraggedItem(index)}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => handleDrop(event, index)}
@@ -743,7 +870,7 @@ const MilestoneB2C = () => {
                     onMoveRight={handleMoveRight}
                     onSwitch={() => openSwitchMilestone(milestone)}
                   />
-                  {index < filteredMilestones.length - 1 && <Arrow />}
+                  {filterActive && index < filteredMilestones.length - 1 && <Arrow />}
                 </React.Fragment>
               ))}
             </div>
@@ -788,10 +915,10 @@ const MilestoneB2C = () => {
       >
         <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 500, color: '#4a5568' }}>Instructions:</h3>
         <ul style={{ margin: 0, padding: '0 0 0 20px', color: '#4a5568', fontSize: '14px' }}>
-          <li style={{ marginBottom: '8px' }}>New milestones are global. Align them to departments and projects with Edit or Switch</li>
-          <li style={{ marginBottom: '8px' }}>All milestones show by default. Pick a department (and optionally a project) and click Search to see only the milestones aligned there</li>
-          <li style={{ marginBottom: '8px' }}>Use Switch on a milestone to add it to more departments and projects. Its current projects are kept</li>
-          <li style={{ marginBottom: '8px' }}>Drag and drop milestone cards to change their order (clear the search first)</li>
+          <li style={{ marginBottom: '8px' }}>New milestones are global and have no order. Align them to departments and projects with Edit or Switch</li>
+          <li style={{ marginBottom: '8px' }}>Search a department to set that department&apos;s order. Pick a project when that project needs a different order</li>
+          <li style={{ marginBottom: '8px' }}>A project keeps its own order after you move it. Changing the department order updates the projects that still follow the department</li>
+          <li style={{ marginBottom: '8px' }}>Use Switch to add a milestone and set its position for that department or project. Its current projects are kept</li>
           <li style={{ marginBottom: '8px' }}>Use ✏️ and 🗑️ buttons to edit or delete milestones</li>
         </ul>
       </div>
@@ -898,7 +1025,7 @@ const MilestoneCard = ({
       }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>Position: {index + 1}</span>
+          {!reorderDisabled && <span>Position: {index + 1}</span>}
           <button
             type="button"
             onMouseDown={(event) => event.stopPropagation()}

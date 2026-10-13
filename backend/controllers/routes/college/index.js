@@ -15,6 +15,7 @@ const { statusLogHelper } = require("../../../helpers/college");
 const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
 const { assertCourseMembers, toIdString, TrainingTeamError } = require("../../../helpers/trainingTeam");
 const { findLeadsBlockedForStatus } = require("../../../helpers/b2cStatusAssignment");
+const { ensureMilestonePositions } = require("../../../helpers/b2cMilestoneAssignment");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, B2cMilestone, B2cMilestoneAssignment, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
 const { ReEnquire } = require("../../models");
@@ -8553,22 +8554,100 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 			title: milestone.title,
 			description: milestone.description || '',
 		};
-		if (String(doc._milestone || '') === String(milestone._id)) {
-			return res.json({ success: true, message: 'Milestone already set', data: { _id: doc._id, _milestone: savedMilestone } });
+
+		const historyPayload = (rows) => (rows || []).map((row) => ({
+			milestone: row.milestone,
+			title: row.title || '',
+			reachedAt: row.reachedAt || null,
+		}));
+
+		let ordered = [];
+		if (projectId) {
+			await ensureMilestonePositions(collegeId);
+			const assignedRows = await B2cMilestoneAssignment.find({
+				college: collegeId,
+				project: projectId,
+			}).sort({ index: 1, createdAt: 1 }).select('milestone').lean();
+			const docs = await B2cMilestone.find({
+				_id: { $in: assignedRows.map((row) => row.milestone) },
+				college: collegeId,
+			}).select('_id title').lean();
+			const byId = new Map(docs.map((item) => [String(item._id), item]));
+			ordered = assignedRows.map((row) => byId.get(String(row.milestone))).filter(Boolean);
+		} else {
+			ordered = await B2cMilestone.find({ college: collegeId })
+				.sort({ index: 1, createdAt: 1 })
+				.select('_id title')
+				.lean();
+		}
+		const orderedIds = ordered.map((item) => String(item._id));
+
+		if (!Array.isArray(doc.milestoneHistory)) doc.milestoneHistory = [];
+		const reachedIds = new Set(doc.milestoneHistory.map((row) => String(row.milestone)));
+		if (doc._milestone && !reachedIds.has(String(doc._milestone))) {
+			const existing = await B2cMilestone.findById(doc._milestone).select('title').lean();
+			if (existing) {
+				doc.milestoneHistory.push({
+					milestone: existing._id,
+					title: existing.title || '',
+					reachedAt: doc.updatedAt || new Date(),
+					reachedBy: userId,
+				});
+				reachedIds.add(String(existing._id));
+			}
 		}
 
-		let previousTitle = '';
-		if (doc._milestone) {
-			const previous = await B2cMilestone.findById(doc._milestone).select('title').lean();
-			previousTitle = previous?.title || '';
+		const currentId = doc.milestoneHistory.length
+			? String(doc.milestoneHistory[doc.milestoneHistory.length - 1].milestone)
+			: '';
+		const requestedId = String(milestone._id);
+
+		if (reachedIds.has(requestedId)) {
+			if (requestedId === currentId) {
+				doc._milestone = milestone._id;
+				await doc.save();
+				return res.json({
+					success: true,
+					message: 'Milestone already reached',
+					data: { _id: doc._id, _milestone: savedMilestone, milestoneHistory: historyPayload(doc.milestoneHistory) },
+				});
+			}
+			return res.status(400).json({
+				success: false,
+				message: `"${milestone.title}" is already reached and stays on this lead`,
+			});
 		}
 
+		const currentPos = currentId ? orderedIds.indexOf(currentId) : -1;
+		const nextId = !currentId
+			? (orderedIds[0] || '')
+			: (currentPos >= 0 ? (orderedIds[currentPos + 1] || '') : (orderedIds.find((itemId) => !reachedIds.has(itemId)) || ''));
+		if (!nextId) {
+			return res.status(400).json({ success: false, message: 'This lead is already on the last milestone' });
+		}
+		if (requestedId !== nextId) {
+			const nextMilestone = ordered.find((item) => String(item._id) === nextId);
+			return res.status(400).json({
+				success: false,
+				message: `Move only to the next milestone${nextMilestone?.title ? `: ${nextMilestone.title}` : ''}. Earlier milestones stay reached.`,
+			});
+		}
+
+		const previousTitle = doc.milestoneHistory.length
+			? (doc.milestoneHistory[doc.milestoneHistory.length - 1].title || '')
+			: '';
+		doc.milestoneHistory.push({
+			milestone: milestone._id,
+			title: milestone.title,
+			reachedAt: new Date(),
+			reachedBy: userId,
+		});
 		doc._milestone = milestone._id;
 		doc.logs.push({
 			user: userId,
 			timestamp: new Date(),
 			action: previousTitle
-				? `Milestone changed from "${previousTitle}" to "${milestone.title}"`
+				? `Milestone moved from "${previousTitle}" to "${milestone.title}". "${previousTitle}" stays reached.`
 				: `Milestone set to "${milestone.title}"`,
 			remarks: '',
 		});
@@ -8579,7 +8658,7 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 		return res.json({
 			success: true,
 			message: 'Milestone updated',
-			data: { _id: doc._id, _milestone: savedMilestone },
+			data: { _id: doc._id, _milestone: savedMilestone, milestoneHistory: historyPayload(doc.milestoneHistory) },
 		});
 	} catch (error) {
 		console.error('[Lead Milestone Change] Error:', error);
@@ -12774,7 +12853,9 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			counselor,
 			owner,
 			batch,
-			leadSource
+			leadSource,
+			milestoneId,
+			reachedMilestone
 		} = req.query;
 		// Parse multi-select filter values
 
@@ -12826,6 +12907,29 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			admissionDone: { $in: [true] },
 
 		};
+
+		if (milestoneId && mongoose.Types.ObjectId.isValid(String(milestoneId))) {
+			const milestoneObjectId = new mongoose.Types.ObjectId(String(milestoneId));
+			baseMatchStage.$and = [
+				...(baseMatchStage.$and || []),
+				{
+					$or: [
+						{ 'milestoneHistory.milestone': milestoneObjectId },
+						{ _milestone: milestoneObjectId },
+					],
+				},
+			];
+		} else if (reachedMilestone === 'true') {
+			baseMatchStage.$and = [
+				...(baseMatchStage.$and || []),
+				{
+					$or: [
+						{ 'milestoneHistory.0': { $exists: true } },
+						{ _milestone: { $ne: null } },
+					],
+				},
+			];
+		}
 
 		applyB2cLeadOwnershipToMatch(baseMatchStage, {
 			teamMemberIds,
