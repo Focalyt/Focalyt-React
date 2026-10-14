@@ -1007,7 +1007,7 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
               )}
-              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator)|| permissions?.permission_type === 'can_be_senior_trainer' || permissions?.permission_type === 'Admin') && (
+              {((permissions?.permission_type === 'Custom' && (permissions?.custom_permissions?.can_be_academic_coordinator || permissions?.custom_permissions?.can_be_senior_trainer)) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/new-training/batch-monitoring' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/batch-monitoring" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faClipboardList} />
@@ -1015,7 +1015,7 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
               )}
-              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'can_be_senior_trainer' || permissions?.permission_type === 'Admin') && (
+              {((permissions?.permission_type === 'Custom' && (permissions?.custom_permissions?.can_be_academic_coordinator || permissions?.custom_permissions?.can_be_senior_trainer)) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/training/senior-trainer' || location.pathname === '/institute/seniorTrainer' ? 'active' : ''}`}>
                 <Link to="/institute/training/senior-trainer" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faCalendarAlt} />
@@ -1023,7 +1023,7 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
               )}
-              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'can_be_trainer' || permissions?.permission_type === 'can_be_senior_trainer' || permissions?.permission_type === 'Admin') && (
+              {((permissions?.permission_type === 'Custom' && (permissions?.custom_permissions?.can_be_academic_coordinator || permissions?.custom_permissions?.can_be_trainer)) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/training' ? 'active' : ''}`}>
                 <Link to="/institute/training" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faUserTie} />
