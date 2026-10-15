@@ -11,8 +11,9 @@ const { resolveProjectSelection, getStatusProjectScope } = require('../../../hel
 const {
   ensureMilestonePositions,
   getMilestoneAssignmentState,
+  createMilestonesForProjects,
+  copyMilestonesOntoProject,
   saveMilestoneProjects,
-  placeMilestonesAt,
   reorderMilestoneScope,
   getMilestonesForProjects,
 } = require('../../../helpers/b2cMilestoneAssignment');
@@ -29,13 +30,6 @@ const ownerIdsForMilestoneCounts = async (user) => {
   return list
     .filter((id) => isValidId(id))
     .map((id) => new mongoose.Types.ObjectId(String(id)));
-};
-
-// No departments and no projects means the milestone stays global (no assignment rows)
-const resolveAlignment = (collegeId, departments, projects) => {
-  const hasSelection = (Array.isArray(departments) && departments.length)
-    || (Array.isArray(projects) && projects.length);
-  return hasSelection ? resolveProjectSelection(collegeId, departments, projects) : { projectIds: [] };
 };
 
 const renumber = async (collegeId) => {
@@ -60,6 +54,7 @@ router.get('/', isCollege, async (req, res) => {
     }
 
     const state = await getMilestoneAssignmentState(collegeId, milestones.map((item) => item._id));
+    milestones = milestones.filter((item) => state.get(String(item._id))?.projects?.size);
     const courseIds = await Courses.find({ college: collegeId }).distinct('_id');
     const ownerIds = await ownerIdsForMilestoneCounts(req.user);
     const counted = courseIds.length
@@ -148,7 +143,7 @@ router.get('/', isCollege, async (req, res) => {
   }
 });
 
-// New milestones are global; they are aligned to projects later through edit or assign.
+// One new milestone document per selected project. A department with no project uses every project in it.
 router.post('/add', isCollege, async (req, res) => {
   try {
     const title = String(req.body.title || '').trim();
@@ -158,23 +153,40 @@ router.post('/add', isCollege, async (req, res) => {
     }
 
     const collegeId = req.user.college._id;
-    const last = await B2cMilestone.findOne({ college: collegeId }).sort('-index').select('index').lean();
-    const data = await B2cMilestone.create({
+    const { projectIds, error } = await resolveProjectSelection(
+      collegeId,
+      req.body.departments,
+      req.body.projects,
+    );
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+
+    const { milestones, error: createError } = await createMilestonesForProjects({
+      collegeId,
       title,
       description,
-      index: last ? last.index + 1 : 0,
-      college: collegeId,
+      projectIds,
       createdBy: req.user._id,
     });
+    if (createError) {
+      return res.status(400).json({ success: false, message: createError });
+    }
 
-    return res.status(201).json({ success: true, message: 'Milestone created successfully', data });
+    return res.status(201).json({
+      success: true,
+      message: milestones.length > 1
+        ? `Milestone added to ${milestones.length} projects`
+        : 'Milestone created successfully',
+      data: milestones,
+    });
   } catch (err) {
     console.error('Error creating milestone:', err.message);
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
-// Sending departments/projects realigns the milestone; empty lists make it global again.
+// This milestone stays on exactly one project. Empty selection is rejected.
 router.put('/edit/:id', isCollege, async (req, res) => {
   try {
     const collegeId = req.user.college._id;
@@ -187,14 +199,17 @@ router.put('/edit/:id', isCollege, async (req, res) => {
     }
 
     const { title, description, departments, projects } = req.body;
-    let newProjectIds = null;
-    if (departments !== undefined || projects !== undefined) {
-      const { projectIds, error } = await resolveAlignment(collegeId, departments, projects);
-      if (error) {
-        return res.status(400).json({ success: false, message: error });
-      }
-      newProjectIds = projectIds;
+    const { projectIds, error } = await resolveProjectSelection(collegeId, departments, projects);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
     }
+    if (projectIds.length !== 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Select one project. Each milestone belongs to a single project.',
+      });
+    }
+    const newProjectIds = projectIds;
 
     if (title !== undefined) {
       const nextTitle = String(title).trim();
@@ -270,7 +285,7 @@ router.put('/reorder', isCollege, async (req, res) => {
   }
 });
 
-// Switch: adds the milestones to the given projects. Their other projects are kept.
+// Switch copies each milestone onto the chosen projects as its own document.
 router.post('/assign', isCollege, async (req, res) => {
   try {
     const collegeId = req.user.college._id;
@@ -280,8 +295,10 @@ router.post('/assign', isCollege, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Select at least one milestone' });
     }
 
-    const found = await B2cMilestone.countDocuments({ _id: { $in: ids }, college: collegeId });
-    if (found !== ids.length) {
+    const sources = await B2cMilestone.find({ _id: { $in: ids }, college: collegeId })
+      .select('title description')
+      .lean();
+    if (sources.length !== ids.length) {
       return res.status(404).json({ success: false, message: 'One or more milestones were not found' });
     }
 
@@ -295,10 +312,10 @@ router.post('/assign', isCollege, async (req, res) => {
         byProject.set(String(item.projectId), { position, customOrder: Boolean(item.customOrder) });
       }
       for (const [projectId, placement] of byProject) {
-        const { error: placeError } = await placeMilestonesAt({
+        const { error: placeError } = await copyMilestonesOntoProject({
           collegeId,
+          sources,
           projectId,
-          milestoneIds: ids,
           startIndex: placement.position - 1,
           customOrder: placement.customOrder,
           createdBy: req.user._id,
@@ -312,14 +329,20 @@ router.post('/assign', isCollege, async (req, res) => {
       if (error) {
         return res.status(400).json({ success: false, message: error });
       }
-      for (const milestoneId of ids) {
-        await saveMilestoneProjects({
+      for (const projectId of projectIds) {
+        const count = await B2cMilestoneAssignment.countDocuments({ college: collegeId, project: projectId });
+        const { error: placeError } = await copyMilestonesOntoProject({
           collegeId,
-          milestoneId,
-          projects: projectIds,
+          sources,
+          projectId,
+          startIndex: count,
+          customOrder: false,
           createdBy: req.user._id,
-          replace: false,
+          repositionExisting: false,
         });
+        if (placeError) {
+          return res.status(400).json({ success: false, message: placeError });
+        }
       }
     }
 

@@ -35,6 +35,7 @@ const appliedJobsSchema = new Schema(
     leadSubstatus: { type: ObjectId, index: true },
     leadOwner: { type: ObjectId, ref: "User", index: true },
     leadCoOwner: { type: ObjectId, ref: "User" },
+    leadCoOwner2: { type: ObjectId, ref: "User" },
     assignedTo: { type: ObjectId, ref: "User" },
     remark: { type: String, trim: true, default: "" },
     source: { type: String, trim: true, default: "" },

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 
 const ShiftTargetModal = ({
@@ -16,6 +16,8 @@ const ShiftTargetModal = ({
   const [selectedProjectIdsByDepartment, setSelectedProjectIdsByDepartment] = useState({});
   const [loadingProjectsByDepartment, setLoadingProjectsByDepartment] = useState({});
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState([]);
+  const [positionByDepartment, setPositionByDepartment] = useState({});
+  const [positionByProject, setPositionByProject] = useState({});
   const loadedDepartmentsRef = useRef({});
 
   useEffect(() => {
@@ -26,6 +28,8 @@ const ShiftTargetModal = ({
     setLoadingProjectsByDepartment({});
     loadedDepartmentsRef.current = {};
     setSelectedMilestoneIds((selection?.milestones || []).map((item) => item._id));
+    setPositionByDepartment({});
+    setPositionByProject({});
   }, [isOpen, selection]);
 
   useEffect(() => {
@@ -77,12 +81,25 @@ const ShiftTargetModal = ({
         delete next[deptId];
         return next;
       });
+      setPositionByDepartment((prev) => {
+        const next = { ...prev };
+        delete next[deptId];
+        return next;
+      });
+      setPositionByProject((prev) => {
+        const next = { ...prev };
+        (projectsByDepartment[deptId] || []).forEach((project) => {
+          delete next[project._id];
+        });
+        return next;
+      });
       return;
     }
     setSelectedDepartmentIds((prev) => [...prev, deptId]);
   };
 
   const toggleProject = (deptId, projId) => {
+    const removing = (selectedProjectIdsByDepartment[deptId] || []).includes(projId);
     setSelectedProjectIdsByDepartment((prev) => {
       const current = prev[deptId] || [];
       return {
@@ -90,6 +107,23 @@ const ShiftTargetModal = ({
         [deptId]: current.includes(projId) ? current.filter((id) => id !== projId) : [...current, projId],
       };
     });
+    if (removing) {
+      setPositionByProject((positions) => {
+        const next = { ...positions };
+        delete next[projId];
+        return next;
+      });
+    }
+  };
+
+  const keepDigits = (value) => String(value || '').replace(/[^\d]/g, '');
+
+  const readPosition = (value) => {
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+    const number = Number(text);
+    if (!Number.isInteger(number) || number < 1) return Number.NaN;
+    return number;
   };
 
   const toggleMilestone = (milestoneId) => {
@@ -100,19 +134,49 @@ const ShiftTargetModal = ({
 
   const handleConfirm = () => {
     const targets = [];
-    selectedDepartmentIds.forEach((deptId) => {
+    for (const deptId of selectedDepartmentIds) {
+      if (loadingProjectsByDepartment[deptId]) {
+        alert('Wait for projects to finish loading');
+        return;
+      }
       const departmentName = departments.find((item) => item._id === deptId)?.name || 'Department';
-      (selectedProjectIdsByDepartment[deptId] || []).forEach((projId) => {
+      const departmentPosition = readPosition(positionByDepartment[deptId]);
+      if (Number.isNaN(departmentPosition)) {
+        alert(`Enter a whole position of 1 or more for ${departmentName}`);
+        return;
+      }
+      const selectedIds = selectedProjectIdsByDepartment[deptId] || [];
+      const departmentProjects = projectsByDepartment[deptId] || [];
+      const chosenProjects = selectedIds.length
+        ? selectedIds.map((projId) => departmentProjects.find((item) => item._id === projId)).filter(Boolean)
+        : departmentProjects;
+      if (!chosenProjects.length) {
+        alert(departmentProjects.length ? `Select a project in ${departmentName}` : `${departmentName} has no projects`);
+        return;
+      }
+      for (const project of chosenProjects) {
+        const projectPosition = readPosition(positionByProject[project._id]);
+        if (Number.isNaN(projectPosition)) {
+          alert(`Enter a whole position of 1 or more for ${project.name}`);
+          return;
+        }
+        const position = projectPosition || departmentPosition;
+        if (!position) {
+          alert(`Enter a position for ${departmentName}`);
+          return;
+        }
         targets.push({
           departmentId: deptId,
-          projectId: projId,
+          projectId: project._id,
           departmentName,
-          projectName: (projectsByDepartment[deptId] || []).find((item) => item._id === projId)?.name || 'Project',
+          projectName: project.name,
+          position,
+          customOrder: projectPosition != null && projectPosition !== departmentPosition,
         });
-      });
-    });
+      }
+    }
     if (!targets.length) {
-      alert('Select at least one project');
+      alert('Select a department');
       return;
     }
     const chosen = milestoneList.filter((item) => selectedMilestoneIds.includes(item._id));
@@ -139,14 +203,14 @@ const ShiftTargetModal = ({
       padding: '40px 16px',
     }}
     >
-      <div style={{ background: 'white', padding: 24, borderRadius: 8, width: 440, maxWidth: '100%', margin: 'auto 0' }}>
+      <div style={{ background: 'white', padding: 24, borderRadius: 8, width: 480, maxWidth: '100%', margin: 'auto 0' }}>
         <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600 }}>
           {isSingle ? 'Switch milestone' : 'Shift all milestones'}
         </h3>
         <p style={{ margin: '0 0 16px', fontSize: 13, color: '#4a5568', lineHeight: 1.5 }}>
           {isSingle
-            ? `Add "${milestoneList[0]?.title || 'this milestone'}" to one or more departments and projects.`
-            : 'Select the milestones and add them to one or more departments and projects.'}
+            ? `Add "${milestoneList[0]?.title || 'this milestone'}" and set its position. A project position overrides the department.`
+            : 'Select the milestones, then set the position for each department or project. They are placed in list order starting at that position.'}
         </p>
         <div style={{
           marginBottom: 16,
@@ -191,8 +255,11 @@ const ShiftTargetModal = ({
           ))}
         </div>
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Departments and projects</label>
-          <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 220, overflowY: 'auto', padding: '8px 12px' }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Departments and projects</label>
+          <div style={{ marginBottom: 8, fontSize: 12, color: '#718096' }}>
+            Position 1 is first. Leave projects unticked to use every project in the department.
+          </div>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 280, overflowY: 'auto', padding: '8px 12px' }}>
             {loadingDepartments ? (
               <div style={{ fontSize: 13, color: '#718096' }}>Loading departments...</div>
             ) : departments.length === 0 ? (
@@ -203,33 +270,65 @@ const ShiftTargetModal = ({
               const selectedProjects = selectedProjectIdsByDepartment[department._id] || [];
               return (
                 <div key={department._id} style={{ marginBottom: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={departmentChecked}
-                      onChange={() => toggleDepartment(department._id)}
-                    />
-                    <span>{department.name}</span>
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={departmentChecked}
+                        onChange={() => toggleDepartment(department._id)}
+                      />
+                      <span>{department.name}</span>
+                    </label>
+                    {departmentChecked && (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={positionByDepartment[department._id] || ''}
+                        onChange={(event) => setPositionByDepartment((prev) => ({
+                          ...prev,
+                          [department._id]: keepDigits(event.target.value),
+                        }))}
+                        placeholder="Position"
+                        aria-label={`Position for ${department.name}`}
+                        style={{ width: 84, height: 28, padding: '0 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 }}
+                      />
+                    )}
+                  </div>
                   {departmentChecked && (
                     <div style={{ marginLeft: 24, marginTop: 4 }}>
                       {loadingProjectsByDepartment[department._id] ? (
                         <div style={{ fontSize: 12, color: '#718096' }}>Loading projects...</div>
                       ) : departmentProjects.length === 0 ? (
                         <div style={{ fontSize: 12, color: '#a0aec0' }}>No projects</div>
-                      ) : departmentProjects.map((project) => (
-                        <label
-                          key={project._id}
-                          style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4, cursor: 'pointer' }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedProjects.includes(project._id)}
-                            onChange={() => toggleProject(department._id, project._id)}
-                          />
-                          <span>{project.name}</span>
-                        </label>
-                      ))}
+                      ) : departmentProjects.map((project) => {
+                        const projectChecked = selectedProjects.includes(project._id);
+                        return (
+                          <div key={project._id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={projectChecked}
+                                onChange={() => toggleProject(department._id, project._id)}
+                              />
+                              <span>{project.name}</span>
+                            </label>
+                            {projectChecked && (
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={positionByProject[project._id] || ''}
+                                onChange={(event) => setPositionByProject((prev) => ({
+                                  ...prev,
+                                  [project._id]: keepDigits(event.target.value),
+                                }))}
+                                placeholder="Position"
+                                aria-label={`Position for ${project.name}`}
+                                style={{ width: 84, height: 28, padding: '0 8px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13 }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -254,16 +353,41 @@ const ShiftTargetModal = ({
   );
 };
 
+const projectDepartmentIds = (project) => {
+  const ids = [];
+  if (project?.department) ids.push(String(project.department._id || project.department));
+  (project?.departments || []).forEach((item) => ids.push(String(item?._id || item)));
+  return [...new Set(ids.filter(Boolean))];
+};
+
+const mapB2bProject = (item) => {
+  const departmentIds = projectDepartmentIds(item);
+  return {
+    _id: String(item._id),
+    name: item.name || 'Untitled project',
+    vertical: departmentIds[0] || '',
+    departmentIds,
+  };
+};
+
+const projectInDepartments = (project, departmentIds) => (
+  (project?.departmentIds || [project?.vertical].filter(Boolean)).some((id) => departmentIds.includes(id))
+);
+
 const MilestoneB2B = () => {
   const [milestones, setMilestones] = useState([]);
-  const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState(null);
+  const [formResetKey, setFormResetKey] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [loadingMilestones, setLoadingMilestones] = useState(false);
+  const [alert, setAlert] = useState({ show: false, message: '', type: '' });
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingMilestoneId, setDeletingMilestoneId] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [allProjects, setAllProjects] = useState([]);
   const [departmentId, setDepartmentId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [appliedDepartmentId, setAppliedDepartmentId] = useState('');
@@ -271,30 +395,40 @@ const MilestoneB2B = () => {
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [transferSelection, setTransferSelection] = useState(null);
-  const [scopeNotice, setScopeNotice] = useState('');
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
   const token = userData.token;
 
+  const showAlert = (message, type) => {
+    setAlert({ show: true, message, type });
+    setTimeout(() => {
+      setAlert({ show: false, message: '', type: '' });
+    }, 5000);
+  };
+
   const fetchMilestones = async () => {
     try {
+      setLoadingMilestones(true);
       const response = await axios.get(`${backendUrl}/college/milestoneB2b`, {
         headers: { 'x-auth': token },
       });
       if (response.data.success) {
         setMilestones((response.data.data || []).map((item) => ({
           _id: item._id,
-          id: item.index + 1,
           title: item.title,
           description: item.description,
           assignedDepartments: (item.assignedDepartments || []).map(String),
           assignedProjects: (item.assignedProjects || []).map(String),
+          projectPositions: item.projectPositions || {},
+          departmentPositions: item.departmentPositions || {},
         })));
       }
     } catch (error) {
       console.error('Error fetching milestones:', error);
-      alert('Failed to fetch milestones');
+      showAlert('Failed to fetch milestones', 'danger');
+    } finally {
+      setLoadingMilestones(false);
     }
   };
 
@@ -331,6 +465,22 @@ const MilestoneB2B = () => {
   }, [backendUrl, token]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    axios.get(`${backendUrl}/college/b2b/b2b-projects`, {
+      headers: { 'x-auth': token },
+      params: { status: true },
+    }).then((response) => {
+      if (cancelled) return;
+      setAllProjects((response.data?.data || []).map(mapB2bProject));
+    }).catch((error) => {
+      console.error('Error fetching projects:', error);
+      if (!cancelled) setAllProjects([]);
+    });
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
     if (!token || !departmentId) {
       setProjects([]);
       setLoadingProjects(false);
@@ -345,10 +495,7 @@ const MilestoneB2B = () => {
           params: { status: true, department: departmentId },
         });
         if (cancelled) return;
-        setProjects((response.data?.data || []).map((item) => ({
-          _id: String(item._id),
-          name: item.name || 'Untitled project',
-        })));
+        setProjects((response.data?.data || []).map(mapB2bProject));
       } catch (error) {
         console.error('Error fetching projects:', error);
         if (!cancelled) setProjects([]);
@@ -365,43 +512,62 @@ const MilestoneB2B = () => {
   const handleDepartmentChange = (value) => {
     setDepartmentId(value);
     setProjectId('');
-  };
-
-  const applyFilter = () => {
-    if (!departmentId) {
-      alert('Select a department to search');
-      return;
-    }
-    setAppliedDepartmentId(departmentId);
-    setAppliedProjectId(projectId);
-  };
-
-  const clearFilter = () => {
-    setDepartmentId('');
-    setProjectId('');
-    setAppliedDepartmentId('');
+    setAppliedDepartmentId(value);
     setAppliedProjectId('');
   };
 
+  const handleProjectChange = (value) => {
+    setProjectId(value);
+    setAppliedProjectId(value);
+  };
+
+  const scopePosition = (item) => {
+    const raw = appliedProjectId
+      ? item.projectPositions?.[appliedProjectId]
+      : item.departmentPositions?.[appliedDepartmentId];
+    const position = Number(raw);
+    return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+  };
+
   const filteredMilestones = filterActive
-    ? milestones.filter((item) => item.assignedDepartments.includes(appliedDepartmentId)
-      && (!appliedProjectId || item.assignedProjects.includes(appliedProjectId)))
+    ? milestones
+      .filter((item) => item.assignedDepartments.includes(appliedDepartmentId)
+        && (!appliedProjectId || item.assignedProjects.includes(appliedProjectId)))
+      .sort((a, b) => scopePosition(a) - scopePosition(b))
     : milestones;
+
+  const tableRows = filteredMilestones.flatMap((milestone, milestoneIndex) => {
+    const departmentIds = filterActive
+      ? milestone.assignedDepartments.filter((id) => id === appliedDepartmentId)
+      : milestone.assignedDepartments;
+    const projectsFor = (departmentId) => milestone.assignedProjects
+      .map((id) => allProjects.find((project) => project._id === id))
+      .filter((project) => project && (!departmentId || projectInDepartments(project, [departmentId])))
+      .filter((project) => !filterActive || !appliedProjectId || project._id === appliedProjectId)
+      .map((project) => project.name);
+
+    if (!departmentIds.length) {
+      return [{
+        key: milestone._id,
+        milestone,
+        milestoneIndex,
+        departmentName: '—',
+        projectNames: [],
+      }];
+    }
+    return departmentIds.map((departmentId) => ({
+      key: `${milestone._id}-${departmentId}`,
+      milestone,
+      milestoneIndex,
+      departmentName: departments.find((item) => item._id === departmentId)?.name || '—',
+      projectNames: projectsFor(departmentId),
+    }));
+  });
 
   const appliedDepartmentName = departments.find((item) => item._id === appliedDepartmentId)?.name || '';
   const appliedProjectName = appliedProjectId
     ? (projects.find((item) => item._id === appliedProjectId)?.name || '')
     : '';
-
-  const assignmentLabelFor = (milestone) => {
-    const projectCount = milestone.assignedProjects.length;
-    if (!projectCount) return null;
-    const departmentNames = milestone.assignedDepartments
-      .map((id) => departments.find((item) => item._id === id)?.name)
-      .filter(Boolean)
-      .join(', ');
-    return `${departmentNames || 'Department'} Â· ${projectCount} project${projectCount === 1 ? '' : 's'}`;
-  };
 
   const openSwitchMilestone = (milestone) => {
     if (!milestone) return;
@@ -413,80 +579,103 @@ const MilestoneB2B = () => {
     try {
       const response = await axios.post(`${backendUrl}/college/milestoneB2b/assign`, {
         milestoneIds: chosen.map((item) => item._id),
-        projects: targets.map((target) => target.projectId),
+        placements: targets.map((target) => ({
+          projectId: target.projectId,
+          position: target.position,
+          customOrder: target.customOrder,
+        })),
       }, { headers: { 'x-auth': token } });
       if (!response.data.success) {
-        alert(response.data.message || 'Failed to assign milestone');
+        showAlert(response.data.message || 'Failed to assign milestone', 'danger');
         return;
       }
     } catch (error) {
       console.error('Error assigning milestone:', error);
-      alert(error.response?.data?.message || 'Failed to assign milestone');
+      showAlert(error.response?.data?.message || 'Failed to assign milestone', 'danger');
       return;
     }
     const targetLabel = targets.length === 1
       ? `${targets[0].departmentName} / ${targets[0].projectName}`
       : `${targets.length} projects`;
-    setScopeNotice(
+    showAlert(
       single
         ? `Assigned "${chosen[0].title}" to ${targetLabel}.`
-        : `Assigned ${chosen.length} milestones to ${targetLabel}.`
+        : `Assigned ${chosen.length} milestones to ${targetLabel}.`,
+      'success'
     );
     setTransferSelection(null);
     fetchMilestones();
   };
 
-  const persistOrder = async (nextMilestones) => {
-    const milestoneOrder = nextMilestones.map((item, index) => ({
+  const persistOrder = async (ordered, scope) => {
+    const milestoneOrder = ordered.map((item, index) => ({
       _id: item._id,
       index,
     }));
     try {
-      const response = await axios.put(`${backendUrl}/college/milestoneB2b/reorder`, { milestoneOrder }, {
+      const response = await axios.put(`${backendUrl}/college/milestoneB2b/reorder`, {
+        milestoneOrder,
+        departmentId: scope.departmentId,
+        projectId: scope.projectId || undefined,
+      }, {
         headers: { 'x-auth': token },
       });
-      if (!response.data.success) fetchMilestones();
+      if (response.data.success) {
+        fetchMilestones();
+        return;
+      }
+      fetchMilestones();
     } catch (error) {
       console.error('Error reordering milestone:', error);
       fetchMilestones();
     }
   };
 
+  const reorderWithinScope = (fromIndex, toIndex) => {
+    if (!filterActive) return;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= filteredMilestones.length || toIndex >= filteredMilestones.length) return;
+    if (fromIndex === toIndex) return;
+    const next = [...filteredMilestones];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const scopeId = appliedProjectId || appliedDepartmentId;
+    const positionKey = appliedProjectId ? 'projectPositions' : 'departmentPositions';
+    setMilestones((current) => current.map((item) => {
+      const at = next.findIndex((row) => row._id === item._id);
+      if (at < 0) return item;
+      return {
+        ...item,
+        [positionKey]: { ...(item[positionKey] || {}), [scopeId]: at },
+      };
+    }));
+    persistOrder(next, { departmentId: appliedDepartmentId, projectId: appliedProjectId });
+  };
+
   const handleMoveLeft = (currentIndex) => {
-    if (currentIndex <= 0) return;
-    const next = [...milestones];
-    const moved = next[currentIndex];
-    next[currentIndex] = next[currentIndex - 1];
-    next[currentIndex - 1] = moved;
-    setMilestones(next);
-    persistOrder(next);
+    reorderWithinScope(currentIndex, currentIndex - 1);
   };
 
   const handleMoveRight = (currentIndex) => {
-    if (currentIndex >= milestones.length - 1) return;
-    const next = [...milestones];
-    const moved = next[currentIndex];
-    next[currentIndex] = next[currentIndex + 1];
-    next[currentIndex + 1] = moved;
-    setMilestones(next);
-    persistOrder(next);
+    reorderWithinScope(currentIndex, currentIndex + 1);
   };
 
-  const handleDrop = async (event, targetIndex) => {
+  const handleDrop = (event, targetIndex) => {
     event.preventDefault();
     if (draggedItem === null || draggedItem === targetIndex) return;
-    const next = [...milestones];
-    const [moved] = next.splice(draggedItem, 1);
-    next.splice(targetIndex, 0, moved);
-    setMilestones(next);
+    reorderWithinScope(draggedItem, targetIndex);
     setDraggedItem(null);
-    persistOrder(next);
+  };
+
+  const resetForm = () => {
+    setIsEditMode(false);
+    setEditingMilestone(null);
+    setFormResetKey((value) => value + 1);
   };
 
   const handleEditMilestone = (milestone) => {
     setEditingMilestone(milestone);
     setIsEditMode(true);
-    setIsMilestoneModalOpen(true);
+    setFormResetKey((value) => value + 1);
   };
 
   const handleDeleteMilestone = (milestoneId) => {
@@ -496,27 +685,46 @@ const MilestoneB2B = () => {
 
   const handleSave = async ({ title, description, departments: formDepartments, projects: formProjects }) => {
     const headers = { 'x-auth': token };
+    if (!formDepartments?.length) {
+      showAlert('Select a department', 'danger');
+      return false;
+    }
+    if (isEditMode && (formProjects || []).length !== 1) {
+      showAlert('Select one project. Each milestone belongs to a single project.', 'danger');
+      return false;
+    }
+    setSaving(true);
     try {
       if (isEditMode && editingMilestone?._id) {
-        // Empty departments and projects make the milestone global again.
-        // A department with no picked project gets all of its current projects.
         const response = await axios.put(
           `${backendUrl}/college/milestoneB2b/edit/${editingMilestone._id}`,
-          { title, description, departments: formDepartments, projects: formProjects },
+          { title, description, departments: formDepartments || [], projects: formProjects || [] },
           { headers }
         );
-        if (response.data.success) alert('Milestone updated successfully');
+        if (response.data.success) showAlert('Milestone updated successfully', 'success');
       } else {
-        const response = await axios.post(`${backendUrl}/college/milestoneB2b/add`, { title, description }, { headers });
-        if (response.data.success) alert('Milestone added successfully');
+        const response = await axios.post(
+          `${backendUrl}/college/milestoneB2b/add`,
+          { title, description, departments: formDepartments || [], projects: formProjects || [] },
+          { headers }
+        );
+        if (response.data.success) {
+          const count = Array.isArray(response.data.data) ? response.data.data.length : 1;
+          showAlert(
+            count > 1 ? `Milestone added to ${count} projects` : 'Milestone added successfully',
+            'success'
+          );
+        }
       }
-      setIsMilestoneModalOpen(false);
-      setEditingMilestone(null);
-      setIsEditMode(false);
+      resetForm();
       fetchMilestones();
+      return true;
     } catch (error) {
       console.error('Error saving milestone:', error);
-      alert(error.response?.data?.message || 'Failed to save');
+      showAlert(error.response?.data?.message || 'Failed to save', 'danger');
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -528,13 +736,14 @@ const MilestoneB2B = () => {
           { headers: { 'x-auth': token } }
         );
         if (response.data.success) {
-          alert('Milestone deleted successfully');
+          showAlert('Milestone deleted successfully', 'success');
+          if (editingMilestone?._id === deletingMilestoneId) resetForm();
           fetchMilestones();
         }
       }
     } catch (error) {
       console.error('Error deleting milestone:', error);
-      alert('Error occurred while deleting');
+      showAlert('Error occurred while deleting', 'danger');
     }
     setIsDeleteModalOpen(false);
     setDeletingMilestoneId(null);
@@ -542,272 +751,254 @@ const MilestoneB2B = () => {
 
   const deletingMilestone = milestones.find((item) => item._id === deletingMilestoneId);
 
+
   return (
-    <div
-      className="milestone-b2b-page"
-      style={{
-        fontFamily: 'Inter, sans-serif',
-        fontSize: '14px',
-        maxWidth: '100%',
-        margin: '0 auto',
-        padding: '24px',
-      }}
-    >
-      <style>{`
-        .milestone-b2b-page,
-        .milestone-b2b-page button,
-        .milestone-b2b-page input {
-          font-family: Inter, sans-serif;
-        }
-        .milestone-b2b-page button,
-        .milestone-b2b-page input {
-          font-size: 14px;
-        }
-      `}</style>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: '600', color: '#333', margin: 0 }}>
-          Lead Milestone Flow
-        </h1>
-        <button
-          type="button"
-          onClick={() => {
-            setIsEditMode(false);
-            setEditingMilestone(null);
-            setIsMilestoneModalOpen(true);
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            padding: '10px 20px',
-            fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: '18px', marginRight: '4px' }}>+</span>
-          Add New Milestone
-        </button>
+    <div className="container-fluid milestone-b2b-page">
+      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+        <div className="content-header-left col-md-9 col-12 mb-2">
+          <div className="row breadcrumbs-top">
+            <div className="col-12">
+              <h3 className="content-header-title float-left mb-0">
+                {isEditMode ? 'Edit Milestone' : 'Add Milestone'}
+              </h3>
+              <div className="breadcrumb-wrapper col-12">
+                <ol className="breadcrumb">
+                  <li className="breadcrumb-item">
+                    <a href="/">Home</a>
+                  </li>
+                  <li className="breadcrumb-item active">
+                    {isEditMode ? 'Edit Milestone' : 'Add Milestone'}
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {scopeNotice && (
-        <div style={{
-          marginBottom: '12px',
-          padding: '8px 12px',
-          background: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderRadius: '6px',
-          color: '#166534',
-          fontSize: '13px',
-        }}
-        >
-          {scopeNotice}
+      {alert.show && (
+        <div className={`alert alert-${alert.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`}>
+          {alert.message}
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => setAlert({ show: false, message: '', type: '' })}
+          ></button>
         </div>
       )}
 
-      <div style={{
-        background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: '8px',
-        marginTop: '16px',
-        overflowX: 'auto',
-        whiteSpace: 'nowrap',
-      }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          borderBottom: '1px solid #eef2f6',
-          background: '#fafbfc',
-          borderRadius: '8px 8px 0 0',
-          whiteSpace: 'normal',
-        }}
-        >
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Department</span>
-            <select
-              value={departmentId}
-              onChange={(event) => handleDepartmentChange(event.target.value)}
-              disabled={loadingDepartments}
-              style={{
-                height: '32px',
-                width: '160px',
-                padding: '0 8px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                fontSize: '13px',
-                color: '#1e293b',
-                background: 'white',
-              }}
-            >
-              <option value="">{loadingDepartments ? 'Loading...' : 'Select'}</option>
-              {departments.map((item) => (
-                <option key={item._id} value={item._id}>{item.name}</option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Project</span>
-            <select
-              value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
-              disabled={!departmentId || loadingProjects}
-              style={{
-                height: '32px',
-                width: '160px',
-                padding: '0 8px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                fontSize: '13px',
-                color: '#1e293b',
-                background: !departmentId ? '#f8fafc' : 'white',
-              }}
-            >
-              <option value="">
-                {!departmentId ? 'Select department' : loadingProjects ? 'Loading...' : 'All projects'}
-              </option>
-              {projects.map((item) => (
-                <option key={item._id} value={item._id}>{item.name}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={applyFilter}
-            disabled={!departmentId}
-            style={{
-              height: '32px',
-              padding: '0 14px',
-              border: 'none',
-              borderRadius: '6px',
-              background: '#3b82f6',
-              color: 'white',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: !departmentId ? 'not-allowed' : 'pointer',
-              opacity: !departmentId ? 0.55 : 1,
-            }}
-          >
-            Search
-          </button>
-          {(filterActive || departmentId) && (
-            <button
-              type="button"
-              onClick={clearFilter}
-              style={{
-                height: '32px',
-                padding: '0 14px',
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                background: 'white',
-                color: '#334155',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div style={{ padding: '8px 0 24px' }}>
-          {filterActive && (
-            <div style={{ padding: '8px 16px 0', fontSize: '13px', color: '#475569', whiteSpace: 'normal' }}>
-              Showing milestones for <strong>{appliedDepartmentName || 'Department'}</strong>
-              {' / '}
-              <strong>{appliedProjectId ? (appliedProjectName || 'Project') : 'All projects'}</strong>
-            </div>
-          )}
-          {filteredMilestones.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px 16px', minWidth: 'max-content' }}>
-              {filteredMilestones.map((milestone, index) => (
-                <React.Fragment key={milestone._id}>
-                  <MilestoneCard
-                    index={index}
-                    total={filteredMilestones.length}
-                    title={milestone.title}
-                    _id={milestone._id}
-                    description={milestone.description}
-                    assignmentLabel={assignmentLabelFor(milestone)}
-                    reorderDisabled={filterActive}
-                    onDragStart={() => setDraggedItem(index)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => handleDrop(event, index)}
-                    onEdit={() => handleEditMilestone(milestone)}
-                    onDelete={handleDeleteMilestone}
-                    onMoveLeft={handleMoveLeft}
-                    onMoveRight={handleMoveRight}
-                    onSwitch={() => openSwitchMilestone(milestone)}
-                  />
-                  {index < filteredMilestones.length - 1 && <Arrow />}
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-          {!filterActive && milestones.length === 0 && (
-            <div style={{ color: '#718096', padding: '20px 24px', whiteSpace: 'normal' }}>
-              No milestones yet. Add one to show it in the Performance tab.
-            </div>
-          )}
-          {filterActive && filteredMilestones.length === 0 && (
-            <div style={{
-              minHeight: '140px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
-              color: '#718096',
-              gap: '8px',
-              whiteSpace: 'normal',
-              padding: '0 16px',
-            }}
-            >
-              <div style={{ fontSize: '16px', fontWeight: 600, color: '#4a5568' }}>
-                No milestones added here yet
-              </div>
-              <div style={{ fontSize: '14px', maxWidth: '420px' }}>
-                Clear the search to see all milestones, then use Switch or Edit to align them to this department and project.
+      <div className="content-body">
+        <section className="list-view">
+          <div className="row b2b-main-row">
+            <div className="col-6 equal-height-2 b2b-form-col">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">
+                    {isEditMode ? 'Edit Milestone' : 'Add Milestone'}
+                  </h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <MilestoneForm
+                      key={formResetKey}
+                      editMode={isEditMode}
+                      initialData={editingMilestone}
+                      departments={departments}
+                      backendUrl={backendUrl}
+                      token={token}
+                      onSave={handleSave}
+                      onCancel={resetForm}
+                      saving={saving}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          )}
-        </div>
+
+            <div className="col-6 rounded equal-height-2 coloumn-2 b2b-table-col">
+              <div className="card">
+                <div className="row p-1">
+                  <div className="col-xl-5">
+                    <div className="card-header">
+                      <h4 className="card-title">All Milestones</h4>
+                    </div>
+                  </div>
+                  <div className="col-xl-7">
+                    <div className="card-header d-flex gap-2">
+                      <select
+                        className="form-control form-control-sm"
+                        value={departmentId}
+                        onChange={(event) => handleDepartmentChange(event.target.value)}
+                        disabled={loadingDepartments}
+                      >
+                        <option value="">{loadingDepartments ? 'Loading...' : 'All Departments'}</option>
+                        {departments.map((item) => (
+                          <option key={item._id} value={item._id}>{item.name}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="form-control form-control-sm"
+                        value={projectId}
+                        onChange={(event) => handleProjectChange(event.target.value)}
+                        disabled={!departmentId || loadingProjects}
+                      >
+                        <option value="">
+                          {!departmentId ? 'All Projects' : loadingProjects ? 'Loading...' : 'All Projects'}
+                        </option>
+                        {projects.map((item) => (
+                          <option key={item._id} value={item._id}>{item.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {filterActive && (
+                  <p className="text-muted small px-2 mb-0">
+                    Showing milestones for <strong>{appliedDepartmentName || 'Department'}</strong>
+                    {' / '}
+                    <strong>{appliedProjectId ? (appliedProjectName || 'Project') : 'All projects'}</strong>
+                    . Drag a row to set the order.
+                  </p>
+                )}
+
+                <div className="card-content">
+                  <div className="table-responsive">
+                    {loadingMilestones && milestones.length === 0 ? (
+                      <div className="text-center p-4">
+                        <div className="spinner-border text-primary"></div>
+                        <p className="mt-2">Loading milestones...</p>
+                      </div>
+                    ) : (
+                      <table className="table table-hover-animation mb-0 table-hover">
+                        <thead>
+                          <tr>
+                            <th>Milestone</th>
+                            <th>Department</th>
+                            <th>Project</th>
+                            <th>Description</th>
+                            {filterActive && <th>Position</th>}
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tableRows.length > 0 ? (
+                            tableRows.map((row) => {
+                              const { milestone, milestoneIndex } = row;
+                              return (
+                                <tr
+                                  key={row.key}
+                                  draggable={filterActive}
+                                  onDragStart={() => setDraggedItem(milestoneIndex)}
+                                  onDragOver={(event) => event.preventDefault()}
+                                  onDrop={(event) => handleDrop(event, milestoneIndex)}
+                                  style={{ cursor: filterActive ? 'grab' : 'default' }}
+                                >
+                                  <td className="milestone-title-cell">
+                                    <div className="milestone-title">{milestone.title}</div>
+                                  </td>
+                                  <td>
+                                    {row.departmentName === '—' ? '—' : (
+                                      <span className="dept-chip dept-chip-table">{row.departmentName}</span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    {row.projectNames.length === 0 && '—'}
+                                    {row.projectNames.length === 1 && (
+                                      <span className="dept-chip dept-chip-table">{row.projectNames[0]}</span>
+                                    )}
+                                    {row.projectNames.length > 1 && (
+                                      <span className="milestone-project-count" title={row.projectNames.join(', ')}>
+                                        {row.projectNames.length} projects
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    <span className="milestone-desc" title={milestone.description || 'No description'}>
+                                      {milestone.description || 'No description'}
+                                    </span>
+                                  </td>
+                                  {filterActive && (
+                                    <td>
+                                      <div className="d-flex align-items-center gap-1">
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-outline-secondary"
+                                          onMouseDown={(event) => event.stopPropagation()}
+                                          onClick={() => handleMoveLeft(milestoneIndex)}
+                                          disabled={milestoneIndex === 0}
+                                          title="Move up"
+                                        >
+                                          ↑
+                                        </button>
+                                        <span>{milestoneIndex + 1}</span>
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-outline-secondary"
+                                          onMouseDown={(event) => event.stopPropagation()}
+                                          onClick={() => handleMoveRight(milestoneIndex)}
+                                          disabled={milestoneIndex === filteredMilestones.length - 1}
+                                          title="Move down"
+                                        >
+                                          ↓
+                                        </button>
+                                      </div>
+                                    </td>
+                                  )}
+                                  <td>
+                                    <div className="milestone-row-actions">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary milestone-icon-btn"
+                                        onMouseDown={(event) => event.stopPropagation()}
+                                        onClick={() => openSwitchMilestone(milestone)}
+                                        title="Switch"
+                                      >
+                                        <i className="fas fa-exchange-alt"></i>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-primary milestone-icon-btn"
+                                        onMouseDown={(event) => event.stopPropagation()}
+                                        onClick={() => handleEditMilestone(milestone)}
+                                        title="Edit"
+                                        disabled={saving}
+                                      >
+                                        <i className="fas fa-edit"></i>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-danger milestone-icon-btn"
+                                        onMouseDown={(event) => event.stopPropagation()}
+                                        onClick={() => handleDeleteMilestone(milestone._id)}
+                                        title="Delete"
+                                        disabled={saving}
+                                      >
+                                        <i className="fas fa-trash"></i>
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={filterActive ? 6 : 5} className="text-center">
+                                {filterActive ? 'No milestones added here yet' : 'No milestones found'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div style={{
-        background: '#f9fafb',
-        marginTop: '20px',
-        padding: '16px',
-        borderRadius: '8px',
-        border: '1px solid #e5e7eb',
-      }}
-      >
-        <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 500, color: '#4a5568' }}>Instructions:</h3>
-        <ul style={{ margin: 0, padding: '0 0 0 20px', color: '#4a5568', fontSize: '14px' }}>
-          <li style={{ marginBottom: '8px' }}>New milestones are global. Align them to departments and projects with Edit or Switch</li>
-          <li style={{ marginBottom: '8px' }}>All milestones show by default. Pick a department (and optionally a project) and click Search to see only the milestones aligned there</li>
-          <li style={{ marginBottom: '8px' }}>Use Switch on a milestone to add it to more departments and projects. Its current projects are kept</li>
-          <li style={{ marginBottom: '8px' }}>Drag and drop milestone cards to change their order (clear the search first)</li>
-          <li style={{ marginBottom: '8px' }}>Use âœï¸ and ðŸ—‘ï¸ buttons to edit or delete milestones</li>
-        </ul>
-      </div>
-
-      <MilestoneModal
-        isOpen={isMilestoneModalOpen}
-        onClose={() => setIsMilestoneModalOpen(false)}
-        onSave={handleSave}
-        editMode={isEditMode}
-        initialData={editingMilestone}
-        departments={departments}
-        loadingDepartments={loadingDepartments}
-        backendUrl={backendUrl}
-        token={token}
-      />
       <ShiftTargetModal
         isOpen={Boolean(transferSelection)}
         selection={transferSelection}
@@ -827,382 +1018,583 @@ const MilestoneB2B = () => {
         onConfirm={handleConfirmDelete}
         itemTitle={deletingMilestone?.title}
       />
+
+      <style>{`
+        .milestone-b2b-page .asterisk {
+          color: red;
+        }
+        .milestone-b2b-page .content-header-title {
+          font-size: 1.2rem;
+          font-weight: 600;
+          color: #000;
+        }
+        .milestone-b2b-page .breadcrumb a,
+        .milestone-b2b-page .breadcrumb-item.active {
+          font-size: 0.8rem;
+        }
+        .milestone-b2b-page .card .card-title {
+          font-size: 1rem !important;
+        }
+        .milestone-b2b-page .table th {
+          font-size: 12px !important;
+          text-transform: uppercase;
+          background-color: #f8f9fa;
+          font-weight: 600;
+          border-top: none;
+        }
+        .milestone-b2b-page .table-hover-animation thead th {
+          border-top: 2px solid #f8f8f8;
+          border-bottom: 0;
+          background-color: #fff;
+        }
+        .milestone-b2b-page label {
+          font-size: 0.80rem !important;
+          text-transform: capitalize;
+        }
+        .milestone-b2b-page .card {
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          border: none;
+          border-radius: 8px;
+        }
+        .milestone-b2b-page .card-header {
+          border-bottom: 1px solid #dee2e6;
+        }
+        .milestone-b2b-page .table {
+          width: 100%;
+          margin-bottom: 1rem;
+          color: #626262;
+        }
+        .milestone-b2b-page .table td {
+          vertical-align: middle;
+          white-space: normal;
+        }
+        .milestone-b2b-page .milestone-title {
+          font-weight: 600;
+          color: #1f2937;
+          line-height: 1.3;
+        }
+        .milestone-b2b-page .milestone-title-projects {
+          margin-top: 4px;
+          max-width: 240px;
+          color: #64748b;
+          font-size: 12px;
+          line-height: 1.45;
+        }
+        .milestone-b2b-page .milestone-project-count {
+          display: inline-flex;
+          align-items: center;
+          background: #f3f4f6;
+          color: #374151;
+          border: 1px solid #e5e7eb;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 0.72rem;
+          white-space: nowrap;
+        }
+        .milestone-b2b-page .milestone-desc {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          max-width: 160px;
+          color: #6b7280;
+          line-height: 1.4;
+        }
+        .milestone-b2b-page .milestone-row-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .milestone-b2b-page .milestone-icon-btn {
+          width: 32px;
+          height: 32px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .milestone-b2b-page .form-control:focus {
+          border-color: #28a745;
+          box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+        .milestone-b2b-page .btn-success {
+          background-color: #28a745;
+          border-color: #28a745;
+        }
+        .milestone-b2b-page .btn-success:hover {
+          background-color: #218838;
+          border-color: #1e7e34;
+        }
+        .milestone-b2b-page .btn-success:disabled {
+          background-color: #6c757d;
+          border-color: #6c757d;
+        }
+        .milestone-b2b-page .content-header {
+          margin-bottom: 2rem;
+        }
+        .milestone-b2b-page .breadcrumb {
+          background-color: transparent;
+          padding: 0;
+        }
+        .milestone-b2b-page .alert {
+          margin-bottom: 1rem;
+        }
+        .milestone-b2b-page .spinner-border-sm {
+          width: 1rem;
+          height: 1rem;
+        }
+        .milestone-b2b-page .gap-2 {
+          gap: 0.5rem;
+        }
+        .milestone-b2b-page .font-small-3 {
+          font-size: 0.875rem;
+        }
+        .milestone-b2b-page .dept-table-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .milestone-b2b-page .dept-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #eef6ff;
+          color: #1a5fb4;
+          border: 1px solid #cfe2ff;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 0.72rem;
+          line-height: 1.4;
+          text-transform: none;
+        }
+        .milestone-b2b-page .dept-chip-table {
+          background: #f3f4f6;
+          color: #374151;
+          border-color: #e5e7eb;
+        }
+        .milestone-b2b-page .dept-chip-remove {
+          border: none;
+          background: transparent;
+          color: inherit;
+          font-size: 0.95rem;
+          line-height: 1;
+          padding: 0 0 0 2px;
+          cursor: pointer;
+        }
+        .milestone-b2b-page .dept-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 8px;
+        }
+        .milestone-b2b-page .dept-multi-select {
+          position: relative;
+        }
+        .milestone-b2b-page .dept-multi-trigger {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          text-align: left;
+          background: #fff;
+          cursor: pointer;
+        }
+        .milestone-b2b-page .dept-multi-trigger.open {
+          border-color: #28a745;
+        }
+        .milestone-b2b-page .dept-multi-trigger-text {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          padding-right: 8px;
+        }
+        .milestone-b2b-page .dept-multi-dropdown {
+          position: absolute;
+          z-index: 20;
+          left: 0;
+          right: 0;
+          margin-top: 4px;
+          background: #fff;
+          border: 1px solid #ced4da;
+          border-radius: 6px;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+          max-height: 260px;
+          display: flex;
+          flex-direction: column;
+        }
+        .milestone-b2b-page .dept-multi-search {
+          padding: 8px;
+          border-bottom: 1px solid #eee;
+        }
+        .milestone-b2b-page .dept-multi-options {
+          overflow-y: auto;
+          padding: 4px 0;
+        }
+        .milestone-b2b-page .dept-multi-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          margin: 0;
+          cursor: pointer;
+          font-size: 0.85rem;
+          text-transform: none;
+        }
+        .milestone-b2b-page .dept-multi-option:hover {
+          background: #f8f9fa;
+        }
+        .milestone-b2b-page .dept-multi-empty {
+          padding: 12px;
+          color: #888;
+          font-size: 0.8rem;
+        }
+        .milestone-b2b-page .milestone-scope-box {
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          max-height: 220px;
+          overflow-y: auto;
+          padding: 8px 12px;
+        }
+        .milestone-b2b-page .milestone-scope-box label {
+          text-transform: none;
+        }
+        @media (max-width: 768px) {
+          .milestone-b2b-page .content-header {
+            display: none;
+          }
+        }
+        @media (max-width: 991px) {
+          .milestone-b2b-page .b2b-main-row {
+            flex-direction: column;
+          }
+          .milestone-b2b-page .b2b-form-col,
+          .milestone-b2b-page .b2b-table-col {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 0 0 100% !important;
+            margin-bottom: 1rem;
+          }
+        }
+      `}</style>
     </div>
   );
 };
 
-const MilestoneCard = ({
-  index,
-  total,
-  title,
-  _id,
-  description,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onEdit,
-  onDelete,
-  onMoveLeft,
-  onMoveRight,
-  onSwitch,
-  assignmentLabel,
-  reorderDisabled,
-}) => (
-  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', minWidth: 220, margin: '0 4px' }}>
-    <div style={{ marginTop: '15%' }}>
-      {!reorderDisabled && (
+function MultiSelect({
+  options,
+  selectedValues,
+  onChange,
+  disabled,
+  loading,
+  placeholder,
+  searchPlaceholder,
+  emptyText,
+  loadingText,
+  pluralLabel,
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isOpen]);
+
+  const filteredOptions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = Array.isArray(options) ? options : [];
+    if (!q) return list;
+    return list.filter((option) => String(option.label || '').toLowerCase().includes(q));
+  }, [options, query]);
+
+  const toggleValue = (value) => {
+    if (disabled) return;
+    const next = selectedValues.includes(value)
+      ? selectedValues.filter((item) => item !== value)
+      : [...selectedValues, value];
+    onChange(next);
+  };
+
+  const removeValue = (value) => {
+    if (disabled) return;
+    onChange(selectedValues.filter((item) => item !== value));
+  };
+
+  const displayText = (() => {
+    if (loading) return loadingText;
+    if (!selectedValues.length) return placeholder;
+    if (selectedValues.length === 1) {
+      return options.find((option) => option.value === selectedValues[0])?.label || '1 selected';
+    }
+    if (selectedValues.length === 2) {
+      return selectedValues
+        .map((id) => options.find((option) => option.value === id)?.label || id)
+        .join(', ');
+    }
+    return `${selectedValues.length} ${pluralLabel} selected`;
+  })();
+
+  return (
+    <div className="dept-multi-select" ref={containerRef}>
       <button
         type="button"
-        onClick={() => onMoveLeft(index)}
-        disabled={index === 0}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: index === 0 ? 'not-allowed' : 'pointer',
-          color: index === 0 ? '#cbd5e0' : '#4299e1',
-          marginRight: '4px',
-          padding: '0',
-          fontSize: '14px',
-          opacity: index === 0 ? 0.5 : 1,
-        }}
+        className={`form-control dept-multi-trigger ${isOpen ? 'open' : ''}`}
+        onClick={() => !disabled && setIsOpen((open) => !open)}
+        disabled={disabled}
       >
-        â† Move Left
+        <span className="dept-multi-trigger-text">{displayText}</span>
+        <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'}`}></i>
       </button>
+      {isOpen && (
+        <div className="dept-multi-dropdown">
+          <div className="dept-multi-search">
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+            />
+          </div>
+          <div className="dept-multi-options">
+            {filteredOptions.length === 0 ? (
+              <div className="dept-multi-empty">{loading ? loadingText : emptyText}</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const checked = selectedValues.includes(option.value);
+                return (
+                  <label key={option.value} className="dept-multi-option">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={checked}
+                      onChange={() => toggleValue(option.value)}
+                    />
+                    <span>{option.label}</span>
+                    {checked && <i className="fas fa-check text-success ms-auto"></i>}
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+      {selectedValues.length > 0 && (
+        <div className="dept-chips">
+          {selectedValues.map((id) => {
+            const option = options.find((item) => item.value === id);
+            return (
+              <span key={id} className="dept-chip">
+                {option?.label || id}
+                <button
+                  type="button"
+                  className="dept-chip-remove"
+                  onClick={() => removeValue(id)}
+                  disabled={disabled}
+                  aria-label="Remove project"
+                >
+                  ×
+                </button>
+              </span>
+            );
+          })}
+        </div>
       )}
     </div>
-    <div
-      style={{
-        width: 220,
-        minHeight: 140,
-        border: '1px solid #e2e8f0',
-        borderRadius: '4px',
-        backgroundColor: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        cursor: reorderDisabled ? 'default' : 'grab',
-        userSelect: 'none',
-        position: 'relative',
-      }}
-      draggable={!reorderDisabled}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      <div style={{
-        padding: '8px 12px',
-        borderBottom: '1px solid #e2e8f0',
-        fontWeight: 500,
-        color: '#4a5568',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>Position: {index + 1}</span>
-          <button
-            type="button"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onSwitch();
-            }}
-            style={{
-              padding: '2px 8px',
-              border: '1px solid #93c5fd',
-              borderRadius: '4px',
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              fontSize: '11px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-            title="Add this milestone to one or more departments and projects"
-          >
-            Switch
-          </button>
-        </div>
-        <div>
-          <button
-            type="button"
-            onClick={() => onEdit(index)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4299e1', marginRight: '8px', padding: 0, fontSize: '14px' }}
-          >
-            âœï¸
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(_id)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f56565', padding: 0, fontSize: '14px' }}
-          >
-            ðŸ—‘ï¸
-          </button>
-        </div>
-      </div>
-      <div style={{ textAlign: 'center', fontWeight: 500, marginTop: 12, fontSize: '16px', color: '#333', whiteSpace: 'normal' }}>
-        {title}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6, whiteSpace: 'normal', padding: '0 8px' }}>
-        {description}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: '12px', marginTop: 6, whiteSpace: 'normal', padding: '0 8px 16px' }}>
-        {assignmentLabel ? (
-          <span style={{ color: '#1e40af' }}>{assignmentLabel}</span>
-        ) : (
-          <span style={{ color: '#d97706' }}>Global Â· not aligned to any project yet</span>
-        )}
-      </div>
-    </div>
-    <div style={{ marginTop: '15%' }}>
-      {!reorderDisabled && (
-      <button
-        type="button"
-        onClick={() => onMoveRight(index)}
-        disabled={index === total - 1}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: index === total - 1 ? 'not-allowed' : 'pointer',
-          color: index === total - 1 ? '#cbd5e0' : '#4299e1',
-          padding: 0,
-          fontSize: '14px',
-          opacity: index === total - 1 ? 0.5 : 1,
-        }}
-      >
-        â†’ Move Right
-      </button>
-      )}
-    </div>
-  </div>
-);
+  );
+}
 
-const Arrow = () => (
-  <div style={{
-    width: 80,
-    minWidth: 80,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    height: 1,
-    margin: '70px -4px 0',
-  }}
-  >
-    <div style={{ height: '1px', background: '#ccc', width: '100%', position: 'relative' }}>
-      <div style={{
-        position: 'absolute',
-        right: 0,
-        top: -4,
-        width: 0,
-        height: 0,
-        borderTop: '4px solid transparent',
-        borderBottom: '4px solid transparent',
-        borderLeft: '8px solid #ccc',
-      }}
-      />
-    </div>
-  </div>
-);
-
-const MilestoneModal = ({
-  isOpen,
-  onClose,
-  onSave,
+const MilestoneForm = ({
   editMode,
   initialData,
   departments,
-  loadingDepartments,
   backendUrl,
   token,
+  onSave,
+  onCancel,
+  saving,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [formDepartmentIds, setFormDepartmentIds] = useState([]);
   const [formProjectIds, setFormProjectIds] = useState([]);
-  const [projectsByDepartment, setProjectsByDepartment] = useState({});
-  const [loadingProjectsByDepartment, setLoadingProjectsByDepartment] = useState({});
-  const loadedDepartmentsRef = useRef({});
+  const [allProjects, setAllProjects] = useState([]);
+  const [loadingAllProjects, setLoadingAllProjects] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
     setTitle(editMode ? (initialData?.title || '') : '');
     setDescription(editMode ? (initialData?.description || '') : '');
     setFormDepartmentIds(editMode ? (initialData?.assignedDepartments || []) : []);
     setFormProjectIds(editMode ? (initialData?.assignedProjects || []) : []);
-  }, [editMode, initialData, isOpen]);
+  }, [editMode, initialData]);
 
   useEffect(() => {
-    if (!isOpen || !editMode || !token) return undefined;
+    if (!token) return undefined;
     let cancelled = false;
-    const loadedDepartments = loadedDepartmentsRef.current;
-    formDepartmentIds.forEach((deptId) => {
-      if (loadedDepartments[deptId]) return;
-      loadedDepartments[deptId] = 'loading';
-      setLoadingProjectsByDepartment((prev) => ({ ...prev, [deptId]: true }));
-      axios.get(`${backendUrl}/college/b2b/b2b-projects`, {
-        headers: { 'x-auth': token },
-        params: { status: true, department: deptId },
-      }).then((response) => {
+    const loadProjects = async () => {
+      setLoadingAllProjects(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/b2b/b2b-projects`, {
+          headers: { 'x-auth': token },
+          params: { status: true },
+        });
         if (cancelled) return;
-        loadedDepartmentsRef.current[deptId] = 'done';
-        setProjectsByDepartment((prev) => ({
-          ...prev,
-          [deptId]: (response.data?.data || []).map((item) => ({
-            _id: String(item._id),
-            name: item.name || 'Untitled project',
-          })),
-        }));
-      }).catch((error) => {
+        setAllProjects((response.data?.data || []).map(mapB2bProject));
+      } catch (error) {
         console.error('Error fetching projects for milestone form:', error);
-        if (!cancelled) {
-          loadedDepartmentsRef.current[deptId] = '';
-          setProjectsByDepartment((prev) => ({ ...prev, [deptId]: [] }));
-        }
-      }).finally(() => {
-        if (!cancelled) {
-          setLoadingProjectsByDepartment((prev) => ({ ...prev, [deptId]: false }));
-        }
-      });
-    });
-    return () => {
-      cancelled = true;
-      Object.keys(loadedDepartments).forEach((deptId) => {
-        if (loadedDepartments[deptId] === 'loading') loadedDepartments[deptId] = '';
-      });
+        if (!cancelled) setAllProjects([]);
+      } finally {
+        if (!cancelled) setLoadingAllProjects(false);
+      }
     };
-  }, [isOpen, editMode, formDepartmentIds, backendUrl, token]);
+    loadProjects();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
 
-  if (!isOpen) return null;
+  const departmentOptions = useMemo(() => (
+    departments.map((department) => ({
+      value: department._id,
+      label: department.name,
+    }))
+  ), [departments]);
 
-  const toggleDepartment = (deptId) => {
-    if (formDepartmentIds.includes(deptId)) {
-      const departmentProjectIds = (projectsByDepartment[deptId] || []).map((item) => item._id);
-      setFormDepartmentIds((prev) => prev.filter((id) => id !== deptId));
-      setFormProjectIds((prev) => prev.filter((id) => !departmentProjectIds.includes(id)));
-      return;
-    }
-    setFormDepartmentIds((prev) => [...prev, deptId]);
+  const projectOptions = useMemo(() => (
+    allProjects
+      .filter((project) => projectInDepartments(project, formDepartmentIds))
+      .map((project) => ({
+        value: project._id,
+        label: project.name,
+      }))
+  ), [allProjects, formDepartmentIds]);
+
+  const handleDepartmentsChange = (next) => {
+    setFormDepartmentIds(next);
+    setFormProjectIds((current) => current.filter((id) => {
+      const project = allProjects.find((item) => item._id === id);
+      return project && projectInDepartments(project, next);
+    }));
   };
 
-  const toggleProject = (projId) => {
-    setFormProjectIds((prev) => (
-      prev.includes(projId) ? prev.filter((id) => id !== projId) : [...prev, projId]
-    ));
+  const handleSubmit = async () => {
+    if (!title.trim() || saving) return;
+    const saved = await onSave({
+      title: title.trim(),
+      description: description.trim(),
+      departments: formDepartmentIds,
+      projects: formProjectIds,
+    });
+    if (saved && !editMode) {
+      setTitle('');
+      setDescription('');
+      setFormDepartmentIds([]);
+      setFormProjectIds([]);
+    }
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 100,
-    }}
-    >
-      <div style={{ background: 'white', padding: 24, borderRadius: 8, width: 400, maxWidth: '90%' }}>
-        <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>
-          {editMode ? 'Edit Milestone' : 'Add New Milestone'}
-        </h3>
-        {editMode && (
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Departments and projects:</label>
-            <div style={{ fontSize: 12, color: '#718096', marginBottom: 8 }}>
-              A department with no project ticked gets all of its projects. Nothing ticked keeps the milestone global.
-            </div>
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 220, overflowY: 'auto', padding: '8px 12px' }}>
-              {loadingDepartments ? (
-                <div style={{ fontSize: 13, color: '#718096' }}>Loading departments...</div>
-              ) : departments.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#a0aec0' }}>No departments</div>
-              ) : departments.map((department) => {
-                const departmentChecked = formDepartmentIds.includes(department._id);
-                const departmentProjects = projectsByDepartment[department._id] || [];
-                return (
-                  <div key={department._id} style={{ marginBottom: 8 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={departmentChecked}
-                        onChange={() => toggleDepartment(department._id)}
-                      />
-                      <span>{department.name}</span>
-                    </label>
-                    {departmentChecked && (
-                      <div style={{ marginLeft: 24, marginTop: 4 }}>
-                        {loadingProjectsByDepartment[department._id] ? (
-                          <div style={{ fontSize: 12, color: '#718096' }}>Loading projects...</div>
-                        ) : departmentProjects.length === 0 ? (
-                          <div style={{ fontSize: 12, color: '#a0aec0' }}>No projects</div>
-                        ) : departmentProjects.map((project) => (
-                          <label
-                            key={project._id}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4, cursor: 'pointer' }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formProjectIds.includes(project._id)}
-                              onChange={() => toggleProject(project._id)}
-                            />
-                            <span>{project.name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Milestone Name:</label>
+    <div className="form-horizontal">
+      <div className="row">
+        <div className="col-xl-8 mb-1">
+          <label>Select Departments</label>
+          <MultiSelect
+            options={departmentOptions}
+            selectedValues={formDepartmentIds}
+            onChange={handleDepartmentsChange}
+            disabled={saving}
+            loading={false}
+            placeholder="Select Departments"
+            searchPlaceholder="Search departments..."
+            emptyText="No departments found"
+            loadingText="Loading departments..."
+            pluralLabel="departments"
+          />
+        </div>
+
+        <div className="col-xl-8 mb-1">
+          <label>Select Projects</label>
+          <MultiSelect
+            options={projectOptions}
+            selectedValues={formProjectIds}
+            onChange={setFormProjectIds}
+            disabled={saving || loadingAllProjects || !formDepartmentIds.length}
+            loading={loadingAllProjects}
+            placeholder={formDepartmentIds.length ? 'Select Projects' : 'Select a department first'}
+            searchPlaceholder="Search projects..."
+            emptyText="No projects found"
+            loadingText="Loading projects..."
+            pluralLabel="projects"
+          />
+        </div>
+
+        <div className="col-xl-8 mb-1">
+          <label>
+            Enter Milestone
+            <span className="asterisk" style={{ color: 'red' }}>*</span>
+          </label>
           <input
-            type="text"
+            className="form-control"
+            name="title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="Example: Admission"
-            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: 4, fontSize: 14 }}
+            placeholder="Enter Milestone"
+            required
+            disabled={saving}
           />
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Milestone Description:</label>
-          <input
-            type="text"
+
+        <div className="col-xl-8 mb-1">
+          <label>Description</label>
+          <textarea
+            className="form-control"
+            name="description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="Example: Leads ready for admission"
-            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: 4, fontSize: 14 }}
+            placeholder="Enter description (optional)"
+            rows="3"
+            disabled={saving}
           />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-          <button type="button" onClick={onClose} style={{ padding: '8px 16px', background: '#f1f5f9', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-            Cancel
-          </button>
+
+        <div className="col-xl-4 mb-1 d-flex align-items-end gap-2">
           <button
             type="button"
-            onClick={() => {
-              if (!title.trim()) return;
-              const departmentIds = formDepartmentIds.filter((id) => departments.some((item) => item._id === id));
-              onSave({
-                title: title.trim(),
-                description: description.trim(),
-                ...(editMode ? {
-                  departments: departmentIds,
-                  projects: formProjectIds.filter((projId) => departmentIds.some((deptId) => (
-                    (projectsByDepartment[deptId] || []).some((item) => item._id === projId)
-                  ))),
-                } : {}),
-              });
-            }}
-            style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            className="btn btn-success font-small-3"
+            onClick={handleSubmit}
+            disabled={saving || !title.trim() || !formDepartmentIds.length}
           >
-            {editMode ? 'Update' : 'Add'}
+            {saving ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2"></span>
+                {editMode ? 'Updating...' : 'Adding...'}
+              </>
+            ) : (
+              editMode ? 'Update' : 'Add'
+            )}
           </button>
+          {editMode && (
+            <button
+              type="button"
+              className="btn btn-secondary font-small-3"
+              onClick={onCancel}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1246,3 +1638,4 @@ const DeleteModal = ({ isOpen, onClose, onConfirm, itemTitle }) => {
 };
 
 export default MilestoneB2B;
+

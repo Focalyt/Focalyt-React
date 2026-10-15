@@ -450,6 +450,7 @@ const hrLeadOwnerId = (lead) => String(
 const hrLeadPersonIds = (lead) => [
   hrLeadOwnerId(lead),
   String(lead?.leadCoOwner?._id || lead?.leadCoOwner || ''),
+  String(lead?.leadCoOwner2?._id || lead?.leadCoOwner2 || ''),
 ].filter(Boolean);
 
 const resolveHrViewerTeamIds = async (user) => {
@@ -673,6 +674,7 @@ const APPLY_LEAD_POPULATE = [
   },
   { path: 'leadOwner', select: 'name email' },
   { path: 'leadCoOwner', select: 'name email' },
+  { path: 'leadCoOwner2', select: 'name email' },
   { path: 'assignedTo', select: 'name email' },
   { path: 'project', select: 'name' },
   { path: 'department', select: 'name' },
@@ -750,8 +752,9 @@ const mapApplyToLead = (apply, statusIndex) => {
     leadSubstatus: sub?._id || apply.leadSubstatus || null,
     subStatusTitle: resolvedSubTitle,
     leadOwner,
-    hasStoredLeadOwner: Boolean(apply.leadOwner || apply.assignedTo || apply.leadCoOwner),
+    hasStoredLeadOwner: Boolean(apply.leadOwner || apply.assignedTo || apply.leadCoOwner || apply.leadCoOwner2),
     leadCoOwner: apply.leadCoOwner || null,
+    leadCoOwner2: apply.leadCoOwner2 || null,
     assignedTo: apply.assignedTo || leadOwner,
     followups: apply.followups || [],
     logs: apply.logs || [],
@@ -1051,6 +1054,7 @@ const buildMatch = (query = {}, collegeId) => {
         { assignedTo: { $in: counselorIds } },
         { leadOwner: { $in: counselorIds } },
         { leadCoOwner: { $in: counselorIds } },
+        { leadCoOwner2: { $in: counselorIds } },
       ],
     });
   }
@@ -1285,6 +1289,7 @@ router.get('/leads/download', isCollege, async (req, res) => {
       )?.title || '',
       'Lead Owner': lead.leadOwner?.name || '',
       'Lead Co-Owner': lead.leadCoOwner?.name || '',
+      'Lead Co-Owner 2': lead.leadCoOwner2?.name || '',
       Source: lead.source || '',
       Remark: lead.remark || '',
       Resume: lead.resume ? resolvePublicUrl(lead.resume) || lead.resume : '',
@@ -1342,17 +1347,28 @@ router.post('/leads/refer', isCollege, async (req, res) => {
         continue;
       }
 
-      let nextCoOwner = toCollegeObjectId(apply.leadCoOwner);
-      if (sameId(nextCoOwner, counselorId)) nextCoOwner = null;
+      let nextCo1 = toCollegeObjectId(apply.leadCoOwner);
+      let nextCo2 = toCollegeObjectId(apply.leadCoOwner2);
+      if (sameId(nextCo1, counselorId)) nextCo1 = null;
+      if (sameId(nextCo2, counselorId)) nextCo2 = null;
 
+      let coOwnerNote = 'No previous owner to set as co-owner';
       if (previousOwnerId && !sameId(previousOwnerId, counselorId)) {
-        if (nextCoOwner && !sameId(nextCoOwner, previousOwnerId)) {
-          return res.status(400).json({
-            success: false,
-            message: `${apply._candidate?.name || 'Lead'} already has a co-owner. Remove the co-owner first so the previous owner can become co-owner.`,
-          });
+        const alreadyCoOwner = sameId(nextCo1, previousOwnerId) || sameId(nextCo2, previousOwnerId);
+        if (!alreadyCoOwner) {
+          if (!nextCo1) {
+            nextCo1 = previousOwnerId;
+            coOwnerNote = 'Previous owner set as co-owner 1';
+          } else if (!nextCo2) {
+            nextCo2 = previousOwnerId;
+            coOwnerNote = 'Previous owner set as co-owner 2';
+          } else {
+            nextCo2 = previousOwnerId;
+            coOwnerNote = 'Previous owner replaced co-owner 2';
+          }
+        } else {
+          coOwnerNote = 'Previous owner already a co-owner';
         }
-        if (!nextCoOwner) nextCoOwner = previousOwnerId;
       }
 
       const previousOwner = previousOwnerId
@@ -1362,15 +1378,14 @@ router.post('/leads/refer', isCollege, async (req, res) => {
 
       apply.leadOwner = counselorId;
       apply.assignedTo = counselorId;
-      apply.leadCoOwner = nextCoOwner;
+      apply.leadCoOwner = nextCo1;
+      apply.leadCoOwner2 = nextCo2;
       apply.logs = apply.logs || [];
       apply.logs.push({
         user: req.user?._id,
         timestamp: new Date(),
         action: `Lead referred from ${oldName} to ${newName}`,
-        remarks: previousOwnerId
-          ? 'Previous owner set as co-owner'
-          : 'No previous owner to set as co-owner',
+        remarks: coOwnerNote,
       });
       await apply.save();
       referred += 1;
@@ -2058,6 +2073,11 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
     if (typeof req.body.leadCoOwner !== 'undefined') {
       apply.leadCoOwner = toObjectId(req.body.leadCoOwner);
       logActions.push('Lead co-owner updated');
+    }
+
+    if (typeof req.body.leadCoOwner2 !== 'undefined') {
+      apply.leadCoOwner2 = toObjectId(req.body.leadCoOwner2);
+      logActions.push('Lead co-owner 2 updated');
     }
 
     logActions.forEach((action) => {

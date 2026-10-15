@@ -8542,15 +8542,16 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 		}
 
 		const projectId = doc._course?.project;
-		if (projectId) {
-			const assigned = await B2cMilestoneAssignment.findOne({
-				college: collegeId,
-				milestone: milestone._id,
-				project: projectId,
-			}).select('_id').lean();
-			if (!assigned) {
-				return res.status(400).json({ success: false, message: "This milestone is not aligned to the lead's project" });
-			}
+		if (!projectId) {
+			return res.status(400).json({ success: false, message: "This lead's course has no project, so it has no milestones" });
+		}
+		const assigned = await B2cMilestoneAssignment.findOne({
+			college: collegeId,
+			milestone: milestone._id,
+			project: projectId,
+		}).select('_id').lean();
+		if (!assigned) {
+			return res.status(400).json({ success: false, message: "This milestone is not aligned to the lead's project" });
 		}
 
 		const savedMilestone = {
@@ -8565,25 +8566,17 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 			reachedAt: row.reachedAt || null,
 		}));
 
-		let ordered = [];
-		if (projectId) {
-			await ensureMilestonePositions(collegeId);
-			const assignedRows = await B2cMilestoneAssignment.find({
-				college: collegeId,
-				project: projectId,
-			}).sort({ index: 1, createdAt: 1 }).select('milestone').lean();
-			const docs = await B2cMilestone.find({
-				_id: { $in: assignedRows.map((row) => row.milestone) },
-				college: collegeId,
-			}).select('_id title').lean();
-			const byId = new Map(docs.map((item) => [String(item._id), item]));
-			ordered = assignedRows.map((row) => byId.get(String(row.milestone))).filter(Boolean);
-		} else {
-			ordered = await B2cMilestone.find({ college: collegeId })
-				.sort({ index: 1, createdAt: 1 })
-				.select('_id title')
-				.lean();
-		}
+		await ensureMilestonePositions(collegeId);
+		const assignedRows = await B2cMilestoneAssignment.find({
+			college: collegeId,
+			project: projectId,
+		}).sort({ index: 1, createdAt: 1 }).select('milestone').lean();
+		const docs = await B2cMilestone.find({
+			_id: { $in: assignedRows.map((row) => row.milestone) },
+			college: collegeId,
+		}).select('_id title').lean();
+		const byId = new Map(docs.map((item) => [String(item._id), item]));
+		const ordered = assignedRows.map((row) => byId.get(String(row.milestone))).filter(Boolean);
 		const orderedIds = ordered.map((item) => String(item._id));
 
 		if (!Array.isArray(doc.milestoneHistory)) doc.milestoneHistory = [];

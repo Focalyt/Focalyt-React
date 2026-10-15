@@ -669,10 +669,17 @@ const MilestoneB2C = () => {
 
   const handleSave = async ({ title, description, departments: formDepartments, projects: formProjects }) => {
     const headers = { 'x-auth': token };
+    if (!formDepartments?.length) {
+      showAlert('Select a department', 'danger');
+      return false;
+    }
+    if (isEditMode && (formProjects || []).length !== 1) {
+      showAlert('Select one project. Each milestone belongs to a single project.', 'danger');
+      return false;
+    }
     setSaving(true);
     try {
       if (isEditMode && editingMilestone?._id) {
-        // No selected departments or projects makes the milestone global again.
         const response = await axios.put(
           `${backendUrl}/college/milestone/edit/${editingMilestone._id}`,
           { title, description, departments: formDepartments || [], projects: formProjects || [] },
@@ -680,17 +687,18 @@ const MilestoneB2C = () => {
         );
         if (response.data.success) showAlert('Milestone updated successfully', 'success');
       } else {
-        const response = await axios.post(`${backendUrl}/college/milestone/add`, { title, description }, { headers });
-        const createdId = response.data?.data?._id;
-        const hasScope = formDepartments?.length || formProjects?.length;
-        if (response.data.success && createdId && hasScope) {
-          await axios.put(
-            `${backendUrl}/college/milestone/edit/${createdId}`,
-            { departments: formDepartments || [], projects: formProjects || [] },
-            { headers }
+        const response = await axios.post(
+          `${backendUrl}/college/milestone/add`,
+          { title, description, departments: formDepartments || [], projects: formProjects || [] },
+          { headers }
+        );
+        if (response.data.success) {
+          const count = Array.isArray(response.data.data) ? response.data.data.length : 1;
+          showAlert(
+            count > 1 ? `Milestone added to ${count} projects` : 'Milestone added successfully',
+            'success'
           );
         }
-        if (response.data.success) showAlert('Milestone added successfully', 'success');
       }
       resetForm();
       fetchMilestones();
@@ -1553,7 +1561,7 @@ const MilestoneForm = ({
             type="button"
             className="btn btn-success font-small-3"
             onClick={handleSubmit}
-            disabled={saving || !title.trim()}
+            disabled={saving || !title.trim() || !formDepartmentIds.length}
           >
             {saving ? (
               <>

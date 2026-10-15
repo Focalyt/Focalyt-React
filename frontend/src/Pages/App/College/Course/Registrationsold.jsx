@@ -258,6 +258,9 @@ const mapHrLeadToB2cProfile = (lead) => {
   const coOwner = lead?.leadCoOwner && typeof lead.leadCoOwner === 'object'
     ? lead.leadCoOwner
     : (lead?.leadCoOwner ? { _id: lead.leadCoOwner } : null);
+  const coOwner2 = lead?.leadCoOwner2 && typeof lead.leadCoOwner2 === 'object'
+    ? lead.leadCoOwner2
+    : (lead?.leadCoOwner2 ? { _id: lead.leadCoOwner2 } : null);
   const jobName = lead?.applyingFor || '';
   const projectName = lead?.projectName || lead?.project?.name || '';
   const departmentName = lead?.departmentName || lead?.department?.name || '';
@@ -324,7 +327,7 @@ const mapHrLeadToB2cProfile = (lead) => {
     vertical: lead?.department || null,
     counsellor: owner,
     leadCoOwner: coOwner,
-    leadCoOwner2: null,
+    leadCoOwner2: coOwner2,
     assignedTo: owner,
     leadAssignment: owner
       ? [{
@@ -7034,17 +7037,12 @@ console.log('API Response:', response.data);
     const nextId = String(newCoOwnerId || '');
     if (currentId === nextId) return;
 
-    if (profile?.isHrJobLead && field === 'leadCoOwner2') {
-      toast.info('HR job leads support only one co-owner');
-      return;
-    }
-
     try {
       const isHrJobLead = Boolean(profile?.isHrJobLead);
       const response = isHrJobLead
         ? await axios.patch(
           `${backendUrl}/college/hr/leads/${profile._id}`,
-          { leadCoOwner: nextId || null },
+          { [field]: nextId || null },
           {
             headers: {
               'x-auth': token,
@@ -7893,7 +7891,7 @@ console.log('API Response:', response.data);
         ? rows
           .filter((item) => (item.assignedProjects || []).map(String).includes(projectId))
           .sort((a, b) => projectPosition(a) - projectPosition(b))
-        : rows;
+        : [];
       setLeadMilestoneRows(matched);
       const following = getNextMilestone(profile, matched);
       setLeadMilestoneForm({ milestoneId: following?._id || '' });
@@ -7966,15 +7964,39 @@ console.log('API Response:', response.data);
         return;
       }
 
-      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
-        counselorId: selectedConcernPerson,
-        appliedCourseId: type === 'RefferSingleLead' ? selectedProfile._id : selectedProfiles,
-        type
-      }, {
-        headers: {
-          'x-auth': token,
-        },
-      });
+      const isSingle = type === 'RefferSingleLead';
+      const leadIds = isSingle
+        ? (selectedProfile?._id ? [selectedProfile._id] : [])
+        : (Array.isArray(selectedProfiles) ? selectedProfiles : []);
+      if (!leadIds.length) {
+        alert(isSingle ? 'Please select a lead to refer' : 'Please select at least one lead to refer');
+        return;
+      }
+
+      // Applied Jobs rows are HR leads, not applied courses. Sending their id to
+      // /refer-leads looks up AppliedCourses and returns "Applied course not found".
+      const isJobRefer = isSingle
+        ? Boolean(selectedProfile?.isHrJobLead || showAppliedJobsRef.current)
+        : Boolean(showAppliedJobsRef.current);
+
+      const response = isJobRefer
+        ? await axios.post(`${backendUrl}/college/hr/leads/refer`, {
+          counselorId: selectedConcernPerson,
+          leadIds,
+        }, {
+          headers: {
+            'x-auth': token,
+          },
+        })
+        : await axios.post(`${backendUrl}/college/refer-leads`, {
+          counselorId: selectedConcernPerson,
+          appliedCourseId: isSingle ? selectedProfile._id : selectedProfiles,
+          type
+        }, {
+          headers: {
+            'x-auth': token,
+          },
+        });
 
       if (response.data.success || response.data.status) {
         alert(response.data.message || 'Lead referred successfully!');

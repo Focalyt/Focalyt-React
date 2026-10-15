@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const JobAssignmentRule = require('../../models/jobAssignmentRule');
 const Vacancy = require('../../models/vacancy');
+const { applyRuleScope } = require('../../../helpers/jobRuleMatch');
 const { isCollege } = require('../../../helpers/index');
 const { body, validationResult, param } = require('express-validator');
 
@@ -55,66 +56,9 @@ function populateRule(query) {
     .populate('modifiedBy', 'name email');
 }
 
-function toId(value) {
-  if (!value) return null;
-  if (typeof value === 'object') return value._id || value.id || null;
-  return value;
-}
-
-// Job exists first, then the rule is created for that job.
-// Write the rule's HR directly onto those vacancies.
 async function applyRuleToMatchingVacancies(rule) {
   try {
-    if (!rule || rule.status !== 'Active') return;
-
-    const hrId = toId(Array.isArray(rule.assignedHrs) ? rule.assignedHrs[0] : null);
-    if (!hrId) {
-      console.log('[JobRule] skip vacancy HR assign — no HR on rule', String(rule._id || ''));
-      return;
-    }
-
-    const jobNameType = rule.jobName?.type || 'any';
-    const jobNameIds = (rule.jobName?.values || []).map(toId).filter(Boolean);
-    const categoryIds = (rule.jobCategory?.values || []).map(toId).filter(Boolean);
-
-    const noHr = { $or: [{ hr: { $exists: false } }, { hr: null }] };
-    let vacancyFilter = null;
-
-    if (jobNameType === 'includes') {
-      if (jobNameIds.length === 0) return;
-      vacancyFilter = { _id: { $in: jobNameIds }, ...noHr };
-    } else if (rule.jobCategory?.type === 'includes') {
-      if (categoryIds.length === 0) return;
-      vacancyFilter = { _jobCategory: { $in: categoryIds }, status: true, ...noHr };
-    } else {
-      return;
-    }
-
-    const User = require('../../models/users');
-    const hrDetails = await User.findById(hrId).select('name').lean();
-    const hrName = hrDetails?.name || 'Unknown';
-
-    const result = await Vacancy.updateMany(vacancyFilter, {
-      $set: {
-        hr: hrId,
-        hrAssignmentStatus: 1,
-      },
-      $push: {
-        hrAssignment: {
-          _hr: hrId,
-          hrName,
-          assignDate: new Date(),
-        },
-      },
-    });
-
-    console.log('[JobRule] assigned HR onto vacancies', {
-      ruleId: String(rule._id || ''),
-      hrId: String(hrId),
-      matched: result.matchedCount ?? result.n,
-      modified: result.modifiedCount ?? result.nModified,
-      jobNameIds: jobNameIds.map(String),
-    });
+    await applyRuleScope(rule);
   } catch (error) {
     console.error('[JobRule] failed to assign HR onto vacancies:', error);
   }
@@ -480,6 +424,8 @@ router.delete('/:id', [
         message: 'Job assignment rule not found'
       });
     }
+
+    await applyRuleToMatchingVacancies(deletedRule);
 
     res.json({
       status: true,
