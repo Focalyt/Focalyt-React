@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Course from '../../../../Layouts/App/College/ProjectManagement/Course';
+import Jobs from '../../../../Layouts/App/College/ProjectManagement/Jobs';
 import axios from 'axios';
 const Center = ({ selectedProject = null, onBackToProjects = null, onBackToVerticals = null, selectedVertical = null }) => {
 
@@ -559,8 +560,11 @@ const updatedPermission = async () => {
 
                 </div> */}
 
-                {/* Course Component with filtered data */}
-                <Course selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
+                {/hr|job|recruit/i.test(selectedVertical?.name || '') ? (
+                  <Jobs selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
+                ) : (
+                  <Course selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
+                )}
             </div>
         );
     }

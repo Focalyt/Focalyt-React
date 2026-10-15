@@ -139,6 +139,9 @@ import ShortListedCandidate from './Pages/App/Company/Candidate/ShortListedCandi
 import AddJd from './Pages/App/Company/Jobs/AddJd';
 import Coins from './Pages/App/Company/Coins/MyPieCoins';
 import Ranking from './Pages/App/College/Settings/LeadRanking/Ranking';
+import JobsCard from './Pages/App/College/HR/jobs';
+
+
 
 // import EditJob from './Pages/App/Company/Jobs/editJob';
 import ViewJd from './Pages/App/Company/Jobs/ViewJd';
@@ -405,6 +408,7 @@ const Layout = () => {
           <Route path='academicCoordinator' element={<AcademicCoordinator/>}/>
           <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
           <Route path='myfollow' element={<MyFollowups/>}/>
+          <Route path='jobs' element={<JobsCard/>}/>
         </Route>
 
         {/* company  */}

@@ -5377,14 +5377,14 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			else approvalCounts.pending += count;
 		});
 
-		console.log('[registrationCrmFilterCounts]', JSON.stringify({
-			url: req.originalUrl,
-			query: req.query,
-			all: counts.all,
-			won: counts[WON_LEAD_STATUS_ID] || null,
-			movedInKyc: counts[MOVED_IN_KYC_STATUS_ID] || null,
-			wonKeptInKyc: wonKeptInKycCount[0]?.total || 0,
-		}, null, 2));
+		// console.log('[registrationCrmFilterCounts]', JSON.stringify({
+		// 	url: req.originalUrl,
+		// 	query: req.query,
+		// 	all: counts.all,
+		// 	won: counts[WON_LEAD_STATUS_ID] || null,
+		// 	movedInKyc: counts[MOVED_IN_KYC_STATUS_ID] || null,
+		// 	wonKeptInKyc: wonKeptInKycCount[0]?.total || 0,
+		// }, null, 2));
 
 		res.status(200).json({ success: true, crmFilterCount: counts, aiCrmFilterCount: aiCounts, approvalCounts });
 
@@ -11046,12 +11046,12 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		}
 
 		if (req.query.countOnly === 'true' || req.query.countsOnly === 'true') {
-			console.log('[kycCandidates]', JSON.stringify({
-				url: req.originalUrl,
-				query: req.query,
-				totalCount: listTotalCount,
-				crmFilterCounts,
-			}, null, 2));
+			// console.log('[kycCandidates]', JSON.stringify({
+			// 	url: req.originalUrl,
+			// 	query: req.query,
+			// 	totalCount: listTotalCount,
+			// 	crmFilterCounts,
+			// }, null, 2));
 			return res.status(200).json({
 				success: true,
 				count: 0,
