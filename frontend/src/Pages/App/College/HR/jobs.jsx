@@ -4774,17 +4774,53 @@ const CRMDashboard = () => {
           return;
         }
 
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/bulk_status_change`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
+        const hrLeadIds = new Set(
+          (allProfiles || []).filter((p) => p.isHrJobLead).map((p) => String(p._id))
         );
+        const isHrBulk = selectedProfiles.every((id) => hrLeadIds.has(String(id)));
+
+        let response;
+        if (isHrBulk) {
+          let bulkFollowupDate = null;
+          if (followupDate && followupTime) {
+            const [hh, mm] = followupTime.split(':');
+            const dt = new Date(followupDate);
+            dt.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
+            if (!isNaN(dt.getTime())) bulkFollowupDate = dt.toISOString();
+          }
+          const results = await Promise.allSettled(selectedProfiles.map((id) => axios.patch(
+            `${backendUrl}/college/hr/leads/${id}`,
+            {
+              leadStatus: data._leadStatus,
+              leadSubstatus: data._leadSubStatus,
+              followupDate: bulkFollowupDate,
+              remark: data.remarks,
+            },
+            { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+          )));
+          const failed = results.filter((r) => r.status === 'rejected' || !r.value?.data?.success);
+          response = {
+            data: failed.length
+              ? {
+                success: false,
+                message: failed[0].reason?.response?.data?.message
+                  || failed[0].value?.data?.message
+                  || `${failed.length} of ${selectedProfiles.length} leads failed to update`,
+              }
+              : { success: true },
+          };
+        } else {
+          response = await axios.put(
+            `${backendUrl}/college/lead/bulk_status_change`,
+            data,
+            {
+              headers: {
+                'x-auth': token,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
 
 
         if (response.data.success) {
@@ -4889,17 +4925,32 @@ const CRMDashboard = () => {
           return;
         }
 
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
+        const response = selectedProfile.isHrJobLead
+          ? await axios.patch(
+            `${backendUrl}/college/hr/leads/${selectedProfile._id}`,
+            {
+              leadStatus: data._leadStatus,
+              leadSubstatus: data._leadSubStatus,
+              followupDate: data.followup,
+              remark: data.remarks,
+            },
+            {
+              headers: {
+                'x-auth': token,
+                'Content-Type': 'application/json'
+              }
             }
-          }
-        );
+          )
+          : await axios.put(
+            `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+            data,
+            {
+              headers: {
+                'x-auth': token,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
 console.log('API Response:', response.data);
 
         if (response.data.success) {
@@ -4917,7 +4968,7 @@ console.log('API Response:', response.data);
 
           // Refetch full details for this lead and merge into list so NEXT ACTION DATE updates immediately
           const updatedLeadId = selectedProfile._id;
-          try {
+          if (!selectedProfile.isHrJobLead) try {
             const detailRes = await axios.get(`${backendUrl}/college/appliedCandidatesDetails`, {
               params: { leadId: updatedLeadId },
               headers: { 'x-auth': token }
@@ -10913,8 +10964,8 @@ useEffect(() => {
                         onChange={handleStatusChange}
                       >
                         <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.name}</option>))}
+                        {statuses.map((filter) => (
+                          <option key={filter._id} value={filter._id}>{filter.name}</option>))}
                       </select>
                     </div>
                   </div>

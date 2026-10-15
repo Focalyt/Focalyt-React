@@ -13,6 +13,8 @@ const Vertical = require('../../models/verticals');
 const Vacancy = require('../../models/vacancy');
 const AppliedJobs = require('../../models/appliedJobs');
 const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
+const B2cStatusAssignment = require('../../models/b2cStatusAssignment');
+const { getStatusProjectScope, getAssignedForProjects } = require('../../../helpers/b2cStatusAssignment');
 
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
 const HR_DOCUMENT_TYPES = [
@@ -564,11 +566,10 @@ const resolveNamedProjectAndDepartment = async ({ projectName, departmentName, c
 const firstHrStatus = async (collegeId) => {
   const id = toCollegeObjectId(collegeId);
   if (id) {
-    const owned = await StatusHr.findOne({ isDeleted: { $ne: true }, college: id }).sort({ index: 1 });
+    const owned = await Status.findOne({ college: id }).sort({ index: 1 });
     if (owned) return owned;
   }
-  return StatusHr.findOne({
-    isDeleted: { $ne: true },
+  return Status.findOne({
     $or: [{ college: null }, { college: { $exists: false } }],
   }).sort({ index: 1 });
 };
@@ -686,7 +687,7 @@ const loadStatusIndex = async (collegeId) => {
   const id = toCollegeObjectId(collegeId);
   const scope = [{ college: null }, { college: { $exists: false } }];
   if (id) scope.unshift({ college: id });
-  const list = await StatusHr.find({ isDeleted: { $ne: true }, $or: scope }).sort({ index: 1 }).lean();
+  const list = await Status.find({ $or: scope }).sort({ index: 1 }).lean();
   const byTitle = new Map();
   const byId = new Map();
   list.forEach((status) => {
@@ -1009,7 +1010,7 @@ const buildMatch = (query = {}, collegeId) => {
     extraClauses.push(...followupClauses);
   }
 
-  // Statuses are configured from the HR Status Design page, so filters carry StatusHr ids.
+  // Job leads use the B2C statuses (Status ids), scoped per project like course leads.
   // 'none' keeps the bucket of leads that were never moved to a configured status.
   if (leadStatus && leadStatus !== 'all') {
     if (leadStatus === 'none') {
@@ -1236,14 +1237,24 @@ router.get('/followupcounts', isCollege, async (req, res) => {
   }
 });
 
-// Configured HR statuses (managed from the HR Status Design page)
+// B2C statuses visible to the user, filtered by the projects their role can access
 router.get('/statuses', isCollege, async (req, res) => {
   try {
     const collegeId = req.user?.college?._id;
     const scope = [{ college: null }, { college: { $exists: false } }];
     if (collegeId) scope.unshift({ college: collegeId });
 
-    const statuses = await StatusHr.find({ isDeleted: { $ne: true }, $or: scope }).sort({ index: 1 });
+    let statuses = await Status.find({ $or: scope }).sort({ index: 1 }).lean();
+    const projectIds = await getStatusProjectScope(req.user);
+    if (projectIds) {
+      const assigned = await getAssignedForProjects(collegeId, projectIds);
+      statuses = statuses
+        .filter((status) => assigned.has(String(status._id)))
+        .map((status) => {
+          const subIds = assigned.get(String(status._id));
+          return { ...status, substatuses: (status.substatuses || []).filter((sub) => subIds.has(String(sub._id))) };
+        });
+    }
 
     return res.json({
       success: true,
@@ -2004,7 +2015,7 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
         return res.status(400).json({ success: false, message: 'Please select a valid status' });
       }
 
-      const status = await StatusHr.findOne({ _id: statusId, isDeleted: { $ne: true } });
+      const status = await Status.findOne({ _id: statusId });
       if (!status) {
         return res.status(404).json({ success: false, message: 'Selected status no longer exists' });
       }
@@ -2012,12 +2023,31 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
       let substatus = null;
       const substatusId = toObjectId(req.body.leadSubstatus);
       if (substatusId) {
-        substatus = (status.substatuses || []).find((item) => String(item._id) === substatusId) || null;
+        substatus = (status.substatuses || []).find((item) => String(item._id) === String(substatusId)) || null;
         if (!substatus) {
           return res.status(400).json({ success: false, message: 'Selected sub-status does not belong to this status' });
         }
       } else if ((status.substatuses || []).length) {
         return res.status(400).json({ success: false, message: 'Please select a sub-status' });
+      }
+
+      const leadProjectId = apply.project || loaded.lead?.project?._id || loaded.lead?.project || null;
+      const statusChanging = String(apply.leadStatus || '') !== String(status._id)
+        || String(apply.leadSubstatus || '') !== String(substatus?._id || '');
+      if (req.user?.permissions?.permission_type !== 'Admin' && leadProjectId && statusChanging) {
+        const assignment = await B2cStatusAssignment.findOne({
+          college: req.user.college._id,
+          project: leadProjectId,
+          status: status._id,
+        }).select('substatuses').lean();
+        const subAllowed = !substatus
+          || (assignment?.substatuses || []).map(String).includes(String(substatus._id));
+        if (!assignment || !subAllowed) {
+          return res.status(403).json({
+            success: false,
+            message: "This status/sub-status is not assigned to the lead's project",
+          });
+        }
       }
 
       if (substatus?.hasRemarks && !String(req.body.remark || '').trim()) {

@@ -31,7 +31,7 @@ const appliedJobsSchema = new Schema(
     college: { type: ObjectId, ref: "College", index: true },
     project: { type: ObjectId, ref: "Project" },
     department: { type: ObjectId, ref: "Vertical" },
-    leadStatus: { type: ObjectId, ref: "StatusHr", index: true },
+    leadStatus: { type: ObjectId, ref: "Status", index: true },
     leadSubstatus: { type: ObjectId, index: true },
     leadOwner: { type: ObjectId, ref: "User", index: true },
     leadCoOwner: { type: ObjectId, ref: "User" },
