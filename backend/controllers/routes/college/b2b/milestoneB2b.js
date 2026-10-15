@@ -8,7 +8,10 @@ const B2bMilestoneAssignment = require('../../../models/b2bMilestoneAssignment')
 const { resolveProjectSelection: resolveB2bProjectSelection, getStatusProjectScope } = require('../../../../helpers/b2bStatusAssignment');
 const {
   getMilestoneAssignmentState,
+  createMilestonesForProjects,
+  copyMilestonesOntoProject,
   saveMilestoneProjects,
+  reorderMilestoneScope,
   getMilestonesForProjects,
 } = require('../../../../helpers/b2bMilestoneAssignment');
 
@@ -16,13 +19,6 @@ const isValidId = (value) => mongoose.Types.ObjectId.isValid(String(value || '')
 
 // B2B departments and projects are not tied to a college
 const resolveProjectSelection = (collegeId, departments, projects) => resolveB2bProjectSelection(departments, projects);
-
-// No departments and no projects means the milestone stays global (no assignment rows)
-const resolveAlignment = (collegeId, departments, projects) => {
-  const hasSelection = (Array.isArray(departments) && departments.length)
-    || (Array.isArray(projects) && projects.length);
-  return hasSelection ? resolveProjectSelection(collegeId, departments, projects) : { projectIds: [] };
-};
 
 const renumber = async (collegeId) => {
   const milestones = await B2bMilestone.find({ college: collegeId }).sort({ index: 1, createdAt: 1 }).select('_id');
@@ -45,8 +41,19 @@ router.get('/', isCollege, async (req, res) => {
     }
 
     const state = await getMilestoneAssignmentState(collegeId, milestones.map((item) => item._id));
+    milestones = milestones.filter((item) => state.get(String(item._id))?.projects?.size);
     const data = milestones.map((item) => {
       const assignment = state.get(String(item._id));
+      const projectPositions = {};
+      const departmentPositions = {};
+      if (assignment) {
+        assignment.projectPositions.forEach((position, projectId) => {
+          projectPositions[projectId] = position;
+        });
+        assignment.departmentPositions.forEach((position, departmentId) => {
+          departmentPositions[departmentId] = position;
+        });
+      }
       return {
         _id: item._id,
         title: item.title,
@@ -54,6 +61,8 @@ router.get('/', isCollege, async (req, res) => {
         index: item.index,
         assignedDepartments: assignment ? [...assignment.departments] : [],
         assignedProjects: assignment ? [...assignment.projects] : [],
+        projectPositions,
+        departmentPositions,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       };
@@ -66,7 +75,6 @@ router.get('/', isCollege, async (req, res) => {
   }
 });
 
-// New milestones are global; they are aligned to projects later through edit or assign.
 router.post('/add', isCollege, async (req, res) => {
   try {
     const title = String(req.body.title || '').trim();
@@ -76,23 +84,39 @@ router.post('/add', isCollege, async (req, res) => {
     }
 
     const collegeId = req.user.college._id;
-    const last = await B2bMilestone.findOne({ college: collegeId }).sort('-index').select('index').lean();
-    const data = await B2bMilestone.create({
+    const { projectIds, error } = await resolveProjectSelection(
+      collegeId,
+      req.body.departments,
+      req.body.projects,
+    );
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+
+    const { milestones, error: createError } = await createMilestonesForProjects({
+      collegeId,
       title,
       description,
-      index: last ? last.index + 1 : 0,
-      college: collegeId,
+      projectIds,
       createdBy: req.user._id,
     });
+    if (createError) {
+      return res.status(400).json({ success: false, message: createError });
+    }
 
-    return res.status(201).json({ success: true, message: 'Milestone created successfully', data });
+    return res.status(201).json({
+      success: true,
+      message: milestones.length > 1
+        ? `Milestone added to ${milestones.length} projects`
+        : 'Milestone created successfully',
+      data: milestones,
+    });
   } catch (err) {
     console.error('Error creating milestone:', err.message);
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
-// Sending departments/projects realigns the milestone; empty lists make it global again.
 router.put('/edit/:id', isCollege, async (req, res) => {
   try {
     const collegeId = req.user.college._id;
@@ -105,14 +129,17 @@ router.put('/edit/:id', isCollege, async (req, res) => {
     }
 
     const { title, description, departments, projects } = req.body;
-    let newProjectIds = null;
-    if (departments !== undefined || projects !== undefined) {
-      const { projectIds, error } = await resolveAlignment(collegeId, departments, projects);
-      if (error) {
-        return res.status(400).json({ success: false, message: error });
-      }
-      newProjectIds = projectIds;
+    const { projectIds, error } = await resolveProjectSelection(collegeId, departments, projects);
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
     }
+    if (projectIds.length !== 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Select one project. Each milestone belongs to a single project.',
+      });
+    }
+    const newProjectIds = projectIds;
 
     if (title !== undefined) {
       const nextTitle = String(title).trim();
@@ -164,54 +191,87 @@ router.delete('/delete/:id', isCollege, async (req, res) => {
 
 router.put('/reorder', isCollege, async (req, res) => {
   try {
-    const { milestoneOrder } = req.body;
+    const { milestoneOrder, departmentId, projectId } = req.body;
     if (!Array.isArray(milestoneOrder)) {
       return res.status(400).json({ success: false, message: 'milestoneOrder must be an array' });
     }
-    const updates = milestoneOrder.filter((item) => isValidId(item?._id) && Number.isFinite(Number(item.index)));
-    if (updates.length) {
-      await B2bMilestone.bulkWrite(updates.map((item) => ({
-        updateOne: {
-          filter: { _id: item._id, college: req.user.college._id },
-          update: { $set: { index: Number(item.index) } },
-        },
-      })));
+    if (!departmentId) {
+      return res.status(400).json({ success: false, message: 'Choose a department or project before changing milestone order' });
     }
-    return res.status(200).json({ success: true, message: 'Milestones reordered successfully' });
+    const { error } = await reorderMilestoneScope({
+      collegeId: req.user.college._id,
+      departmentId,
+      projectId: projectId || '',
+      orderedMilestoneIds: milestoneOrder.map((item) => item?._id),
+    });
+    if (error) {
+      return res.status(400).json({ success: false, message: error });
+    }
+    return res.status(200).json({ success: true, message: 'Milestone order updated' });
   } catch (err) {
     console.error('Error reordering milestones:', err.message);
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
-// Switch: adds the milestones to the given projects. Their other projects are kept.
 router.post('/assign', isCollege, async (req, res) => {
   try {
     const collegeId = req.user.college._id;
-    const { milestoneIds = [], departments = [], projects = [] } = req.body;
+    const { milestoneIds = [], departments = [], projects = [], placements = [] } = req.body;
     const ids = [...new Set((Array.isArray(milestoneIds) ? milestoneIds : []).map(String).filter(isValidId))];
     if (!ids.length) {
       return res.status(400).json({ success: false, message: 'Select at least one milestone' });
     }
 
-    const { projectIds, error } = await resolveProjectSelection(collegeId, departments, projects);
-    if (error) {
-      return res.status(400).json({ success: false, message: error });
-    }
-
-    const found = await B2bMilestone.countDocuments({ _id: { $in: ids }, college: collegeId });
-    if (found !== ids.length) {
+    const sources = await B2bMilestone.find({ _id: { $in: ids }, college: collegeId })
+      .select('title description')
+      .lean();
+    if (sources.length !== ids.length) {
       return res.status(404).json({ success: false, message: 'One or more milestones were not found' });
     }
 
-    for (const milestoneId of ids) {
-      await saveMilestoneProjects({
-        collegeId,
-        milestoneId,
-        projects: projectIds,
-        createdBy: req.user._id,
-        replace: false,
-      });
+    if (Array.isArray(placements) && placements.length) {
+      const byProject = new Map();
+      for (const item of placements) {
+        const position = Number(item?.position);
+        if (!isValidId(item?.projectId) || !Number.isInteger(position) || position < 1) {
+          return res.status(400).json({ success: false, message: 'Each project needs a position of 1 or more' });
+        }
+        byProject.set(String(item.projectId), { position, customOrder: Boolean(item.customOrder) });
+      }
+      for (const [projectId, placement] of byProject) {
+        const { error: placeError } = await copyMilestonesOntoProject({
+          collegeId,
+          sources,
+          projectId,
+          startIndex: placement.position - 1,
+          customOrder: placement.customOrder,
+          createdBy: req.user._id,
+        });
+        if (placeError) {
+          return res.status(400).json({ success: false, message: placeError });
+        }
+      }
+    } else {
+      const { projectIds, error } = await resolveProjectSelection(collegeId, departments, projects);
+      if (error) {
+        return res.status(400).json({ success: false, message: error });
+      }
+      for (const projectId of projectIds) {
+        const count = await B2bMilestoneAssignment.countDocuments({ college: collegeId, project: projectId });
+        const { error: placeError } = await copyMilestonesOntoProject({
+          collegeId,
+          sources,
+          projectId,
+          startIndex: count,
+          customOrder: false,
+          createdBy: req.user._id,
+          repositionExisting: false,
+        });
+        if (placeError) {
+          return res.status(400).json({ success: false, message: placeError });
+        }
+      }
     }
 
     return res.status(200).json({ success: true, message: 'Milestones assigned successfully' });

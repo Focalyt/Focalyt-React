@@ -8,11 +8,15 @@ const B2bMilestoneAssignmentSchema = new mongoose.Schema({
   department: { type: ObjectId, ref: 'B2BDepartment', default: null },
   project: { type: ObjectId, ref: 'B2BProject', required: true },
   milestone: { type: ObjectId, ref: 'B2bMilestone', required: true },
+  // Position of this milestone in this project.
+  index: { type: Number },
+  customOrder: { type: Boolean, default: false },
   createdBy: { type: ObjectId, ref: 'User' },
   updatedBy: { type: ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 B2bMilestoneAssignmentSchema.index({ college: 1, project: 1, milestone: 1 }, { unique: true });
+B2bMilestoneAssignmentSchema.index({ college: 1, project: 1, index: 1 });
 B2bMilestoneAssignmentSchema.index({ milestone: 1 });
 
 module.exports = mongoose.model('B2bMilestoneAssignment', B2bMilestoneAssignmentSchema);

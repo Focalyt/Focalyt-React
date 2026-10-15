@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Schema.Types;
 
-// A B2B lead milestone. Global until it is aligned to projects through B2bMilestoneAssignment.
+// One B2B milestone for one project. Another project gets its own document, even with the same title.
 const B2bMilestoneSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, trim: true, default: '' },

@@ -116,6 +116,101 @@ async function getMilestoneAssignmentState(collegeId, milestoneIds = []) {
 }
 
 /**
+ * Creates a separate milestone document for each project and assigns it at the end of that project.
+ */
+async function createMilestonesForProjects({ collegeId, title, description, projectIds, createdBy }) {
+	const ids = uniqueIds(projectIds);
+	if (!ids.length) return { error: 'Select at least one project' };
+
+	const projectDocs = await Project.find({ _id: { $in: ids }, college: collegeId }).select('_id vertical').lean();
+	if (projectDocs.length !== ids.length) return { error: 'One or more projects were not found' };
+	if (projectDocs.some((project) => !project.vertical)) {
+		return { error: 'A selected project has no department' };
+	}
+
+	const existing = await B2cMilestoneAssignment.find({ college: collegeId, project: { $in: ids } })
+		.select('project index')
+		.lean();
+	const nextIndex = new Map();
+	existing.forEach((row) => {
+		if (!Number.isFinite(row.index)) return;
+		const projectId = String(row.project);
+		nextIndex.set(projectId, Math.max(nextIndex.get(projectId) ?? -1, row.index));
+	});
+
+	const milestones = [];
+	for (const project of projectDocs) {
+		const projectId = String(project._id);
+		const index = (nextIndex.get(projectId) ?? -1) + 1;
+		nextIndex.set(projectId, index);
+		const milestone = await B2cMilestone.create({
+			title,
+			description: description || '',
+			index: 0,
+			college: collegeId,
+			createdBy,
+		});
+		await B2cMilestoneAssignment.create({
+			college: collegeId,
+			department: project.vertical,
+			project: project._id,
+			milestone: milestone._id,
+			index,
+			customOrder: false,
+			createdBy,
+		});
+		milestones.push(milestone);
+	}
+	return { milestones };
+}
+
+/**
+ * Puts copies of these milestones on one project. A milestone already on that project stays that document.
+ * Other projects get a new milestone document with the same title and description.
+ */
+async function copyMilestonesOntoProject({
+	collegeId,
+	sources,
+	projectId,
+	startIndex,
+	customOrder,
+	createdBy,
+	repositionExisting = true,
+}) {
+	const existingIds = [];
+	const freshIds = [];
+	for (const source of sources) {
+		const already = await B2cMilestoneAssignment.findOne({
+			college: collegeId,
+			milestone: source._id,
+			project: projectId,
+		}).select('_id').lean();
+		if (already) {
+			existingIds.push(String(source._id));
+			continue;
+		}
+		const copy = await B2cMilestone.create({
+			title: source.title,
+			description: source.description || '',
+			index: 0,
+			college: collegeId,
+			createdBy,
+		});
+		freshIds.push(String(copy._id));
+	}
+	const milestoneIds = repositionExisting ? [...existingIds, ...freshIds] : freshIds;
+	if (!milestoneIds.length) return {};
+	return placeMilestonesAt({
+		collegeId,
+		projectId,
+		milestoneIds,
+		startIndex,
+		customOrder,
+		createdBy,
+	});
+}
+
+/**
  * Adds rows for the given projects. With replace, rows for other projects are deleted.
  * index on the row is the milestone position in that project.
  * A project that still follows its department shares that index with the department's other projects.
@@ -324,6 +419,8 @@ async function getMilestonesForProjects(collegeId, projectIds = []) {
 module.exports = {
 	ensureMilestonePositions,
 	getMilestoneAssignmentState,
+	createMilestonesForProjects,
+	copyMilestonesOntoProject,
 	saveMilestoneProjects,
 	placeMilestonesAt,
 	reorderMilestoneScope,
