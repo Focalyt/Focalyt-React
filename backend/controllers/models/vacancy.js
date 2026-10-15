@@ -135,134 +135,25 @@ vacancySchema.index({ hr: 1 });
 
 vacancySchema.methods.assignHr = async function () {
   try {
-    require("./jobAssignmentRule");
-    const JobAssignmentRule = mongoose.model("JobAssignmentRule");
-    const Vacancy = this.constructor;
-    const College = mongoose.model("College");
-    const User = mongoose.model("User");
-
-    const jobCategoryId = this._jobCategory;
-
-    const categoryMatch = [{ "jobCategory.type": "any" }];
-    if (jobCategoryId) {
-      categoryMatch.push({
-        "jobCategory.type": "includes",
-        "jobCategory.values": jobCategoryId,
-      });
-    }
-
-    const vacancyId = this._id;
-    const jobTitle = this.title;
-
-    const jobNameIds = new Set();
-    if (vacancyId) {
-      jobNameIds.add(vacancyId.toString());
-    }
-    if (jobTitle) {
-      const sameNameJobs = await Vacancy.find({ status: true, title: jobTitle }).select("_id").lean();
-      sameNameJobs.forEach((job) => jobNameIds.add(job._id.toString()));
-    }
-
-    const jobNameMatch = [
-      { "jobName.type": "any" },
-      { jobName: { $exists: false } },
-    ];
-    if (jobNameIds.size > 0) {
-      jobNameMatch.push({
-        "jobName.type": "includes",
-        "jobName.values": { $in: [...jobNameIds] },
-      });
-    }
-
-    const applicableRules = await JobAssignmentRule.find({
-      status: "Active",
-      $and: [
-        { $or: categoryMatch },
-        { $or: jobNameMatch },
-      ],
-    });
-
-    let allHrs = [];
-
-    if (applicableRules.length === 0) {
-      const collegeId = Array.isArray(this.collegeAcNo) && this.collegeAcNo.length
-        ? this.collegeAcNo[0]
-        : null;
-
-      if (!collegeId) {
-        return null;
-      }
-
-      const college = await College.findById(collegeId);
-      if (!college || !college._concernPerson || college._concernPerson.length === 0) {
-        return null;
-      }
-
-      const defaultAdmin = college._concernPerson.find((person) => person.defaultAdmin === true);
-      const fallback = defaultAdmin || college._concernPerson[0];
-      if (!fallback || !fallback._id) {
-        return null;
-      }
-      allHrs = [fallback._id.toString()];
-    } else {
-      applicableRules.forEach((rule) => {
-        allHrs = allHrs.concat(rule.assignedHrs || []);
-      });
-      allHrs = [...new Set(allHrs.map((hr) => hr.toString()))];
-    }
-
-    if (allHrs.length === 0) {
+    const { resolveWinningHr } = require("../../helpers/jobRuleMatch");
+    const selected = await resolveWinningHr(this);
+    if (!selected?.hrId) {
       return null;
     }
-
-    const hrAssignments = [];
-    for (const hrId of allHrs) {
-      const lastAssignment = await Vacancy.findOne({
-        "hrAssignment._hr": hrId,
-      }).sort({ createdAt: -1 });
-
-      hrAssignments.push({
-        hrId,
-        lastAssignmentDate: lastAssignment ? lastAssignment.createdAt : null,
-        hasAssignment: Boolean(lastAssignment),
-      });
-    }
-
-    let selectedHr = null;
-    if (allHrs.length === 1) {
-      selectedHr = allHrs[0];
-    } else {
-      const withoutAssignment = hrAssignments.filter((item) => !item.hasAssignment);
-      if (withoutAssignment.length > 0) {
-        selectedHr = withoutAssignment[0].hrId;
-      } else {
-        const sortedByDate = hrAssignments.sort((a, b) => {
-          return new Date(a.lastAssignmentDate) - new Date(b.lastAssignmentDate);
-        });
-        selectedHr = sortedByDate[0].hrId;
-      }
-    }
-
-    if (!selectedHr) {
-      return null;
-    }
-
-    const hrDetails = await User.findById(selectedHr);
-    const hrName = hrDetails ? hrDetails.name : "Unknown";
 
     if (!Array.isArray(this.hrAssignment)) {
       this.hrAssignment = [];
     }
 
     this.hrAssignment.push({
-      _hr: new mongoose.Types.ObjectId(selectedHr),
-      hrName,
+      _hr: new mongoose.Types.ObjectId(selected.hrId),
+      hrName: selected.hrName || "Unknown",
       assignDate: new Date(),
     });
-    this.hr = new mongoose.Types.ObjectId(selectedHr);
+    this.hr = new mongoose.Types.ObjectId(selected.hrId);
     this.hrAssignmentStatus = 1;
 
-    return selectedHr;
+    return selected.hrId;
   } catch (error) {
     console.error("Error in assignHr:", error);
     throw error;
