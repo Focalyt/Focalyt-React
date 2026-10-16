@@ -1234,7 +1234,7 @@ function CollegeLayout({ children }) {
                   </ul>
                 </li>
               )}
-              {/* <li className={`nav-item has-sub dropdown-hr ${openSubmenu.hr ? 'open' : ''}`}>
+              <li className={`nav-item has-sub dropdown-hr ${openSubmenu.hr ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('hr')}>
                   <FontAwesomeIcon icon={faUserTie} />
                   <span className="menu-title">HR</span>
@@ -1255,20 +1255,20 @@ function CollegeLayout({ children }) {
                     opacity: submenuMaxHeight.hr === '0px' ? 0 : 1
                   }}
                 >
-                  <li className={`nav-item ${location.pathname === '/institute/hr' ? 'active' : ''}`}>
-                    <Link to="/institute/hr" onClick={() => handleSidebarClose()}>
+                  <li className={`nav-item ${location.pathname === '/institute/jobs' ? 'active' : ''}`}>
+                    <Link to="/institute/jobs" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserFriends} />
                       <span className="menu-title">HR Leads</span>
                     </Link>
                   </li>
-                  <li className={`nav-item ${location.pathname === '/institute/statusdesignhr' ? 'active' : ''}`}>
+                  {/* <li className={`nav-item ${location.pathname === '/institute/statusdesignhr' ? 'active' : ''}`}>
                     <Link to="/institute/statusdesignhr" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faSitemap} />
                       <span className="menu-title">HR Status Design</span>
                     </Link>
-                  </li>
+                  </li>*/}
                 </ul>
-              </li> */}
+              </li> 
               <li className={`nav-item has-sub dropdown-placements ${openSubmenu.placements ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('placements')}>
                   <FontAwesomeIcon icon={faHandshake} />
