@@ -1257,8 +1257,14 @@ function CollegeLayout({ children }) {
                 >
                   <li className={`nav-item ${location.pathname === '/institute/jobs' ? 'active' : ''}`}>
                     <Link to="/institute/jobs" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faUserFriends} />
+                      <FontAwesomeIcon icon={faUserCheck} />
                       <span className="menu-title">HR Leads</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/myfollow' ? 'active' : ''}`}>
+                    <Link to="/institute/myfollow" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBell} />
+                      <span className="menu-title">Follow Ups</span>
                     </Link>
                   </li>
                   {/* <li className={`nav-item ${location.pathname === '/institute/statusdesignhr' ? 'active' : ''}`}>
