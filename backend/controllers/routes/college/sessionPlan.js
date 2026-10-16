@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const uuid = require('uuid/v1');
 const { isCollege } = require('../../../helpers');
+const { seesAllTrainingBatches, isSeniorTrainer, seniorBatchOwnershipQuery } = require('../../../helpers/trainingTeam');
 const { SessionPlan, SessionActivityType, College, Courses, CoursesCopy, CourseActivity, Batch, BatchSessionAssignment } = require('../../models');
 const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
 const { bucketName } = require('../../../config');
@@ -597,6 +598,19 @@ router.get('/', async (req, res) => {
     const college = await resolveCollege(req);
     const filter = { college: college._id, isDeleted: false };
 
+    if (req.user?._id && !seesAllTrainingBatches(req.user) && isSeniorTrainer(req.user)) {
+      const ownedBatches = await Batch.find({
+        college: college._id,
+        ...seniorBatchOwnershipQuery(req.user._id),
+      }).select('_id').lean();
+      filter.$and = [{
+        $or: [
+          { seniorTrainer: req.user._id },
+          { batch: { $in: ownedBatches.map((batch) => batch._id) } },
+        ],
+      }];
+    }
+
     if (req.query.batch) {
       const batchId = toObjectId(req.query.batch);
       if (batchId) {
@@ -655,6 +669,21 @@ router.get('/:id', async (req, res) => {
     });
     if (!session) {
       return res.status(404).json({ status: false, message: 'Session not found' });
+    }
+    if (req.user?._id && !seesAllTrainingBatches(req.user) && isSeniorTrainer(req.user)) {
+      const ownsSession = session.seniorTrainer && String(session.seniorTrainer) === String(req.user._id);
+      let ownsBatch = false;
+      if (!ownsSession && session.batch) {
+        const batch = await Batch.findOne({
+          _id: session.batch,
+          college: college._id,
+          ...seniorBatchOwnershipQuery(req.user._id),
+        }).select('_id').lean();
+        ownsBatch = Boolean(batch);
+      }
+      if (!ownsSession && !ownsBatch) {
+        return res.status(403).json({ status: false, message: 'You are not assigned to this session' });
+      }
     }
     return res.json({ status: true, data: mapSessionToClient(session) });
   } catch (err) {

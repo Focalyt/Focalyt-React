@@ -6,6 +6,45 @@ const isSeniorTrainer = (user) => flagsOf(user).can_be_senior_trainer === true;
 
 const isFieldTrainer = (user) => flagsOf(user).can_be_trainer === true && !isSeniorTrainer(user);
 
+const isAcademicCoordinator = (user) => flagsOf(user).can_be_academic_coordinator === true;
+
+const isAdminUser = (user) => user?.permissions?.permission_type === 'Admin';
+
+const seesAllTrainingBatches = (user) => isAdminUser(user) || isAcademicCoordinator(user);
+
+const seniorBatchOwnershipQuery = (userId) => ({
+  $or: [
+    { seniorTrainer: userId },
+    { seniorTrainer: null, trainers: userId },
+  ],
+});
+
+const applyBatchListScope = (filter, user) => {
+  if (!user?._id || seesAllTrainingBatches(user)) return filter;
+  if (isSeniorTrainer(user)) {
+    Object.assign(filter, seniorBatchOwnershipQuery(user._id));
+    return filter;
+  }
+  if (flagsOf(user).can_be_trainer === true) {
+    filter.trainers = user._id;
+  }
+  return filter;
+};
+
+const userCanAccessBatch = (batch, user) => {
+  if (!user?._id || seesAllTrainingBatches(user)) return true;
+  const me = String(user._id);
+  if (isSeniorTrainer(user)) {
+    const owner = toIdString(batch?.seniorTrainer);
+    if (owner) return owner === me;
+    return (batch?.trainers || []).some((id) => toIdString(id) === me);
+  }
+  if (flagsOf(user).can_be_trainer === true) {
+    return (batch?.trainers || []).some((id) => toIdString(id) === me);
+  }
+  return true;
+};
+
 const toIdString = (value) => {
   if (value == null || value === '') return '';
   if (typeof value === 'object') return String(value._id || value.id || '');
@@ -112,6 +151,11 @@ module.exports = {
   TrainingTeamError,
   isSeniorTrainer,
   isFieldTrainer,
+  isAcademicCoordinator,
+  seesAllTrainingBatches,
+  seniorBatchOwnershipQuery,
+  applyBatchListScope,
+  userCanAccessBatch,
   toIdString,
   parseIdList,
   splitUsers,

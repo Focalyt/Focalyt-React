@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
-const { assertCourseMembers, toIdString, TrainingTeamError } = require("../../../helpers/trainingTeam");
+const { assertCourseMembers, toIdString, TrainingTeamError, applyBatchListScope, isSeniorTrainer, seesAllTrainingBatches } = require("../../../helpers/trainingTeam");
 const { findLeadsBlockedForStatus } = require("../../../helpers/b2cStatusAssignment");
 const { ensureMilestonePositions } = require("../../../helpers/b2cMilestoneAssignment");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
@@ -9155,21 +9155,47 @@ router.get('/get_batches', isCollege, async (req, res) => {
 			filter.courseId = courseId;
 		}
 
-		// Senior trainers and trainers only see batches they are assigned to.
-		// Admins and other staff keep seeing every batch for the college.
-		const customPermissions = req.user?.permissions?.custom_permissions || {};
-		const isAdminUser = req.user?.permissions?.permission_type === 'Admin';
-		const isTrainingStaff = customPermissions.can_be_senior_trainer === true
-			|| customPermissions.can_be_trainer === true;
-		if (!isAdminUser && isTrainingStaff) {
-			filter.trainers = req.user._id;
-		}
+		// Senior trainers see only batches assigned to them.
+		// Admin and academic coordinator see every batch. Field trainers stay limited to their own team list.
+		applyBatchListScope(filter, req.user);
 
-		const batches = await Batch.find(filter)
+		let batches = await Batch.find(filter)
+			.populate('seniorTrainer', 'name email')
 			.populate('trainers', 'name email mobile permissions.custom_permissions.can_be_senior_trainer permissions.custom_permissions.can_be_trainer')
 			.populate('createdBy', 'name email')
 			.sort({ createdAt: -1 })
 			.lean();
+
+		const seniorBackfill = [];
+		batches.forEach((batch) => {
+			if (batch.seniorTrainer) return;
+			const senior = (batch.trainers || []).find(
+				(user) => user?.permissions?.custom_permissions?.can_be_senior_trainer === true
+			);
+			if (!senior?._id) return;
+			batch.seniorTrainer = {
+				_id: senior._id,
+				name: senior.name || '',
+				email: senior.email || '',
+			};
+			seniorBackfill.push(
+				Batch.updateOne(
+					{ _id: batch._id, seniorTrainer: null },
+					{ $set: { seniorTrainer: senior._id } }
+				)
+			);
+		});
+		if (seniorBackfill.length) {
+			await Promise.all(seniorBackfill);
+		}
+
+		if (req.user?._id && !seesAllTrainingBatches(req.user) && isSeniorTrainer(req.user)) {
+			const me = String(req.user._id);
+			batches = batches.filter((batch) => {
+				const owner = batch.seniorTrainer?._id || batch.seniorTrainer;
+				return owner && String(owner) === me;
+			});
+		}
 
 		const courseIds = [...new Set(batches.map((batch) => String(batch.courseId || '')).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
 		const centerIds = [...new Set(batches.map((batch) => String(batch.centerId || '')).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
@@ -9179,11 +9205,18 @@ router.get('/get_batches', isCollege, async (req, res) => {
 		]);
 		const courseNameById = new Map(courses.map((course) => [String(course._id), course.name || '']));
 		const centerNameById = new Map(centers.map((center) => [String(center._id), center.name || '']));
-		const data = batches.map((batch) => ({
-			...batch,
-			courseName: courseNameById.get(String(batch.courseId || '')) || '',
-			centerName: centerNameById.get(String(batch.centerId || '')) || '',
-		}));
+		const data = batches.map((batch) => {
+			const senior = batch.seniorTrainer && typeof batch.seniorTrainer === 'object'
+				? batch.seniorTrainer
+				: null;
+			return {
+				...batch,
+				courseName: courseNameById.get(String(batch.courseId || '')) || '',
+				centerName: centerNameById.get(String(batch.centerId || '')) || '',
+				seniorTrainerId: senior?._id ? String(senior._id) : (batch.seniorTrainer ? String(batch.seniorTrainer) : ''),
+				seniorTrainerName: senior?.name || senior?.email || '',
+			};
+		});
 
 		res.json({
 			success: true,

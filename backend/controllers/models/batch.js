@@ -11,6 +11,7 @@ const BatchSchema = new Schema({
   assessmentDate: { type: Date, default: null },
   maxStudents: { type: Number, default: 0 },
   trainers: [ { type: ObjectId, ref: 'User' } ],
+  seniorTrainer: { type: ObjectId, ref: 'User', default: null, index: true },
   status: { type: String, enum: ['active', 'completed', 'inactive'], default: 'active' },
   courseId: { type: Types.ObjectId, ref: 'Course', required: true },
   centerId: { type: Types.ObjectId, ref: 'Center', required: true },

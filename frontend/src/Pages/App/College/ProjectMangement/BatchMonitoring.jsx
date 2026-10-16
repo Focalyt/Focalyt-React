@@ -1199,6 +1199,12 @@ const BatchMonitoring = () => {
                     <span className="lead-strip-v3__owner-label">{card.ownerLabel}</span>
                     <span className="lead-strip-v3__owner-val">{card.owner || '—'}</span>
                   </div>
+                  {card.seniorLabel ? (
+                    <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner" title={card.senior || ''}>
+                      <span className="lead-strip-v3__owner-label">{card.seniorLabel}</span>
+                      <span className="lead-strip-v3__owner-val">{card.senior || '—'}</span>
+                    </div>
+                  ) : null}
                   {(card.co1Label || card.co2Label) && card.stackMeta ? (
                     <>
                       <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner" title={card.co1 || ''}>
@@ -1439,6 +1445,7 @@ const BatchMonitoring = () => {
               {[
                 ['Name', card.name],
                 [card.ownerLabel, card.owner],
+                [card.seniorLabel, card.senior],
                 [card.co1Label, card.co1],
                 [card.co2Label, card.co2],
                 ['Call follow-up', call.nextDate],
@@ -1503,6 +1510,8 @@ const BatchMonitoring = () => {
       line2Icon: 'fas fa-graduation-cap',
       ownerLabel: 'Center',
       owner: batch.centerName || batch.center?.name || '—',
+      seniorLabel: 'Senior',
+      senior: batch.seniorTrainerName || batch.seniorTrainer?.name || '—',
       co1Label: 'Start Date',
       co1: formatDate(batch.startDate),
       co2Label: 'End Date',

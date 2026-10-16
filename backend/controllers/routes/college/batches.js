@@ -18,6 +18,7 @@ const {
 	assertCourseMembers,
 	uniqueIds,
 	toIdString,
+	userCanAccessBatch,
 } = require("../../../helpers/trainingTeam");
 const Candidate = require("../../models/candidateProfile");
 const candidateServices = require('../services/candidate')
@@ -315,6 +316,7 @@ router.put('/:batchId/training-team', async (req, res) => {
 		assertRoleMembers(usersById, seniorTrainerIds, trainerIds);
 
 		batch.trainers = combinedIds;
+		batch.seniorTrainer = seniorTrainerIds[0] || null;
 		await batch.save();
 
 		const courseAssignment = await assignCourseToSeniorTrainer(batch, seniorTrainerIds, usersById);
@@ -488,14 +490,8 @@ router.get('/:batchId/sessions', async (req, res) => {
 			throw new TrainingTeamError('Course not found', 404);
 		}
 
-		const permissions = req.user?.permissions?.custom_permissions || {};
-		const isAdmin = req.user?.permissions?.permission_type === 'Admin';
-		const isTrainingStaff = permissions.can_be_senior_trainer === true || permissions.can_be_trainer === true;
-		if (!isAdmin && isTrainingStaff) {
-			const assigned = (batch.trainers || []).some((id) => toIdString(id) === String(req.user._id));
-			if (!assigned) {
-				throw new TrainingTeamError('You are not assigned to this batch', 403);
-			}
+		if (!userCanAccessBatch(batch, req.user)) {
+			throw new TrainingTeamError('You are not assigned to this batch', 403);
 		}
 
 		const sessions = await SessionPlan.find({
