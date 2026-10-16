@@ -57,6 +57,7 @@ const appliedJobsSchema = new Schema(
         createdBy: { type: ObjectId, ref: "User" },
         createdAt: { type: Date, default: Date.now },
         completedAt: { type: Date },
+        googleCalendarEventId: { type: String, default: "" },
       },
     ],
     logs: [

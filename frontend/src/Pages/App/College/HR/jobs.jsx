@@ -251,6 +251,29 @@ const mergeHrCountsIntoB2cCrm = (b2cCounts = {}, hrPayload = {}, statusFilters =
   };
 };
 
+const hrFollowupSlot = (followups, type) => {
+  const wantVisit = type === 'visit';
+  const rows = (Array.isArray(followups) ? followups : []).filter((item) => {
+    const isVisit = String(item?.type || item?.followUpType || 'Call').toLowerCase() === 'visit';
+    return wantVisit ? isVisit : !isVisit;
+  });
+  if (!rows.length) return null;
+  const toSlot = (item) => ({
+    _id: item._id,
+    followupDate: item.followupDate,
+    scheduledDate: item.followupDate,
+    remarks: item.remarks || '',
+    status: item.status || 'planned',
+    followUpType: wantVisit ? 'Visit' : 'Call',
+  });
+  const planned = rows
+    .filter((item) => String(item.status || '').toLowerCase() === 'planned')
+    .sort((a, b) => new Date(a.followupDate) - new Date(b.followupDate));
+  if (planned.length) return toSlot(planned[0]);
+  const latest = [...rows].sort((a, b) => new Date(b.followupDate || 0) - new Date(a.followupDate || 0))[0];
+  return toSlot(latest);
+};
+
 const mapHrLeadToB2cProfile = (lead) => {
   const owner = lead?.leadOwner && typeof lead.leadOwner === 'object'
     ? lead.leadOwner
@@ -294,6 +317,8 @@ const mapHrLeadToB2cProfile = (lead) => {
     };
   });
   const uploadedCount = uploadedDocs.filter((doc) => doc.uploads.length > 0).length;
+  const followUpCall = hrFollowupSlot(lead?.followups, 'call');
+  const followUpVisit = hrFollowupSlot(lead?.followups, 'visit');
 
   return {
     _id: lead?._id,
@@ -343,6 +368,11 @@ const mapHrLeadToB2cProfile = (lead) => {
       ? { _id: lead?.leadSubstatus || null, title: lead.subStatusTitle }
       : null,
     followups: lead?.followups || [],
+    followUpCall,
+    followUpVisit,
+    followup: followUpCall || followUpVisit,
+    followupDate: followUpCall?.followupDate || followUpVisit?.followupDate || null,
+    followupStats: lead?.followupCounts || null,
     logs: lead?.logs || [],
     createdAt: lead?.createdAt,
     updatedAt: lead?.updatedAt,
@@ -4794,6 +4824,8 @@ const CRMDashboard = () => {
               leadStatus: data._leadStatus,
               leadSubstatus: data._leadSubStatus,
               followupDate: bulkFollowupDate,
+              followupType: followUpType || 'Call',
+              googleCalendarEvent: !!(bulkFollowupDate && userData.googleAuthToken?.accessToken),
               remark: data.remarks,
             },
             { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
@@ -4932,6 +4964,8 @@ const CRMDashboard = () => {
               leadStatus: data._leadStatus,
               leadSubstatus: data._leadSubStatus,
               followupDate: data.followup,
+              followupType: followUpType || 'Call',
+              googleCalendarEvent: data.googleCalendarEvent,
               remark: data.remarks,
             },
             {
@@ -4954,7 +4988,9 @@ const CRMDashboard = () => {
 console.log('API Response:', response.data);
 
         if (response.data.success) {
-          alert('Status updated successfully!');
+          alert(response.data.calendarError
+            ? `Status updated. Calendar event was not created: ${response.data.calendarError}`
+            : 'Status updated successfully!');
 
           // Reset form
           setSelectedStatus('');
@@ -5030,38 +5066,6 @@ console.log('API Response:', response.data);
           }
         }
 
-        const slotForType = (type) => {
-          const t = String(type || 'Call').toLowerCase();
-          if (t === 'visit') return selectedProfile?.followUpVisit || null;
-          const callSlot = selectedProfile?.followUpCall || null;
-          if (callSlot) return callSlot;
-          const legacy = selectedProfile?.followup || null;
-          if (legacy && String(legacy?.followUpType || 'Call').toLowerCase() !== 'visit') return legacy;
-          return null;
-        };
-
-        const activeSlot = slotForType(followUpType);
-        const slotBucket = getFollowupBucket(activeSlot);
-        const hasExistingFollowup = Boolean(activeSlot?._id) && slotBucket === 'planned';
-        const payload = hasExistingFollowup
-          ? {
-            id: activeSlot._id,
-            appliedCourseId: selectedProfile._id,
-            followUpType: followUpType || 'Call',
-            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
-            remarks: remarks || '',
-            folloupType: 'update',
-            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
-          }
-          : {
-            appliedCourseId: selectedProfile._id,
-            followUpType: followUpType || 'Call',
-            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
-            remarks: remarks || '',
-            folloupType: 'new',
-            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
-          };
-
         // Check if backend URL and token exist
         if (!backendUrl) {
           alert('Backend URL not configured');
@@ -5073,32 +5077,91 @@ console.log('API Response:', response.data);
           return;
         }
 
-        const response = await axios.post(
-          `${backendUrl}/college/b2c-set-followups`,
-          payload,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        // Backend returns status: true (not success: true)
-        if (response.data.status === true || response.data.success === true) {
-          toast.success(`${followUpType === 'Visit' ? 'Visit' : 'Call'} followup updated successfully!`);
-          const updatedLeadId = selectedProfile._id;
-          setAllProfiles((prev) => prev.map((p) => (
-            p._id === updatedLeadId
-              ? {
-                ...p,
-                followup: response.data.followup ?? p.followup,
-                followUpCall: response.data.followUpCall ?? p.followUpCall,
-                followUpVisit: response.data.followUpVisit ?? p.followUpVisit,
-                followupStats: response.data.followupStats ?? p.followupStats,
+        const googleCalendarEvent = !!(followupDateTime && userData.googleAuthToken?.accessToken);
+        const response = selectedProfile.isHrJobLead
+          ? await axios.post(
+            `${backendUrl}/college/hr/leads/${selectedProfile._id}/followup`,
+            {
+              type: followUpType === 'Visit' ? 'Visit' : 'Call',
+              followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+              remarks: remarks || '',
+              googleCalendarEvent,
+            },
+            {
+              headers: {
+                'x-auth': token,
+                'Content-Type': 'application/json'
               }
-              : p
-          )));
+            }
+          )
+          : await axios.post(
+            `${backendUrl}/college/b2c-set-followups`,
+            (() => {
+              const slotForType = (type) => {
+                const t = String(type || 'Call').toLowerCase();
+                if (t === 'visit') return selectedProfile?.followUpVisit || null;
+                const callSlot = selectedProfile?.followUpCall || null;
+                if (callSlot) return callSlot;
+                const legacy = selectedProfile?.followup || null;
+                if (legacy && String(legacy?.followUpType || 'Call').toLowerCase() !== 'visit') return legacy;
+                return null;
+              };
+              const activeSlot = slotForType(followUpType);
+              const slotBucket = getFollowupBucket(activeSlot);
+              const hasExistingFollowup = Boolean(activeSlot?._id) && slotBucket === 'planned';
+              return hasExistingFollowup
+                ? {
+                  id: activeSlot._id,
+                  appliedCourseId: selectedProfile._id,
+                  followUpType: followUpType || 'Call',
+                  followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+                  remarks: remarks || '',
+                  folloupType: 'update',
+                  googleCalendarEvent,
+                }
+                : {
+                  appliedCourseId: selectedProfile._id,
+                  followUpType: followUpType || 'Call',
+                  followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+                  remarks: remarks || '',
+                  folloupType: 'new',
+                  googleCalendarEvent,
+                };
+            })(),
+            {
+              headers: {
+                'x-auth': token,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+
+        // Job leads return success; course leads return status
+        if (response.data.status === true || response.data.success === true) {
+          const updatedLeadId = selectedProfile._id;
+          if (selectedProfile.isHrJobLead && response.data.data) {
+            const mapped = mapHrLeadToB2cProfile(response.data.data);
+            setAllProfiles((prev) => prev.map((p) => (
+              p._id === updatedLeadId ? { ...p, ...mapped } : p
+            )));
+          } else {
+            setAllProfiles((prev) => prev.map((p) => (
+              p._id === updatedLeadId
+                ? {
+                  ...p,
+                  followup: response.data.followup ?? p.followup,
+                  followUpCall: response.data.followUpCall ?? p.followUpCall,
+                  followUpVisit: response.data.followUpVisit ?? p.followUpVisit,
+                  followupStats: response.data.followupStats ?? p.followupStats,
+                }
+                : p
+            )));
+          }
+          if (response.data.calendarError) {
+            toast.error(`Followup saved. Calendar event was not created: ${response.data.calendarError}`);
+          } else {
+            toast.success(`${followUpType === 'Visit' ? 'Visit' : 'Call'} followup updated successfully!`);
+          }
           shouldClosePanel = true;
           closePanel();
 
@@ -7672,16 +7735,23 @@ console.log('API Response:', response.data);
 
       if (profile && profile._id) {
         try {
-          const response = await axios.get(
-            `${backendUrl}/college/appliedCandidatesDetails`,
-            {
-              params: { leadId: profile._id },
-              headers: { 'x-auth': token }
-            }
-          );
+          const response = profile.isHrJobLead
+            ? await axios.get(
+              `${backendUrl}/college/hr/leads/${profile._id}`,
+              { headers: { 'x-auth': token } }
+            )
+            : await axios.get(
+              `${backendUrl}/college/appliedCandidatesDetails`,
+              {
+                params: { leadId: profile._id },
+                headers: { 'x-auth': token }
+              }
+            );
 
           if (response.data.success && response.data.data) {
-            const fullProfile = response.data.data;
+            const fullProfile = profile.isHrJobLead
+              ? mapHrLeadToB2cProfile(response.data.data)
+              : response.data.data;
             setSelectedProfile(fullProfile);
           }
         } catch (error) {

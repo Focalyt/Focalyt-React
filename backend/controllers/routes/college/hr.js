@@ -186,6 +186,52 @@ const getStartOfTodayIST = () => {
   return new Date(`${y}-${m}-${d}T00:00:00+05:30`);
 };
 
+const attachHrFollowupCalendar = async ({ reqUser, candidate, job, followupDate, remarks, type, requested }) => {
+  if (!requested || !reqUser?.googleAuthToken?.accessToken) {
+    return { eventId: '', error: '' };
+  }
+  try {
+    const { createGoogleCalendarEvent } = require('../services/googleservice');
+    const name = candidate?.name || 'Candidate';
+    const scheduledDateTime = new Date(followupDate);
+    const googleEvent = await createGoogleCalendarEvent({
+      user: reqUser,
+      event: {
+        summary: `Job Follow-up: ${name}`,
+        description: [
+          `${type || 'Call'} follow-up with ${name}`,
+          '',
+          `Mobile: ${candidate?.mobile || 'N/A'}`,
+          `Email: ${candidate?.email || 'N/A'}`,
+          `Job: ${job?.title || 'N/A'}`,
+          '',
+          `Remarks: ${remarks || 'No remarks'}`,
+        ].join('\n'),
+        start: {
+          dateTime: scheduledDateTime.toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        end: {
+          dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
+          timeZone: 'Asia/Kolkata',
+        },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'email', minutes: 24 * 60 },
+            { method: 'popup', minutes: 60 },
+          ],
+        },
+      },
+    });
+    if (googleEvent?.error) return { eventId: '', error: googleEvent.error };
+    return { eventId: googleEvent?.event?.id || '', error: '' };
+  } catch (error) {
+    console.error('[HR followup] calendar error:', error);
+    return { eventId: '', error: error.message || 'Failed to create calendar event' };
+  }
+};
+
 const closeOpenHrFollowups = (lead, type) => {
   const now = new Date();
   const startOfToday = getStartOfTodayIST();
@@ -2061,15 +2107,27 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
         }
 
         const followupType = req.body.followupType === 'Visit' ? 'Visit' : 'Call';
+        const followupRemarks = String(req.body.remark || '').trim();
         closeOpenHrFollowups(apply, followupType);
+        const calendar = await attachHrFollowupCalendar({
+          reqUser: req.user,
+          candidate: loaded.candidate,
+          job: loaded.job,
+          followupDate: nextFollowup,
+          remarks: followupRemarks,
+          type: followupType,
+          requested: req.body.googleCalendarEvent,
+        });
         apply.followups.push({
           type: followupType,
           followupDate: nextFollowup,
-          remarks: String(req.body.remark || '').trim(),
+          remarks: followupRemarks,
           status: 'planned',
           createdBy: req.user?._id,
+          ...(calendar.eventId ? { googleCalendarEventId: calendar.eventId } : {}),
         });
         logActions.push(`${followupType} followup scheduled`);
+        if (calendar.error) req.hrCalendarError = calendar.error;
       }
 
       apply.leadStatus = statusId;
@@ -2124,7 +2182,10 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
     const next = await loadAppliedLead(req.params.id, req.user?.college?._id);
     return res.json({
       success: true,
-      message: logActions.length ? 'Lead updated' : 'No changes',
+      message: req.hrCalendarError
+        ? `Lead updated. Calendar event was not created: ${req.hrCalendarError}`
+        : (logActions.length ? 'Lead updated' : 'No changes'),
+      calendarError: req.hrCalendarError || '',
       data: next?.lead,
     });
   } catch (error) {
@@ -2161,12 +2222,23 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
     if (!apply.logs) apply.logs = [];
     closeOpenHrFollowups(apply, type);
 
+    const calendar = await attachHrFollowupCalendar({
+      reqUser: req.user,
+      candidate: loaded.candidate,
+      job: loaded.job,
+      followupDate,
+      remarks,
+      type,
+      requested: req.body.googleCalendarEvent,
+    });
+
     apply.followups.push({
       type,
       followupDate,
       remarks,
       status: 'planned',
       createdBy: req.user?._id,
+      ...(calendar.eventId ? { googleCalendarEventId: calendar.eventId } : {}),
     });
     apply.logs.push({
       user: req.user?._id,
@@ -2180,7 +2252,10 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 
     return res.json({
       success: true,
-      message: `${type} followup set successfully`,
+      message: calendar.error
+        ? `${type} followup set. Calendar event was not created: ${calendar.error}`
+        : `${type} followup set successfully`,
+      calendarError: calendar.error || '',
       data: updated?.lead,
     });
   } catch (error) {
