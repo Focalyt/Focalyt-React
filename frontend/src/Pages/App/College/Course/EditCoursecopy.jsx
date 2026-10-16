@@ -1397,7 +1397,7 @@ const EditCourse = () => {
 
                       {/* Course Level */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseblock">
-                        <label htmlFor="courseLevel">Course Level</label>
+                        <label htmlFor="courseLevel" style={{ color: formErrors.courseLevel ? '#ef4444' : '' }}>Course Level <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.courseLevel ? 'is-invalid' : ''}`}
                           name="courseLevel"
@@ -1432,9 +1432,9 @@ const EditCourse = () => {
 
                       {/* Vertical */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="vertical">Vertical</label>
+                        <label htmlFor="vertical" style={{ color: formErrors.vertical ? '#ef4444' : '' }}>Vertical <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
-                          className="form-control"
+                          className={`form-control ${formErrors.vertical ? 'is-invalid' : ''}`}
                           name="vertical"
                           id="vertical"
                           value={formData.vertical}
@@ -1445,13 +1445,14 @@ const EditCourse = () => {
                             <option key={vertical._id || index} value={vertical._id}>{vertical.name}</option>
                           ))}
                         </select>
+                        {formErrors.vertical && <div className="invalid-feedback">{formErrors.vertical}</div>}
                       </div>
 
                       {/* Project */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="project">Project</label>
+                        <label htmlFor="project" style={{ color: formErrors.project ? '#ef4444' : '' }}>Project <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
-                          className="form-control"
+                          className={`form-control ${formErrors.project ? 'is-invalid' : ''}`}
                           name="project"
                           id="project"
                           value={formData.project}
@@ -1462,6 +1463,7 @@ const EditCourse = () => {
                             <option key={project._id || index} value={project._id}>{project.name}</option>
                           ))}
                         </select>
+                        {formErrors.project && <div className="invalid-feedback">{formErrors.project}</div>}
                       </div>
 
                       {/* Course Type */}
@@ -1482,7 +1484,7 @@ const EditCourse = () => {
 
                       {/* Name */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="nameblock">
-                        <label htmlFor="name">Name</label>
+                        <label htmlFor="name" style={{ color: formErrors.name ? '#ef4444' : '' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           className={`form-control ${formErrors.name ? 'is-invalid' : ''}`}
                           type="text"
@@ -1496,7 +1498,7 @@ const EditCourse = () => {
 
                       {/* Duration */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="durationblock">
-                        <label htmlFor="duration">Duration</label>
+                        <label htmlFor="duration" style={{ color: formErrors.duration ? '#ef4444' : '' }}>Duration <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                           className={`form-control ${formErrors.duration ? 'is-invalid' : ''}`}
                           type="text"
@@ -1536,7 +1538,7 @@ const EditCourse = () => {
 
                       {/* Qualification */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="qualificationblock">
-                        <label htmlFor="qualification">Qualification</label>
+                        <label htmlFor="qualification" style={{ color: formErrors.qualification ? '#ef4444' : '' }}>Qualification <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
                           className={`form-control ${formErrors.qualification ? 'is-invalid' : ''}`}
                           name="qualification"
@@ -1729,7 +1731,7 @@ const EditCourse = () => {
                         <>
                           {/* OJT */}
                           <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="ojtblock">
-                            <label htmlFor="ojt">OJT</label>
+                            <label htmlFor="ojt" style={{ color: formErrors.ojt ? '#ef4444' : '' }}>OJT <span style={{ color: '#ef4444' }}>*</span></label>
                             <select
                               className={`form-control ${formErrors.ojt ? 'is-invalid' : ''}`}
                               name="ojt"
@@ -1828,7 +1830,7 @@ const EditCourse = () => {
 
                           {/* EMI Option */}
                           <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="emioptionblock">
-                            <label htmlFor="emiOptionAvailable">EMI Option Available</label>
+                            <label htmlFor="emiOptionAvailable" style={{ color: formErrors.emiOptionAvailable ? '#ef4444' : '' }}>EMI Option Available <span style={{ color: '#ef4444' }}>*</span></label>
                             <select
                               className={`form-control ${formErrors.emiOptionAvailable ? 'is-invalid' : ''}`}
                               name="emiOptionAvailable"
