@@ -25,6 +25,7 @@ const EMPTY_FORM = {
   mobile: '',
   city: '',
   applyingFor: '',
+  jobId: '',
   experience: '',
   qualification: '',
   dateOfBirth: '',
@@ -429,6 +430,7 @@ const HrLeads = () => {
     visit: EMPTY_FOLLOWUP_BUCKET,
   });
   const [roles, setRoles] = useState([]);
+  const [jobOptions, setJobOptions] = useState([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [leadStatus, setLeadStatus] = useState('all');
@@ -624,6 +626,33 @@ const HrLeads = () => {
     };
     fetchHrStatuses();
   }, [backendUrl, headers]);
+
+  useEffect(() => {
+    const fetchJobOptions = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/jobAssignmentRule/job-names`, { headers });
+        const list = res.data?.data || res.data?.jobs || [];
+        setJobOptions(Array.isArray(list) ? list : []);
+      } catch (error) {
+        console.error('Failed to fetch HR job options:', error);
+      }
+    };
+    fetchJobOptions();
+  }, [backendUrl, headers]);
+
+  const addRoleOptions = useMemo(() => {
+    const map = new Map();
+    jobOptions.forEach((job) => {
+      const title = String(job?.title || job?.name || '').trim();
+      if (!title || map.has(title)) return;
+      map.set(title, { title, jobId: String(job._id || job.id || '') });
+    });
+    roles.forEach((role) => {
+      const title = String(role || '').trim();
+      if (title && !map.has(title)) map.set(title, { title, jobId: '' });
+    });
+    return [...map.values()].sort((a, b) => a.title.localeCompare(b.title));
+  }, [jobOptions, roles]);
 
   const statusById = useMemo(
     () => new Map((hrStatuses || []).map((status) => [String(status._id), status])),
@@ -1102,6 +1131,15 @@ const HrLeads = () => {
 
   const submitAddLead = async (e) => {
     e.preventDefault();
+    const mobile = String(addForm.mobile || '').replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (!String(addForm.applyingFor || '').trim()) {
+      toast.error('Applying for is required');
+      return;
+    }
     try {
       setAdding(true);
       const formData = new FormData();
@@ -1110,11 +1148,12 @@ const HrLeads = () => {
           if (value) formData.append('resume', value);
           return;
         }
+        if (key === 'jobId' && !value) return;
         formData.append(key, value || '');
       });
       formData.append('source', 'manual');
-      await axios.post(`${backendUrl}/college/hr/leads`, formData, { headers });
-      toast.success('HR lead added');
+      const res = await axios.post(`${backendUrl}/college/hr/leads`, formData, { headers });
+      toast.success(res.data?.message || 'HR lead added');
       setShowAddModal(false);
       setAddForm(EMPTY_FORM);
       setPage(1);
@@ -2325,6 +2364,7 @@ const HrLeads = () => {
                           <i className="fas fa-download" style={{ fontSize: '10px' }} /> Download Leads
                         </button>
                         <button
+                          type="button"
                           className="btn btn-sm btn-outline-primary"
                           style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600 }}
                           onClick={() => setShowAddModal(true)}
@@ -3048,7 +3088,7 @@ const HrLeads = () => {
         <DocumentPreviewModal previewDoc={selectedDocument} onClose={closeDocumentModal} />
       )}
 
-      {showAddModal && (
+      {showAddModal && createPortal(
         <div className="hr-b2c-modal-backdrop" onClick={() => !adding && setShowAddModal(false)}>
           <div className="hr-b2c-modal" onClick={(e) => e.stopPropagation()}>
             <div className="hr-b2c-modal__head">
@@ -3056,11 +3096,11 @@ const HrLeads = () => {
                 <h5 className="mb-0">Add HR Lead</h5>
                 <small>Same fields as the public career form</small>
               </div>
-              <button type="button" className="btn btn-sm text-white" onClick={() => setShowAddModal(false)}>
+              <button type="button" className="btn btn-sm text-white" disabled={adding} onClick={() => setShowAddModal(false)}>
                 <i className="fas fa-times" />
               </button>
             </div>
-            <form onSubmit={submitAddLead}>
+            <form className="hr-b2c-modal__form" onSubmit={submitAddLead}>
               <div className="hr-b2c-form-grid">
                 <div>
                   <label className="small fw-bold">Full name *</label>
@@ -3080,10 +3120,31 @@ const HrLeads = () => {
                 </div>
                 <div>
                   <label className="small fw-bold">Applying for *</label>
-                  <select className="form-select form-select-sm" required value={addForm.applyingFor} onChange={(e) => setAddForm((p) => ({ ...p, applyingFor: e.target.value }))}>
-                    <option value="">Select role</option>
-                    {roles.map((role) => <option key={role} value={role}>{role}</option>)}
-                  </select>
+                  {addRoleOptions.length ? (
+                    <select
+                      className="form-select form-select-sm"
+                      required
+                      value={addForm.applyingFor}
+                      onChange={(e) => {
+                        const title = e.target.value;
+                        const match = addRoleOptions.find((option) => option.title === title);
+                        setAddForm((p) => ({ ...p, applyingFor: title, jobId: match?.jobId || '' }));
+                      }}
+                    >
+                      <option value="">Select role</option>
+                      {addRoleOptions.map((option) => (
+                        <option key={option.jobId || option.title} value={option.title}>{option.title}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      className="form-control form-control-sm"
+                      required
+                      placeholder="Enter job role"
+                      value={addForm.applyingFor}
+                      onChange={(e) => setAddForm((p) => ({ ...p, applyingFor: e.target.value, jobId: '' }))}
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="small fw-bold">Experience *</label>
@@ -3114,7 +3175,8 @@ const HrLeads = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

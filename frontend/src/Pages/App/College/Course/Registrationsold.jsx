@@ -4196,11 +4196,9 @@ const CRMDashboard = () => {
 
   const handleSubStatusChange = (e) => {
     const selectedSubStatusId = e.target.value;
-
-    // ID Ã Â¤Â¸Ã Â¥â€¡ Ã Â¤ÂªÃ Â¥â€šÃ Â¤Â°Ã Â¤Â¾ object find Ã Â¤|Ã Â¤Â°Ã Â¥â€¡Ã Â¤â€š
-    const selectedSubStatusObject = subStatuses.find(status => status._id === selectedSubStatusId);
-
-    // Ã Â¤ÂªÃ Â¥â€šÃ Â¤Â°Ã Â¤Â¾ object set Ã Â¤|Ã Â¤Â°Ã Â¥â€¡Ã Â¤â€š
+    const statusSubs = statuses.find((item) => String(item._id) === String(seletectedStatus))?.substatuses || [];
+    const selectedSubStatusObject = statusSubs.find((status) => String(status._id) === String(selectedSubStatusId))
+      || subStatuses.find((status) => String(status._id) === String(selectedSubStatusId));
     setSelectedSubStatus(selectedSubStatusObject || null);
   };
 
@@ -4228,7 +4226,12 @@ const CRMDashboard = () => {
         setStatuses(status.map(r => ({
           _id: r._id,
           name: r.title,
-          count: r.count || 0,  // agar backend me count nahi hai to 0
+          count: r.count || 0,
+          assignedProjects: (r.assignedProjects || []).map((id) => String(id?._id || id)),
+          substatuses: (r.substatuses || []).map((sub) => ({
+            ...sub,
+            assignedProjects: (sub.assignedProjects || []).map((id) => String(id?._id || id)),
+          })),
         })));
 
         setAiFabSubstatuses(AI_FAB_DEFAULTS);
@@ -7754,6 +7757,40 @@ console.log('API Response:', response.data);
     };
   };
 
+  const getLeadProjectIds = () => {
+    const profiles = showPanel === 'bulkstatuschange'
+      ? (allProfiles || []).filter((profile) =>
+        (selectedProfiles || []).some((id) => String(id) === String(profile._id))
+      )
+      : (selectedProfile ? [selectedProfile] : []);
+    return [...new Set(profiles.map((profile) => getProfileProject(profile).id).filter(Boolean))];
+  };
+
+  const statusIsForLeadProjects = (status, projectIds) => {
+    if (!projectIds.length) return true;
+    const assigned = (status?.assignedProjects || []).map(String).filter(Boolean);
+    if (!assigned.length) return true;
+    const assignedSet = new Set(assigned);
+    return projectIds.every((id) => assignedSet.has(id));
+  };
+
+  const substatusIsForLeadProjects = (sub, status, projectIds) => {
+    if (!projectIds.length) return true;
+    const statusAssigned = (status?.assignedProjects || []).map(String).filter(Boolean);
+    if (!statusAssigned.length) return true;
+    const assigned = new Set((sub?.assignedProjects || []).map(String));
+    return projectIds.every((id) => assigned.has(id));
+  };
+
+  const statusesForLead = statuses.filter((status) => status._id && statusIsForLeadProjects(status, getLeadProjectIds()));
+
+  const substatusesForLead = (() => {
+    const projectIds = getLeadProjectIds();
+    const status = statuses.find((item) => String(item._id) === String(seletectedStatus));
+    if (!status || !Array.isArray(status.substatuses)) return subStatuses;
+    return status.substatuses.filter((sub) => substatusIsForLeadProjects(sub, status, projectIds));
+  })();
+
   const closeLeadMilestones = () => {
     if (leadMilestoneSavingId) return;
     setShowLeadMilestoneModal(false);
@@ -10942,8 +10979,8 @@ useEffect(() => {
                         onChange={handleStatusChange}
                       >
                         <option value="">Select Status</option>
-                        {statuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.name}</option>))}
+                        {statusesForLead.map((filter) => (
+                          <option key={filter._id} value={filter._id}>{filter.name}</option>))}
                       </select>
                     </div>
                   </div>
@@ -10969,8 +11006,8 @@ useEffect(() => {
                         onChange={handleSubStatusChange}
                       >
                         <option value="">Select Sub-Status</option>
-                        {subStatuses.map((filter, index) => (
-                          <option value={filter._id}>{filter.title}</option>))}
+                        {substatusesForLead.map((filter) => (
+                          <option key={filter._id} value={filter._id}>{filter.title}</option>))}
                       </select>
                     </div>
                   </div>
@@ -19030,7 +19067,7 @@ useEffect(() => {
                             onChange={handleFilterChange}
                           >
                             <option value="">All Types</option>
-                            <option value="Free">Ã°Å¸â€ â€œ Free</option>
+                            <option value="Free">Free</option>
                             <option value="Paid">Paid</option>
                           </select>
                         </div>

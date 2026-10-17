@@ -3294,7 +3294,7 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
-  z-index: 1050;
+  z-index: 1060;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3302,8 +3302,18 @@
 }
 .hr-b2c-modal {
   width: min(640px, 100%);
+  max-height: min(90vh, 760px);
   background: #fff;
   border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.hr-b2c-modal__form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow: hidden;
 }
 .hr-b2c-modal__head {
@@ -3319,6 +3329,9 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   padding: 16px 18px;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: calc(90vh - 160px);
 }
 @media (max-width: 768px) {
   .hr-b2c-form-grid { grid-template-columns: 1fr; }

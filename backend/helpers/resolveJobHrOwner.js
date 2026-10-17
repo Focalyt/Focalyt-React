@@ -78,16 +78,16 @@ const resolveJobHrOwner = async ({ applyingFor, jobId } = {}) => {
     await writeHrOntoVacancy(vacancy._id, selected.hrId, selected.hrName);
   }
 
-  console.log('[JobHrOwner] resolve', {
-    applyingFor: String(applyingFor || jobTitle || '').trim(),
-    jobId: id,
-    matchedJobId: String(vacancy._id),
-    matchedTitle: vacancy.title || null,
-    hrId: selected.hrId,
-    hrName: selected.hrName,
-    source: selected.source,
-    ruleId: selected.ruleId,
-  });
+  // console.log('[JobHrOwner] resolve', {
+  //   applyingFor: String(applyingFor || jobTitle || '').trim(),
+  //   jobId: id,
+  //   matchedJobId: String(vacancy._id),
+  //   matchedTitle: vacancy.title || null,
+  //   hrId: selected.hrId,
+  //   hrName: selected.hrName,
+  //   source: selected.source,
+  //   ruleId: selected.ruleId,
+  // });
 
   return {
     hrId: selected.hrId,

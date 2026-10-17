@@ -3083,6 +3083,7 @@ const CRMDashboard = () => {
   // Form state for candidate add leads
   const [centerId, setCenterId] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [addLeadJobId, setAddLeadJobId] = useState('');
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const courseDropdownRef = useRef(null);
   const [isCenterDropdownOpen, setIsCenterDropdownOpen] = useState(false);
@@ -3144,16 +3145,19 @@ const CRMDashboard = () => {
   const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
   const [bulkUploadFormData, setBulkUploadFormData] = useState({
-    courseId: '',
+    jobId: '',
     centerId: '',
     counselorId: '',
     leadCoOwnerId: '',
     leadCoOwner2Id: '',
     registeredBy: '',
     highestQualification: '',
+    statusId: '',
+    subStatusId: '',
   });
   const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
   const [bulkUploadCenters, setBulkUploadCenters] = useState([]);
+  const [bulkUploadSubStatuses, setBulkUploadSubStatuses] = useState([]);
   const bulkUploadFileInputRef = useRef(null);
 
   // Form submission state
@@ -3173,6 +3177,45 @@ const CRMDashboard = () => {
       .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
       .filter((course) => !query || (course?.name || '').toLowerCase().includes(query));
   }, [courses, selectSearch.course]);
+
+  const filteredSortedJobs = useMemo(() => {
+    const query = selectSearch.course.trim().toLowerCase();
+    return [...(jobs || [])]
+      .map((job) => {
+        const centerId = String(job?.center?._id || job?.centerId || (typeof job?.center === 'string' ? job.center : '') || '');
+        const centerName = String(
+          job?.centerName
+          || job?.center?.name
+          || (centerOptions || []).find((center) => String(center.value) === centerId)?.label
+          || ''
+        ).trim();
+        return {
+          _id: job?._id || job?.id,
+          name: String(job?.title || job?.name || '').trim(),
+          centerId,
+          centerName,
+        };
+      })
+      .filter((job) => job._id && job.name)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+      .filter((job) => !query || job.name.toLowerCase().includes(query));
+  }, [jobs, selectSearch.course, centerOptions]);
+
+  const selectAddLeadJob = (job) => {
+    setAddLeadJobId(job._id);
+    updateSelectSearch('course', job.name || '');
+    setIsCourseDropdownOpen(false);
+    if (job.centerId) {
+      const centerName = job.centerName || 'Assigned center';
+      setCenters([{ _id: job.centerId, name: centerName }]);
+      setCenterId(job.centerId);
+      updateSelectSearch('center', centerName);
+      return;
+    }
+    setCenters([]);
+    setCenterId('');
+    updateSelectSearch('center', '');
+  };
 
   const filteredSortedCenters = useMemo(() => {
     const query = selectSearch.center.trim().toLowerCase();
@@ -3336,26 +3379,6 @@ const CRMDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    const loadBulkCenters = async () => {
-      if (!showBulkUploadModal || !bulkUploadFormData.courseId) {
-        setBulkUploadCenters([]);
-        return;
-      }
-      try {
-        const response = await axios.get(
-          `${backendUrl}/college/courses/course_centers?courseId=${bulkUploadFormData.courseId}`,
-          { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
-        );
-        setBulkUploadCenters(response.data.status ? (response.data.data || []) : []);
-      } catch (error) {
-        console.error('Error fetching bulk upload centers:', error);
-        setBulkUploadCenters([]);
-      }
-    };
-    loadBulkCenters();
-  }, [showBulkUploadModal, bulkUploadFormData.courseId, backendUrl, token]);
-
   const handleDuplicateLeadHistoryResponse = async (payload, mobile) => {
     const message = payload?.message || payload?.msg || payload?.error || '';
     const isDuplicateCandidate = /already exists|already applied|course already applied/i.test(message);
@@ -3415,7 +3438,8 @@ const CRMDashboard = () => {
       const highestQualification = candidateFormData.highestQualification || '';
       const dobRaw = candidateFormData.dob;
 
-      if (!courseId) errors.push('Please select Course');
+      if (!addLeadJobId) errors.push('Please select Job');
+      if (!email) errors.push('Please enter Email');
       if (!centerId) errors.push('Please select Center');
       if (!counselorId) errors.push('Please select Counselor');
       if (!registeredBy) errors.push('Please select Source');
@@ -3444,8 +3468,11 @@ const CRMDashboard = () => {
           : dobRaw;
 
       // Prepare the data according to the API structure
+      const selectedJob = (jobs || []).find((job) => String(job?._id || job?.id) === String(addLeadJobId));
       const requestData = {
         courseId,
+        jobId: addLeadJobId,
+        applyingFor: selectedJob?.title || selectedJob?.name || selectSearch.course,
         centerId,
         counselorId,
         candidateData: {
@@ -3477,14 +3504,25 @@ const CRMDashboard = () => {
 
       // Make API call
 
-      const response = await axios.post(`${backendUrl}/college/courses/addleadsb2c`, requestData, {
+      const response = await axios.post(`${backendUrl}/college/hr/leads`, {
+        fullName: name,
+        email,
+        mobile,
+        city: candidateFormData.personalInfo?.currentAddress?.city || '',
+        applyingFor: requestData.applyingFor,
+        jobId: addLeadJobId,
+        experience: 'Not provided',
+        qualification: selectSearch.qualification || '',
+        dateOfBirth: dob || '',
+        source: 'manual',
+      }, {
         headers: {
           'x-auth': token,
           'Content-Type': 'application/json',
         }
       });
 
-      if (response.data.status) {
+      if (response.data.success || response.data.status) {
         alert(response.data.message || "Lead added successfully");
 
         // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
@@ -3523,6 +3561,7 @@ const CRMDashboard = () => {
 
         // Reset form selection fields
         setCourseId('');
+        setAddLeadJobId('');
         setIsCourseDropdownOpen(false);
         setIsCenterDropdownOpen(false);
         setIsQualificationDropdownOpen(false);
@@ -4041,7 +4080,7 @@ const CRMDashboard = () => {
     'Course History',
     'Documents',
     'Placement Doc',
-    'Pre Verification'
+    // 'Pre Verification'
   ];
 
   // Check if device is mobile
@@ -11316,7 +11355,7 @@ useEffect(() => {
         <>
         {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                   <>
-                    <button
+                    {/* <button
                       className="lead-strip-v3__actions-item"
                       onClick={() => {
                         handleMoveToKyc(profile);
@@ -11325,21 +11364,21 @@ useEffect(() => {
                     >
                       <i className="fas fa-arrow-right me-3 text-primary"></i>
                       <span className="fw-medium">Move To KYC List</span>
-                    </button>
+                    </button> */}
           </>
         )}
           {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
             
             <>
-            <button
+            {/* <button
               type="button"
               className="lead-strip-v3__actions-item"
               onClick={() => { handleMoveToAdmission(profile); onClose(); }}
             >
               <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
               Move to Admission
-            </button>
-            <button
+            </button> */}
+            {/* <button
             className="lead-strip-v3__actions-item"
             style={{
               width: "100%",
@@ -11354,19 +11393,19 @@ useEffect(() => {
             onClick={() => handleDownloadAdmissionForm(profile)}
           >
             Download Admission Form
-</button>
+</button> */}
 </>
           )}
 
                                        
-          <button
+          {/* <button
             type="button"
             className="lead-strip-v3__actions-item"
             onClick={() => { openPreVerificationModal(profile); onClose(); }}
           >
             <i className="fas fa-clipboard-check text-primary" aria-hidden="true"></i>
             Add Pre Verification
-          </button>
+          </button> */}
           <button
             type="button"
             className="lead-strip-v3__actions-item"
@@ -11385,14 +11424,14 @@ useEffect(() => {
             <i className="fas fa-user-edit text-info" aria-hidden="true"></i>
             Profile Edit
           </button>
-          <button
+          {/* <button
             type="button"
             className="lead-strip-v3__actions-item"
             onClick={() => { getBranches(profile); setShowBranchModal(true); onClose(); }}
           >
             <i className="fas fa-building text-success" aria-hidden="true"></i>
             Change Branch
-          </button>
+          </button> */}
         </>
       )}
       {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
@@ -11494,21 +11533,23 @@ useEffect(() => {
 
               <div className="mb-3">
                 <label className="form-label fw-semibold text-dark mb-2">
-                  Select Course<span className="text-danger">*</span>
+                  Select Job<span className="text-danger">*</span>
                 </label>
                 <div className="position-relative" ref={courseDropdownRef}>
                   <input
                     type="text"
-                    id="course"
+                    id="job"
                     className="form-control border-0 shadow-sm"
-                    placeholder="Select / Search course..."
+                    placeholder="Select / Search job..."
                     value={selectSearch.course}
                     onFocus={() => setIsCourseDropdownOpen(true)}
                     onClick={() => setIsCourseDropdownOpen(true)}
                     onChange={(e) => {
                       updateSelectSearch('course', e.target.value);
-                      setCourseId('');
+                      updateSelectSearch('center', '');
+                      setAddLeadJobId('');
                       setCenterId('');
+                      setCenters([]);
                       setIsCourseDropdownOpen(true);
                     }}
                     disabled={loadingData}
@@ -11522,7 +11563,7 @@ useEffect(() => {
                       border: '1px solid #e9ecef'
                     }}
                   />
-                  <input type="hidden" required value={courseId} readOnly />
+                  <input type="hidden" required value={addLeadJobId} readOnly />
 
                   {isCourseDropdownOpen && (
                     <div
@@ -11541,18 +11582,12 @@ useEffect(() => {
                         overflowY: 'auto'
                       }}
                     >
-                      {filteredSortedCourses.length ? (
-                        filteredSortedCourses.map((course) => (
+                      {filteredSortedJobs.length ? (
+                        filteredSortedJobs.map((job) => (
                           <button
-                            key={course._id}
+                            key={job._id}
                             type="button"
-                            onClick={() => {
-                              setCourseId(course._id);
-                              updateSelectSearch('course', course.name || '');
-                              updateSelectSearch('center', '');
-                              setCenterId('');
-                              setIsCourseDropdownOpen(false);
-                            }}
+                            onClick={() => selectAddLeadJob(job)}
                             style={{
                               width: '100%',
                               textAlign: 'left',
@@ -11563,12 +11598,12 @@ useEffect(() => {
                               cursor: 'pointer'
                             }}
                           >
-                            {course.name}
+                            {job.name}
                           </button>
                         ))
                       ) : (
                         <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
-                          No course found
+                          No job found
                         </div>
                       )}
                     </div>
@@ -11587,14 +11622,14 @@ useEffect(() => {
                     className="form-control border-0 shadow-sm"
                     placeholder="Select / Search training center..."
                     value={selectSearch.center}
-                    onFocus={() => courseId && setIsCenterDropdownOpen(true)}
-                    onClick={() => courseId && setIsCenterDropdownOpen(true)}
+                    onFocus={() => addLeadJobId && setIsCenterDropdownOpen(true)}
+                    onClick={() => addLeadJobId && setIsCenterDropdownOpen(true)}
                     onChange={(e) => {
                       updateSelectSearch('center', e.target.value);
                       setCenterId('');
-                      if (courseId) setIsCenterDropdownOpen(true);
+                      if (addLeadJobId) setIsCenterDropdownOpen(true);
                     }}
-                    disabled={!courseId}
+                    disabled={!addLeadJobId}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -11607,7 +11642,7 @@ useEffect(() => {
                   />
                   <input type="hidden" required value={centerId} readOnly />
 
-                  {isCenterDropdownOpen && courseId && (
+                  {isCenterDropdownOpen && addLeadJobId && (
                     <div
                       className="shadow-sm"
                       style={{
@@ -11649,7 +11684,7 @@ useEffect(() => {
                         ))
                       ) : (
                         <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
-                          No center found
+                          No center assigned to this job
                         </div>
                       )}
                     </div>
@@ -15718,8 +15753,32 @@ useEffect(() => {
 
   const handleBulkUploadInputChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'courseId') {
-      setBulkUploadFormData((prev) => ({ ...prev, courseId: value, centerId: '' }));
+    if (name === 'jobId') {
+      const selected = (jobs || []).find((job) => String(job?._id || job?.id) === String(value));
+      const nextCenterId = String(
+        selected?.center?._id
+        || selected?.centerId
+        || (typeof selected?.center === 'string' ? selected.center : '')
+        || ''
+      );
+      const centerName = selected?.centerName
+        || selected?.center?.name
+        || (centerOptions || []).find((center) => String(center.value) === nextCenterId)?.label
+        || '';
+      setBulkUploadCenters(nextCenterId ? [{ _id: nextCenterId, name: centerName || 'Assigned center' }] : []);
+      setBulkUploadFormData((prev) => ({ ...prev, jobId: value, centerId: nextCenterId }));
+    } else if (name === 'statusId') {
+      setBulkUploadFormData((prev) => ({ ...prev, statusId: value, subStatusId: '' }));
+      setBulkUploadSubStatuses([]);
+      if (value) {
+        axios.get(`${backendUrl}/college/status/${value}/substatus`, {
+          headers: { 'x-auth': token },
+        })
+          .then((response) => {
+            setBulkUploadSubStatuses(response.data?.success ? (response.data.data || []) : []);
+          })
+          .catch(() => setBulkUploadSubStatuses([]));
+      }
     } else {
       setBulkUploadFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -15730,8 +15789,10 @@ useEffect(() => {
 
   const validateBulkUploadForm = () => {
     const errors = {};
-    if (!bulkUploadFormData.courseId) errors.courseId = 'Course is required';
+    if (!bulkUploadFormData.jobId) errors.jobId = 'Job is required';
     if (!bulkUploadFormData.centerId) errors.centerId = 'Training center is required';
+    if (!bulkUploadFormData.statusId) errors.statusId = 'Status is required';
+    if (!bulkUploadFormData.subStatusId) errors.subStatusId = 'Sub status is required';
     if (!bulkUploadFormData.counselorId) errors.counselorId = 'Counselor is required';
     if (!bulkUploadFormData.registeredBy) errors.registeredBy = 'Source is required';
     if (!bulkUploadFormData.highestQualification) errors.highestQualification = 'Highest qualification is required';
@@ -15740,8 +15801,10 @@ useEffect(() => {
   };
 
   const isBulkUploadConfigComplete = Boolean(
-    bulkUploadFormData.courseId &&
+    bulkUploadFormData.jobId &&
     bulkUploadFormData.centerId &&
+    bulkUploadFormData.statusId &&
+    bulkUploadFormData.subStatusId &&
     bulkUploadFormData.counselorId &&
     bulkUploadFormData.registeredBy &&
     bulkUploadFormData.highestQualification
@@ -15749,16 +15812,19 @@ useEffect(() => {
 
   const openBulkUploadModal = () => {
     setBulkUploadFormData({
-      courseId: '',
+      jobId: '',
       centerId: '',
       counselorId: '',
       leadCoOwnerId: '',
       leadCoOwner2Id: '',
       registeredBy: '',
       highestQualification: '',
+      statusId: '',
+      subStatusId: '',
     });
     setBulkUploadFormErrors({});
     setBulkUploadCenters([]);
+    setBulkUploadSubStatuses([]);
     setBulkUploadFile(null);
     setBulkUploadMessage('');
     setBulkUploadErrors([]);
@@ -15827,7 +15893,7 @@ useEffect(() => {
     }
 
     if (!validateBulkUploadForm()) {
-      setBulkUploadMessage('Please complete all required fields above (Course, Training Center, Counselor, Source, Highest Qualification)');
+      setBulkUploadMessage('Please complete all required fields above (Job, Training Center, Status, Sub Status, Counselor, Source, Highest Qualification)');
       setBulkUploadSuccess(false);
       return;
     }
@@ -15839,11 +15905,21 @@ useEffect(() => {
 
     const formData = new FormData();
     formData.append('file', selectedFile, selectedFile.name);
-    formData.append('courseId', bulkUploadFormData.courseId);
+    formData.append('jobId', bulkUploadFormData.jobId);
     formData.append('centerId', bulkUploadFormData.centerId);
+    formData.append('statusId', bulkUploadFormData.statusId);
+    formData.append('subStatusId', bulkUploadFormData.subStatusId);
     formData.append('counselorId', bulkUploadFormData.counselorId);
     formData.append('registeredBy', bulkUploadFormData.registeredBy);
+    const selectedQualification = (qualifications || []).find(
+      (item) => String(item._id) === String(bulkUploadFormData.highestQualification)
+    );
+    const selectedSource = (sources || []).find(
+      (item) => String(item._id) === String(bulkUploadFormData.registeredBy)
+    );
     formData.append('highestQualification', bulkUploadFormData.highestQualification);
+    formData.append('qualification', selectedQualification?.name || '');
+    formData.append('sourceName', selectedSource?.name || 'bulk_upload');
     if (bulkUploadFormData.leadCoOwnerId) {
       formData.append('leadCoOwner', bulkUploadFormData.leadCoOwnerId);
     }
@@ -15852,11 +15928,11 @@ useEffect(() => {
     }
 
     try {
-      const response = await axios.post(`${backendUrl}/college/courses/leads/import`, formData, {
+      const response = await axios.post(`${backendUrl}/college/hr/leads/import`, formData, {
         headers: { 'x-auth': token },
       });
 
-      if (response.data.status) {
+      if (response.data.status || response.data.success) {
         const successCount = response.data.data?.inserted || 0;
         const errorCount = response.data.data?.errors || 0;
         const errorDetails = response.data.data?.errorDetails || [];
@@ -16891,6 +16967,19 @@ useEffect(() => {
           .b2b-crm-dashboard .b2b-mobile-hscroll--chips{
             flex-wrap: nowrap;
             overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+          }
+          .b2b-crm-dashboard .b2b-mobile-hscroll--chips::-webkit-scrollbar{
+            height: 4px;
+          }
+          .b2b-crm-dashboard .b2b-mobile-hscroll--chips::-webkit-scrollbar-track{
+            background: transparent;
+          }
+          .b2b-crm-dashboard .b2b-mobile-hscroll--chips::-webkit-scrollbar-thumb{
+            background: #cbd5e1;
+            border-radius: 999px;
           }
           .b2b-crm-dashboard .b2b-followup-scroll-row{
             min-width: 0;
@@ -20094,7 +20183,7 @@ useEffect(() => {
                                             </div>
                                           ))}
                                         </div>
-                                        <div className="lead-card-kyc-dash__actions">
+                                        {/* <div className="lead-card-kyc-dash__actions">
                                           {!profile.kyc ? (
                                             <button
                                               type="button"
@@ -20109,7 +20198,7 @@ useEffect(() => {
                                               KYC Done
                                             </span>
                                           )}
-                                        </div>
+                                        </div> */}
                                       </div>
                                     </div>
                                   </div>
@@ -20124,8 +20213,6 @@ useEffect(() => {
                                     const docTotal = Number(profile?.docCounts?.totalRequired ?? 0);
                                     const docPending = Math.max(0, docTotal - docDone);
                                     const kycProgress = kycGetDocProgress(profile);
-                                    const isKycDone = profile.kyc === true;
-                                    const isMarkingKyc = kycMarkingId === profile._id;
                                     const renderStatGrid = (rows) => (
                                       <div className="lead-strip-v3__stat-grid">
                                         <div className="lead-strip-v3__stat-row">
@@ -20514,7 +20601,7 @@ useEffect(() => {
                                             >
                                               <i className="fas fa-edit" aria-hidden="true"></i>
                                             </button>
-                                            <div className="lead-card-kyc-dash__actions">
+                                            {/* <div className="lead-card-kyc-dash__actions">
                                               {!isKycDone ? (
                                                 <button
                                                   type="button"
@@ -20529,7 +20616,7 @@ useEffect(() => {
                                                   KYC Done
                                                 </span>
                                               )}
-                                            </div>
+                                            </div> */}
                                           </div>
                                         </div>
                                       </>
@@ -20538,53 +20625,7 @@ useEffect(() => {
                                 </div>
                               )}
                             </div>
-
-                                  {/* Overdue badge: next action date passed */}
-                                  {/* {(profile.followupDate && new Date(profile.followupDate) < new Date(new Date().setHours(0, 0, 0, 0))) && (
-                                    <div className="col-12 col-md-auto mt-1 mt-md-0">
-                                      <span className="badge bg-danger" title="Next action date has passed">
-                                        <i className="fas fa-clock me-1"></i>Overdue follow-up
-                                      </span>
-                                    </div>
-                                  )}
-                                  
-                                  <div className="col-12 mt-1">
-                                    {leadIntelMap[profile._id] ? (
-                                      <div className="d-flex flex-wrap align-items-center gap-2 small">
-                                        <span className="badge bg-primary">AI Score: {leadIntelMap[profile._id].score}/100</span>
-                                        <span className="text-muted">Intent: {leadIntelMap[profile._id].intent}</span>
-                                        {leadIntelMap[profile._id].suggestedAction && (
-                                          <span className="text-dark" title="Suggested action">
-                                            <i className="fas fa-lightbulb text-warning me-1"></i>
-                                            {leadIntelMap[profile._id].suggestedAction}
-                                          </span>
-                                        )}
-                                        <button
-                                          type="button"
-                                          className="btn btn-xs btn-outline-secondary"
-                                          style={{ padding: '2px 8px', fontSize: '11px' }}
-                                          onClick={() => fetchLeadIntelSingle(profile)}
-                                          disabled={loadingLeadIntel}
-                                          title="Refresh AI for this lead"
-                                        >
-                                          <i className="fas fa-robot me-1"></i>Refresh
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        className="btn btn-xs btn-outline-secondary"
-                                        style={{ padding: '2px 8px', fontSize: '11px' }}
-                                        onClick={() => fetchLeadIntelSingle(profile)}
-                                        disabled={loadingLeadIntel}
-                                        title="Load AI for this lead"
-                                      >
-                                        <i className="fas fa-robot me-1"></i>AI for this lead
-                                      </button>
-                                    )}
-                                  </div> */}
-
-                                  
+                                 
 
                                   <div className="col-md-1 text-end d-none">
                                     <div className="btn-group">
@@ -20632,7 +20673,7 @@ useEffect(() => {
                                             display: showPopup === profileIndex ? "block" : "none"
                                           }}
                                         >
-                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                          {/* {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                                <>
                                                   <button
                                                     className="lead-strip-v3__actions-item"
@@ -20645,10 +20686,10 @@ useEffect(() => {
                                                     <span className="fw-medium">Move To KYC List</span>
                                                  </button>
                                                </>
-                                          )}
+                                          )} */}
                                           {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                             <>
-                                              {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                              {/* {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
                                                 <button
                                                   className="dropdown-item"
                                                   style={{
@@ -20665,9 +20706,9 @@ useEffect(() => {
                                                 >
                                                   Move to Admission
                                                 </button>
-                                              )}
+                                              )} */}
 
-<button
+{/* <button
                                                     className="lead-strip-v3__actions-item"
                                                     style={{
                                                       width: "100%",
@@ -20682,9 +20723,9 @@ useEffect(() => {
                                                     onClick={() => handleDownloadAdmissionForm(profile)}
                                                   >
                                                     Download Admission Form
-                                                  </button>
+                                                  </button> */}
 
-                                              <button
+                                              {/* <button
                                                 className="dropdown-item"
                                                 style={{
                                                   width: "100%",
@@ -20699,7 +20740,7 @@ useEffect(() => {
                                                 onClick={() => openPreVerificationModal(profile)}
                                               >
                                                 Add Pre Verification
-                                              </button>
+                                              </button> */}
 
                                               <button
                                                 className="dropdown-item"
@@ -20741,7 +20782,7 @@ useEffect(() => {
                                               >
                                                 Profile Edit
                                               </button>
-                                              <button
+                                              {/* <button
                                                 className="btn btn-primary border-0 text-black"
                                                 style={{
                                                   width: "100%",
@@ -20759,7 +20800,7 @@ useEffect(() => {
                                                 }}
                                               >
                                                 Change Branch
-                                              </button>
+                                              </button> */}
                                             </>
                                           )}
 
@@ -23634,46 +23675,42 @@ useEffect(() => {
 
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
-                        Select Course <span className="text-danger">*</span>
+                        Select Job <span className="text-danger">*</span>
                       </label>
                       <div className="position-relative" ref={courseDropdownRef}>
                         <input
                           type="text"
                           className="form-control"
-                          placeholder="Select / Search course..."
+                          placeholder="Select / Search job..."
                           value={selectSearch.course}
                           onFocus={() => setIsCourseDropdownOpen(true)}
                           onClick={() => setIsCourseDropdownOpen(true)}
                           onChange={(e) => {
                             updateSelectSearch('course', e.target.value);
-                            setCourseId('');
+                            updateSelectSearch('center', '');
+                            setAddLeadJobId('');
                             setCenterId('');
+                            setCenters([]);
                             setIsCourseDropdownOpen(true);
                           }}
                           disabled={loadingData}
                         />
-                        <input type="hidden" required value={courseId} readOnly />
+                        <input type="hidden" required value={addLeadJobId} readOnly />
                         {isCourseDropdownOpen && (
                           <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
-                            {filteredSortedCourses.length ? (
-                              filteredSortedCourses.map((course) => (
+                            {filteredSortedJobs.length ? (
+                              filteredSortedJobs.map((job) => (
                                 <button
-                                  key={course._id}
+                                  key={job._id}
                                   type="button"
-                                  onClick={() => {
-                                    setCourseId(course._id);
-                                    updateSelectSearch('course', course.name || '');
-                                    updateSelectSearch('center', '');
-                                    setCenterId('');
-                                    setIsCourseDropdownOpen(false);
-                                  }}
+                                  onClick={() => selectAddLeadJob(job)}
                                   style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
                                 >
-                                  {course.name}
+                                  {job.name}
                                 </button>
                               ))
                             ) : (
-                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No course found</div>
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No job found</div>
                             )}
                           </div>
                         )}
@@ -23690,17 +23727,17 @@ useEffect(() => {
                           className="form-control"
                           placeholder="Select / Search training center..."
                           value={selectSearch.center}
-                          onFocus={() => courseId && setIsCenterDropdownOpen(true)}
-                          onClick={() => courseId && setIsCenterDropdownOpen(true)}
+                          onFocus={() => addLeadJobId && setIsCenterDropdownOpen(true)}
+                          onClick={() => addLeadJobId && setIsCenterDropdownOpen(true)}
                           onChange={(e) => {
                             updateSelectSearch('center', e.target.value);
                             setCenterId('');
-                            if (courseId) setIsCenterDropdownOpen(true);
+                            if (addLeadJobId) setIsCenterDropdownOpen(true);
                           }}
-                          disabled={!courseId}
+                          disabled={!addLeadJobId}
                         />
                         <input type="hidden" required value={centerId} readOnly />
-                        {isCenterDropdownOpen && courseId && (
+                        {isCenterDropdownOpen && addLeadJobId && (
                           <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
                             {filteredSortedCenters.length ? (
                               filteredSortedCenters.map((center) => (
@@ -23718,7 +23755,7 @@ useEffect(() => {
                                 </button>
                               ))
                             ) : (
-                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No center found</div>
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No center assigned to this job</div>
                             )}
                           </div>
                         )}
@@ -24082,10 +24119,10 @@ useEffect(() => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Step 1: Select Course, Training Center, Counselor, Source, and Highest Qualification below.</li>
+                    <li>Step 1: Select Job, Training Center, Status, Sub Status, Counselor, Source, and Highest Qualification below.</li>
                     <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
-                    <li><strong>Required in Excel:</strong> Name, Mobile, WhatsApp, Gender.</li>
-                    <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
+                    <li><strong>Required in Excel:</strong> Name, Mobile, Email, WhatsApp, Gender.</li>
+                    <li>All imported leads use the job, center, status, and sub status selected above.</li>
                     <li>Co-owner 1 and Co-owner 2 are optional; if selected, all imported leads are assigned accordingly.</li>
                   </ul>
                 </div>
@@ -24093,23 +24130,26 @@ useEffect(() => {
                 <div className="row g-3 mb-4">
                   <div className="col-md-6">
                     <label className="form-label fw-bold">
-                      <i className="fas fa-book text-primary me-1"></i>
-                      Select Course <span className="text-danger">*</span>
+                      <i className="fas fa-briefcase text-primary me-1"></i>
+                      Select Job <span className="text-danger">*</span>
                     </label>
                     <select
-                      className={`form-select ${bulkUploadFormErrors.courseId ? 'is-invalid' : ''}`}
-                      name="courseId"
-                      value={bulkUploadFormData.courseId}
+                      className={`form-select ${bulkUploadFormErrors.jobId ? 'is-invalid' : ''}`}
+                      name="jobId"
+                      value={bulkUploadFormData.jobId}
                       onChange={handleBulkUploadInputChange}
                       disabled={bulkUploadLoading || loadingData}
                     >
-                      <option value="">Select Course</option>
-                      {courses.map((course) => (
-                        <option key={course._id} value={course._id}>{course.name}</option>
-                      ))}
+                      <option value="">Select Job</option>
+                      {(jobs || []).map((job) => {
+                        const id = job?._id || job?.id;
+                        const title = job?.title || job?.name;
+                        if (!id || !title) return null;
+                        return <option key={id} value={id}>{title}</option>;
+                      })}
                     </select>
-                    {bulkUploadFormErrors.courseId && (
-                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.courseId}</div>
+                    {bulkUploadFormErrors.jobId && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.jobId}</div>
                     )}
                   </div>
 
@@ -24123,10 +24163,10 @@ useEffect(() => {
                       name="centerId"
                       value={bulkUploadFormData.centerId}
                       onChange={handleBulkUploadInputChange}
-                      disabled={bulkUploadLoading || !bulkUploadFormData.courseId}
+                      disabled={bulkUploadLoading || !bulkUploadFormData.jobId}
                     >
                       <option value="">
-                        {bulkUploadFormData.courseId ? 'Select Training Center' : 'Select course first'}
+                        {bulkUploadFormData.jobId ? 'Select Training Center' : 'Select job first'}
                       </option>
                       {bulkUploadCenters.map((center) => (
                         <option key={center._id} value={center._id}>{center.name}</option>
@@ -24134,6 +24174,52 @@ useEffect(() => {
                     </select>
                     {bulkUploadFormErrors.centerId && (
                       <div className="invalid-feedback d-block">{bulkUploadFormErrors.centerId}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-flag text-primary me-1"></i>
+                      Status <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.statusId ? 'is-invalid' : ''}`}
+                      name="statusId"
+                      value={bulkUploadFormData.statusId}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Status</option>
+                      {(statuses || []).filter((status) => status?._id && status._id !== 'all').map((status) => (
+                        <option key={status._id} value={status._id}>{status.name || status.title}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.statusId && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.statusId}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-list text-primary me-1"></i>
+                      Sub Status <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.subStatusId ? 'is-invalid' : ''}`}
+                      name="subStatusId"
+                      value={bulkUploadFormData.subStatusId}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || !bulkUploadFormData.statusId}
+                    >
+                      <option value="">
+                        {bulkUploadFormData.statusId ? 'Select Sub Status' : 'Select status first'}
+                      </option>
+                      {bulkUploadSubStatuses.map((subStatus) => (
+                        <option key={subStatus._id} value={subStatus._id}>{subStatus.title || subStatus.name}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.subStatusId && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.subStatusId}</div>
                     )}
                   </div>
 

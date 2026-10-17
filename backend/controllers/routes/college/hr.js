@@ -1,6 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const moment = require('moment');
+const path = require('path');
+const fs = require('fs');
+const XLSX = require('xlsx');
 const router = express.Router();
 const { isCollege, getAllTeamMembers } = require('../../../helpers');
 const StatusHr = require('../../models/statusHr');
@@ -1509,6 +1512,24 @@ router.post('/leads', isCollege, async (req, res) => {
     const jobId = toCollegeObjectId(jobOwner.jobId);
     const vacancy = jobId ? await Vacancy.findById(jobId).select('_id title _company hr').lean() : null;
     const mobileValues = mobileLookupValues(mobile);
+    const mobileNumber = parseInt(mobile, 10);
+    const existingStudent = await User.findOne({
+      mobile: { $in: mobileValues },
+      role: 3,
+      isDeleted: { $ne: true },
+    }).select('_id').lean();
+    if (!existingStudent) {
+      await User.create({
+        name: fullName,
+        email,
+        mobile: mobileNumber,
+        role: 3,
+        status: true,
+        source,
+        isImported: true,
+        userAddedby: req.user?._id,
+      });
+    }
     let candidate = await CandidateProfile.findOne({
       mobile: { $in: mobileValues },
       isDeleted: { $ne: true },
@@ -1613,6 +1634,281 @@ router.post('/leads', isCollege, async (req, res) => {
   } catch (error) {
     console.error('[HR leads] create error:', error);
     return res.status(500).json({ success: false, message: 'Failed to add HR lead' });
+  }
+});
+
+const bulkHeaderKey = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const BULK_HEADER_MAP = {
+  name: 'name',
+  fullname: 'name',
+  candidatename: 'name',
+  mobile: 'mobile',
+  mobilenumber: 'mobile',
+  phone: 'mobile',
+  phonenumber: 'mobile',
+  email: 'email',
+  emailid: 'email',
+  whatsapp: 'whatsapp',
+  whatsappnumber: 'whatsapp',
+  address: 'address',
+  dateofbirth: 'dob',
+  dob: 'dob',
+  gender: 'gender',
+  sex: 'gender',
+};
+
+const normalizeBulkGender = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (['male', 'm', 'M'].includes(raw)) return 'male';
+  if (['female', 'f', 'F'].includes(raw)) return 'female';
+  if (['other', 'o', 'O'].includes(raw)) return 'other';
+  return '';
+};
+
+const mapBulkExcelRows = (sheetRows) => {
+  const headers = sheetRows[0] || [];
+  return sheetRows.slice(1).map((row) => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      const mapped = BULK_HEADER_MAP[bulkHeaderKey(header)];
+      if (!mapped) return;
+      const value = row[index];
+      if (value === null || value === undefined || value === '') return;
+      if (mapped === 'mobile' || mapped === 'whatsapp') {
+        const phone = normalizeMobile(value);
+        if (phone) obj[mapped] = phone;
+        return;
+      }
+      if (mapped === 'gender') {
+        const gender = normalizeBulkGender(value);
+        if (gender) obj[mapped] = gender;
+        return;
+      }
+      if (mapped === 'dob' && value instanceof Date && !Number.isNaN(value.getTime())) {
+        obj[mapped] = value;
+        return;
+      }
+      const text = String(value).trim();
+      if (text && text !== 'undefined' && text !== 'null') obj[mapped] = text;
+    });
+    return obj;
+  });
+};
+
+// Excel import from the Jobs "Add Bulk Leads" panel.
+router.post('/leads/import', isCollege, async (req, res) => {
+  try {
+    const jobId = toCollegeObjectId(req.body.jobId);
+    const centerId = toCollegeObjectId(req.body.centerId);
+    const counselorId = toCollegeObjectId(req.body.counselorId);
+    const statusId = toCollegeObjectId(req.body.statusId || req.body.leadStatus);
+    const subStatusId = toCollegeObjectId(req.body.subStatusId || req.body.leadSubstatus);
+    const leadCoOwnerId = toCollegeObjectId(req.body.leadCoOwner);
+    const leadCoOwner2Id = toCollegeObjectId(req.body.leadCoOwner2);
+    const qualification = String(req.body.qualification || '').trim();
+    const sourceName = String(req.body.sourceName || req.body.source || 'bulk_upload').trim() || 'bulk_upload';
+
+    if (!jobId) {
+      return res.status(400).json({ success: false, status: false, message: 'Please select a job' });
+    }
+    if (!statusId || !subStatusId) {
+      return res.status(400).json({ success: false, status: false, message: 'Status and sub status are required' });
+    }
+
+    const vacancy = await Vacancy.findById(jobId).select('_id title _company center').lean();
+    if (!vacancy) {
+      return res.status(400).json({ success: false, status: false, message: 'Selected job was not found' });
+    }
+    const jobCenterId = vacancy.center ? String(vacancy.center) : '';
+    if (jobCenterId && centerId && String(centerId) !== jobCenterId) {
+      return res.status(400).json({ success: false, status: false, message: 'Selected center does not belong to this job' });
+    }
+    if (jobCenterId && !centerId) {
+      return res.status(400).json({ success: false, status: false, message: 'This job has no selected center' });
+    }
+
+    const statusDoc = await Status.findById(statusId).select('title substatuses').lean();
+    const subStatusDoc = (statusDoc?.substatuses || []).find((item) => String(item._id) === String(subStatusId));
+    if (!statusDoc || !subStatusDoc) {
+      return res.status(400).json({ success: false, status: false, message: 'Selected status or sub status was not found' });
+    }
+
+    const uploadedFile = req.files?.file
+      ? (Array.isArray(req.files.file) ? req.files.file[0] : req.files.file)
+      : null;
+    if (!uploadedFile) {
+      return res.status(400).json({ success: false, status: false, message: 'Please upload a file' });
+    }
+    const fileName = uploadedFile.name || uploadedFile.originalname || '';
+    const fileExtension = path.extname(fileName).toLowerCase();
+    if (fileExtension !== '.xlsx' && fileExtension !== '.xls') {
+      return res.status(400).json({ success: false, status: false, message: 'Please upload an Excel file (.xlsx or .xls)' });
+    }
+
+    let buffer = uploadedFile.data;
+    if ((!buffer || !buffer.length) && uploadedFile.tempFilePath) {
+      buffer = fs.readFileSync(uploadedFile.tempFilePath);
+    }
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      return res.status(400).json({ success: false, status: false, message: 'Excel file has no sheet' });
+    }
+    const sheet = workbook.Sheets[sheetName];
+    const sheetRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+    const leads = mapBulkExcelRows(sheetRows).filter((row) => row.name || row.mobile);
+    if (!leads.length) {
+      return res.status(400).json({
+        success: false,
+        status: false,
+        message: 'No valid rows found. Required Excel columns: Name, Mobile, WhatsApp, Gender.',
+      });
+    }
+
+    const collegeId = req.user?.college?._id || null;
+    const statusLabel = `${statusDoc.title}${subStatusDoc.title ? ` / ${subStatusDoc.title}` : ''}`;
+    const errors = [];
+    const seenMobiles = new Set();
+    let inserted = 0;
+
+    for (let index = 0; index < leads.length; index += 1) {
+      const row = leads[index];
+      const excelRow = index + 2;
+      const fullName = capitalizeWords(row.name);
+      const mobile = normalizeMobile(row.mobile);
+      const email = String(row.email || '').trim().toLowerCase();
+      const whatsapp = normalizeMobile(row.whatsapp);
+      const gender = normalizeBulkGender(row.gender);
+      if (!fullName || fullName.length < 2) {
+        errors.push(`Row ${excelRow}: Name is required`);
+        continue;
+      }
+      if (!mobile || !MOBILE_RE.test(mobile)) {
+        errors.push(`Valid 10-digit mobile is required`);
+        continue;
+      }
+      if (seenMobiles.has(mobile)) {
+        errors.push(` Duplicate mobile in this file`);
+        continue;
+      }
+      seenMobiles.add(mobile);
+      if (!email ) {
+        errors.push(`Valid email is required`);
+        continue;
+      }
+      
+     
+
+      try {
+        const mobileValues = mobileLookupValues(mobile);
+        const mobileNumber = parseInt(mobile, 10);
+        const existingStudent = await User.findOne({
+          mobile: { $in: mobileValues },
+          role: 3,
+          isDeleted: { $ne: true },
+        }).select('_id').lean();
+        if (!existingStudent) {
+          await User.create({
+            name: fullName,
+            email,
+            mobile: mobileNumber,
+            whatsapp: parseInt(whatsapp, 10),
+            role: 3,
+            status: true,
+            source: sourceName,
+            isImported: true,
+            userAddedby: req.user?._id,
+          });
+        }
+
+        let candidate = await CandidateProfile.findOne({
+          mobile: { $in: mobileValues },
+          isDeleted: { $ne: true },
+        });
+        const dob = row.dob ? new Date(row.dob) : null;
+        if (!candidate) {
+          candidate = await CandidateProfile.create({
+            name: fullName,
+            email,
+            mobile: mobileNumber,
+            whatsapp: parseInt(whatsapp, 10),
+            sex: gender,
+            source: sourceName,
+            college: collegeId,
+            dob: dob && !Number.isNaN(dob.getTime()) ? dob : undefined,
+            isImported: true,
+            personalInfo: {
+              currentAddress: { fullAddress: row.address || '' },
+            },
+            qualifications: qualification ? [{ specialization: qualification }] : [],
+            appliedJobs: [{ jobId }],
+            hiringStatus: [{
+              company: vacancy._company,
+              job: jobId,
+              status: statusLabel,
+              eventDate: new Date().toISOString(),
+            }],
+          });
+        } else {
+          const alreadyApplied = await AppliedJobs.findOne({ _candidate: candidate._id, _job: jobId }).select('_id').lean();
+          if (alreadyApplied) {
+            errors.push(`Row ${excelRow}: Candidate already applied for this job`);
+            continue;
+          }
+          const alreadyLinked = (candidate.appliedJobs || []).some((item) => String(item.jobId || item) === String(jobId));
+          if (!alreadyLinked) {
+            candidate.appliedJobs = candidate.appliedJobs || [];
+            candidate.appliedJobs.push({ jobId });
+          }
+          candidate.hiringStatus = candidate.hiringStatus || [];
+          candidate.hiringStatus.push({
+            company: vacancy._company,
+            job: jobId,
+            status: statusLabel,
+            eventDate: new Date().toISOString(),
+          });
+          await candidate.save();
+        }
+
+        await AppliedJobs.create({
+          _candidate: candidate._id,
+          _job: jobId,
+          _company: vacancy._company || undefined,
+          college: collegeId,
+          source: sourceName,
+          leadStatus: statusId,
+          leadSubstatus: subStatusId,
+          leadOwner: counselorId || undefined,
+          assignedTo: counselorId || undefined,
+          leadCoOwner: leadCoOwnerId || undefined,
+          leadCoOwner2: leadCoOwner2Id || undefined,
+          logs: [{
+            user: req.user?._id,
+            action: 'Lead created',
+            remarks: 'Added from HR bulk upload',
+          }],
+        });
+        inserted += 1;
+      } catch (rowError) {
+        console.error('[HR leads] bulk row error:', rowError);
+        errors.push(`Row ${excelRow}: Failed to save lead`);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: true,
+      message: `${inserted} leads imported`,
+      data: {
+        inserted,
+        errors: errors.length,
+        errorDetails: errors,
+      },
+    });
+  } catch (error) {
+    console.error('[HR leads] import error:', error);
+    return res.status(500).json({ success: false, status: false, message: 'Failed to import HR leads' });
   }
 });
 

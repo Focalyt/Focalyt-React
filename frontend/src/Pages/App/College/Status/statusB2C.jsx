@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios'
+import * as XLSX from 'xlsx';
 
 const subSelectionKey = (status, sub, index) => `${status?._id || 'status'}::${sub?._id || index}`;
 
@@ -158,20 +159,34 @@ const CopyTargetModal = ({
   const [loadingProjectsByDepartment, setLoadingProjectsByDepartment] = useState({});
   const [selectedSubKeys, setSelectedSubKeys] = useState([]);
   const loadedDepartmentsRef = useRef({});
+  const scopedSubsSetRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    setSelectedDepartmentIds([]);
+    const statuses = selection?.statuses || [];
+    const scopeDepartmentId = selection?.scopeDepartmentId ? String(selection.scopeDepartmentId) : '';
+    const scopeProjectId = selection?.scopeProjectId ? String(selection.scopeProjectId) : '';
+    const alignedDepartmentIds = scopeDepartmentId
+      ? [scopeDepartmentId]
+      : [...new Set(statuses.flatMap((status) => (status.assignedDepartments || []).map(String)))];
+    setSelectedDepartmentIds(alignedDepartmentIds);
     setProjectsByDepartment({});
     setSelectedProjectIdsByDepartment({});
     setLoadingProjectsByDepartment({});
     loadedDepartmentsRef.current = {};
+    scopedSubsSetRef.current = false;
     const keys = [];
-    (selection?.statuses || []).forEach((status) => {
-      (status.substatuses || []).forEach((sub, index) => {
-        keys.push(subSelectionKey(status, sub, index));
+    if (!scopeDepartmentId || scopeProjectId) {
+      statuses.forEach((status) => {
+        (status.substatuses || []).forEach((sub, index) => {
+          const projectIds = (sub.assignedProjects || []).map(String);
+          const include = scopeProjectId
+            ? projectIds.includes(scopeProjectId)
+            : projectIds.length > 0 || !(status.assignedProjects || []).length;
+          if (include) keys.push(subSelectionKey(status, sub, index));
+        });
       });
-    });
+    }
     setSelectedSubKeys(keys);
   }, [isOpen, selection]);
 
@@ -192,7 +207,32 @@ const CopyTargetModal = ({
           _id: String(item._id),
           name: item.name || 'Untitled project',
         }));
+        const departmentProjectIds = new Set(list.map((item) => item._id));
+        const alignedProjectIds = new Set(
+          (selection?.statuses || []).flatMap((status) => (status.assignedProjects || []).map(String))
+            .filter((id) => departmentProjectIds.has(id))
+        );
+        const scopeProjectId = selection?.scopeProjectId ? String(selection.scopeProjectId) : '';
+        const alreadyAligned = list
+          .filter((item) => (scopeProjectId ? item._id === scopeProjectId : alignedProjectIds.has(item._id)))
+          .map((item) => item._id);
         setProjectsByDepartment((prev) => ({ ...prev, [deptId]: list }));
+        if (alreadyAligned.length) {
+          setSelectedProjectIdsByDepartment((prev) => (
+            prev[deptId] ? prev : { ...prev, [deptId]: alreadyAligned }
+          ));
+        }
+        if (selection?.scopeDepartmentId && !scopeProjectId && !scopedSubsSetRef.current) {
+          scopedSubsSetRef.current = true;
+          const keys = [];
+          (selection?.statuses || []).forEach((status) => {
+            (status.substatuses || []).forEach((sub, index) => {
+              const hit = (sub.assignedProjects || []).map(String).some((id) => alignedProjectIds.has(id));
+              if (hit) keys.push(subSelectionKey(status, sub, index));
+            });
+          });
+          setSelectedSubKeys(keys);
+        }
       }).catch((error) => {
         console.error('Error fetching projects for copy:', error);
         if (!cancelled) {
@@ -205,7 +245,14 @@ const CopyTargetModal = ({
         }
       });
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      selectedDepartmentIds.forEach((deptId) => {
+        if (loadedDepartmentsRef.current[deptId] === 'loading') {
+          loadedDepartmentsRef.current[deptId] = '';
+        }
+      });
+    };
   }, [isOpen, selectedDepartmentIds, backendUrl, token]);
 
   const toggleDepartment = (deptId) => {
@@ -235,6 +282,9 @@ const CopyTargetModal = ({
   if (!isOpen || !selection) return null;
 
   const statusList = selection.statuses || [];
+  const visibleDepartments = selection.scopeDepartmentId
+    ? departments.filter((item) => item._id === String(selection.scopeDepartmentId))
+    : departments;
   const isSingle = Boolean(selection.single);
   const substatusCount = statusList.reduce((total, item) => total + (item.substatuses || []).length, 0);
   const allSubsSelected = substatusCount > 0 && selectedSubKeys.length === substatusCount;
@@ -373,9 +423,11 @@ const CopyTargetModal = ({
               <div style={{ fontSize: 13, color: '#718096' }}>Loading departments...</div>
             ) : departments.length === 0 ? (
               <div style={{ fontSize: 13, color: '#a0aec0' }}>No departments</div>
-            ) : departments.map((department) => {
+            ) : visibleDepartments.map((department) => {
               const departmentChecked = selectedDepartmentIds.includes(department._id);
-              const departmentProjects = projectsByDepartment[department._id] || [];
+              const departmentProjects = (selection.scopeProjectId
+                ? (projectsByDepartment[department._id] || []).filter((project) => project._id === String(selection.scopeProjectId))
+                : (projectsByDepartment[department._id] || []));
               const selectedProjects = selectedProjectIdsByDepartment[department._id] || [];
               return (
                 <div key={department._id} style={{ marginBottom: 8 }}>
@@ -499,10 +551,12 @@ const StatusB2C = () => {
   const [projectId, setProjectId] = useState('');
   const [appliedDepartmentId, setAppliedDepartmentId] = useState('');
   const [appliedProjectId, setAppliedProjectId] = useState('');
+  const [appliedDepartmentProjectIds, setAppliedDepartmentProjectIds] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [transferSelection, setTransferSelection] = useState(null);
   const [scopeNotice, setScopeNotice] = useState('');
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
 
   useEffect(() => {
 
@@ -574,6 +628,11 @@ const StatusB2C = () => {
     return () => { cancelled = true; };
   }, [departmentId, backendUrl, token]);
 
+  useEffect(() => {
+    if (!appliedDepartmentId || String(departmentId) !== String(appliedDepartmentId) || appliedProjectId) return;
+    setAppliedDepartmentProjectIds(projects.map((item) => String(item._id)));
+  }, [projects, appliedDepartmentId, departmentId, appliedProjectId]);
+
   const filterActive = Boolean(appliedDepartmentId);
 
   const handleDepartmentChange = (value) => {
@@ -588,6 +647,7 @@ const StatusB2C = () => {
     }
     setAppliedDepartmentId(departmentId);
     setAppliedProjectId(projectId);
+    setAppliedDepartmentProjectIds(projects.map((item) => String(item._id)));
   };
 
   const clearFilter = () => {
@@ -595,26 +655,40 @@ const StatusB2C = () => {
     setProjectId('');
     setAppliedDepartmentId('');
     setAppliedProjectId('');
+    setAppliedDepartmentProjectIds([]);
   };
+
+  const scopeProjectIds = appliedProjectId
+    ? [String(appliedProjectId)]
+    : appliedDepartmentProjectIds;
+  const scopeProjectIdSet = new Set(scopeProjectIds);
 
   const savedScopedStatuses = filterActive
     ? statuses
       .map((status, index) => ({ status, index }))
-      .filter(({ status }) => (
-        (status.assignedDepartments || []).includes(appliedDepartmentId)
-        && (!appliedProjectId || (status.assignedProjects || []).includes(appliedProjectId))
-      ))
-      .map(({ status, index }) => ({
-        index,
-        status: appliedProjectId
-          ? {
+      .filter(({ status }) => {
+        const departmentIds = (status.assignedDepartments || []).map(String);
+        const projectIds = (status.assignedProjects || []).map(String);
+        return departmentIds.includes(String(appliedDepartmentId))
+          && (!appliedProjectId || projectIds.includes(String(appliedProjectId)));
+      })
+      .map(({ status, index }) => {
+        const projectIds = (status.assignedProjects || []).map(String).filter((id) => scopeProjectIdSet.has(id));
+        return {
+          index,
+          status: {
             ...status,
-            substatuses: (status.substatuses || []).filter((sub) => (
-              (sub.assignedProjects || []).includes(appliedProjectId)
-            )),
-          }
-          : status,
-      }))
+            assignedDepartments: [String(appliedDepartmentId)],
+            assignedProjects: projectIds,
+            substatuses: (status.substatuses || [])
+              .filter((sub) => (sub.assignedProjects || []).map(String).some((id) => scopeProjectIdSet.has(id)))
+              .map((sub) => ({
+                ...sub,
+                assignedProjects: (sub.assignedProjects || []).map(String).filter((id) => scopeProjectIdSet.has(id)),
+              })),
+          },
+        };
+      })
     : [];
 
   const appliedDepartmentName = departments.find((item) => item._id === appliedDepartmentId)?.name || '';
@@ -624,7 +698,13 @@ const StatusB2C = () => {
 
   const openSwitchStatus = (status) => {
     if (!status) return;
-    setTransferSelection({ statuses: [status], single: true });
+    const fullStatus = statuses.find((item) => String(item._id) === String(status._id)) || status;
+    setTransferSelection({
+      statuses: [fullStatus],
+      single: true,
+      scopeDepartmentId: filterActive ? String(appliedDepartmentId) : '',
+      scopeProjectId: filterActive && appliedProjectId ? String(appliedProjectId) : '',
+    });
   };
 
   const handleCopyToScope = async ({ targets, selectedSubKeys }) => {
@@ -1886,6 +1966,87 @@ const handleMoveRight = async (statusId, currentIndex) => {
     setIsDeleteModalOpen(false);
   };
 
+  const downloadDepartmentExcel = async () => {
+    if (!statuses.length) {
+      alert('No statuses to download');
+      return;
+    }
+    setDownloadingExcel(true);
+    try {
+      const alignedDepartmentIds = [...new Set(
+        statuses.flatMap((status) => (status.assignedDepartments || []).map(String))
+      )];
+      const projectsByDepartment = {};
+      await Promise.all(alignedDepartmentIds.map(async (deptId) => {
+        const response = await axios.get(`${backendUrl}/college/list-projects`, {
+          headers: { 'x-auth': token },
+          params: { vertical: deptId },
+        });
+        projectsByDepartment[deptId] = new Set(
+          (response.data?.data || []).map((item) => String(item._id))
+        );
+      }));
+
+      const rows = [['SR.No', 'Department', 'Status', 'Substatus']];
+      const merges = [];
+      let serial = 1;
+
+      departments.forEach((department) => {
+        const departmentIdValue = String(department._id);
+        if (!alignedDepartmentIds.includes(departmentIdValue)) return;
+        const deptProjectIds = projectsByDepartment[departmentIdValue] || new Set();
+        const departmentStart = rows.length;
+        let wroteDepartment = false;
+
+        statuses.forEach((status) => {
+          const alignedHere = (status.assignedDepartments || []).map(String).includes(departmentIdValue);
+          if (!alignedHere) return;
+          const subs = (status.substatuses || []).filter((sub) => (
+            (sub.assignedProjects || []).map(String).some((id) => deptProjectIds.has(id))
+          ));
+          const lines = subs.length ? subs.map((sub) => sub.title) : [''];
+          const statusStart = rows.length;
+          lines.forEach((subTitle, index) => {
+            rows.push([
+              serial,
+              !wroteDepartment && index === 0 ? department.name : '',
+              index === 0 ? status.title : '',
+              subTitle,
+            ]);
+            serial += 1;
+            if (index === 0) wroteDepartment = true;
+          });
+          const statusEnd = rows.length - 1;
+          if (statusEnd > statusStart) {
+            merges.push({ s: { r: statusStart, c: 2 }, e: { r: statusEnd, c: 2 } });
+          }
+        });
+
+        const departmentEnd = rows.length - 1;
+        if (departmentEnd > departmentStart) {
+          merges.push({ s: { r: departmentStart, c: 1 }, e: { r: departmentEnd, c: 1 } });
+        }
+      });
+
+      if (rows.length === 1) {
+        alert('No department alignment to download');
+        return;
+      }
+
+      const sheet = XLSX.utils.aoa_to_sheet(rows);
+      sheet['!merges'] = merges;
+      sheet['!cols'] = [{ wch: 10 }, { wch: 24 }, { wch: 24 }, { wch: 36 }];
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, 'Status');
+      XLSX.writeFile(book, 'status-substatus-department.xlsx');
+    } catch (error) {
+      console.error('Error downloading status excel:', error);
+      alert('Failed to download Excel');
+    } finally {
+      setDownloadingExcel(false);
+    }
+  };
+
   return (
     <div style={{
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -1908,27 +2069,45 @@ const handleMoveRight = async (statusId, currentIndex) => {
           Lead Status Flow
         </h1>
 
-        <button
-          onClick={() => {
-            setIsEditMode(false);
-            setIsStatusModalOpen(true);
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            padding: '10px 20px',
-            fontWeight: '500',
-            cursor: 'pointer'
-          }}
-        >
-          <span style={{ fontSize: '18px', marginRight: '4px' }}>+</span>
-          Add New Status
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* <button
+            type="button"
+            onClick={downloadDepartmentExcel}
+            disabled={downloadingExcel}
+            style={{
+              background: 'white',
+              color: '#1d4ed8',
+              border: '1px solid #93c5fd',
+              borderRadius: '4px',
+              padding: '10px 16px',
+              fontWeight: '500',
+              cursor: downloadingExcel ? 'wait' : 'pointer'
+            }}
+          >
+            {downloadingExcel ? 'Downloading...' : 'Download Excel'}
+          </button> */}
+          <button
+            onClick={() => {
+              setIsEditMode(false);
+              setIsStatusModalOpen(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '10px 20px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            <span style={{ fontSize: '18px', marginRight: '4px' }}>+</span>
+            Add New Status
+          </button>
+        </div>
       </div>
 
       {scopeNotice && (

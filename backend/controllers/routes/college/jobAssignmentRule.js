@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const JobAssignmentRule = require('../../models/jobAssignmentRule');
 const Vacancy = require('../../models/vacancy');
+require('../../models/center');
 const { applyRuleScope } = require('../../../helpers/jobRuleMatch');
 const { isCollege } = require('../../../helpers/index');
 const { body, validationResult, param } = require('express-validator');
@@ -129,7 +130,8 @@ router.get('/job-names', isCollege, async (req, res) => {
     }
 
     const jobs = await Vacancy.find(filter)
-      .select('_id title _jobCategory')
+      .select('_id title _jobCategory center')
+      .populate('center', 'name')
       .sort({ title: 1 })
       .lean();
 
@@ -140,7 +142,9 @@ router.get('/job-names', isCollege, async (req, res) => {
         id: job._id,
         name: job.title,
         title: job.title,
-        _jobCategory: job._jobCategory
+        _jobCategory: job._jobCategory,
+        center: job.center?._id || job.center || '',
+        centerName: job.center?.name || '',
       }));
 
     res.json({

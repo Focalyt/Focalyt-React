@@ -2605,6 +2605,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
 			hasFollowUpCall, hasFollowUpVisit, leadSource, includeKyc,
+			aiCalled, aiCallFromDate, aiCallToDate, statusDiff,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2722,6 +2723,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			includeKyc,
 			collegeCourseIds,
 			candidateIds: candidateIds || undefined,
+			aiCalled,
+			aiCallFromDate,
+			aiCallToDate,
+			statusDiff,
 		};
 
 		const countPipeline = buildSimplifiedPipeline({
@@ -2753,10 +2758,18 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			pagination: { skip, limit }
 		});
 
-		const [results, totalCount] = await Promise.all([
+		const compareMode = aiCompareRequested(pipelineFilters);
+		const [results, countResult] = await Promise.all([
 			AppliedCourses.aggregate(pipeline),
-			AppliedCourses.countDocuments(countMatch),
+			compareMode
+				? AppliedCourses.aggregate(countPipeline).then((rows) => rows[0] || {})
+				: AppliedCourses.countDocuments(countMatch),
 		]);
+		const facetCount = (key) => Number(countResult?.[key]?.[0]?.n || 0);
+		const totalCount = compareMode ? facetCount('total') : countResult;
+		const compare = compareMode
+			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same') }
+			: null;
 
 
 		const appliedIds = results.map(r => r._id);
@@ -2907,6 +2920,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				_course: doc._course ? {
 					_id: doc._course._id || null,
 					name: doc._course.name || null,
+					project: doc._course.project || null,
 					docsRequired: doc._course.docsRequired || [],
 					placementDocs: (doc._course.placementDocs || []).filter((item) => item && item.status !== false),
 				} : null,
@@ -3012,7 +3026,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			limit,
 			totalPages: Math.ceil(totalCount / limit),
 			data: processedResults,
-			// crmFilterCounts
+			...(compare ? { compare } : {}),
 		});
 
 	} catch (err) {
@@ -3931,6 +3945,90 @@ async function resolveB2cCandidateSearchIds(name) {
 	return rows.map((row) => row._id);
 }
 
+function aiCompareRequested(filters = {}) {
+	return String(filters.aiCalled) === 'true'
+		|| Boolean(filters.aiCallFromDate)
+		|| Boolean(filters.aiCallToDate)
+		|| filters.statusDiff === 'true'
+		|| filters.statusDiff === 'false';
+}
+
+function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
+	if (!aiCompareRequested(filters)) return false;
+
+	const eventMatch = {};
+	if (String(filters.aiCalled) === 'true') {
+		eventMatch['aiVoice.lastEvent'] = 'CALL_COMPLETED';
+	}
+	if (filters.aiCallFromDate || filters.aiCallToDate) {
+		eventMatch['aiVoice.lastWebhookAt'] = {};
+		if (filters.aiCallFromDate) eventMatch['aiVoice.lastWebhookAt'].$gte = new Date(filters.aiCallFromDate);
+		if (filters.aiCallToDate) {
+			const toDate = new Date(filters.aiCallToDate);
+			toDate.setDate(toDate.getDate() + 1);
+			eventMatch['aiVoice.lastWebhookAt'].$lte = toDate;
+		}
+	}
+	if (Object.keys(eventMatch).length) pipeline.push({ $match: eventMatch });
+
+	pipeline.push(
+		{
+			$lookup: {
+				from: 'status',
+				localField: '_leadStatus',
+				foreignField: '_id',
+				as: '_cmpHumanDoc',
+				pipeline: [{ $project: { title: 1 } }],
+			},
+		},
+		{
+			$lookup: {
+				from: 'status',
+				localField: '_aiLeadStatus',
+				foreignField: '_id',
+				as: '_cmpAiDoc',
+				pipeline: [{ $project: { title: 1 } }],
+			},
+		},
+		{
+			$addFields: {
+				_cmpHuman: { $toLower: { $ifNull: [{ $arrayElemAt: ['$_cmpHumanDoc.title', 0] }, 'untouch'] } },
+				_cmpAi: { $toLower: { $ifNull: [{ $arrayElemAt: ['$_cmpAiDoc.title', 0] }, 'untouch'] } },
+			},
+		},
+		{
+			$addFields: {
+				_cmpHuman: { $cond: [{ $in: ['$_cmpHuman', ['', 'no status']] }, 'untouch', '$_cmpHuman'] },
+				_cmpAi: { $cond: [{ $in: ['$_cmpAi', ['', 'no status']] }, 'untouch', '$_cmpAi'] },
+			},
+		}
+	);
+
+	const sameMatch = { $expr: { $eq: ['$_cmpAi', '$_cmpHuman'] } };
+	const changedMatch = { $expr: { $ne: ['$_cmpAi', '$_cmpHuman'] } };
+	const narrowed = filters.statusDiff === 'true'
+		? changedMatch
+		: filters.statusDiff === 'false'
+			? sameMatch
+			: null;
+	if (narrowed) pipeline.push({ $match: narrowed });
+
+	if (forCount) {
+		pipeline.push({
+			$facet: {
+				total: [{ $count: 'n' }],
+				aiCalled: [{ $match: { 'aiVoice.lastEvent': 'CALL_COMPLETED' } }, { $count: 'n' }],
+				same: [{ $match: sameMatch }, { $count: 'n' }],
+				changed: [{ $match: changedMatch }, { $count: 'n' }],
+			},
+		});
+		return true;
+	}
+
+	pipeline.push({ $project: { _cmpHumanDoc: 0, _cmpAiDoc: 0, _cmpHuman: 0, _cmpAi: 0 } });
+	return false;
+}
+
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, forCount = false }) {
 	const pipeline = [];
 	filters.leadStatus = String(filters.leadStatus);
@@ -4046,9 +4144,10 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 	baseMatch = attachShiftedDepartmentMatch(baseMatch, filters.verticalsArray);
 
 	pipeline.push({ $match: baseMatch });
+	const compareCounted = appendAiCompare(pipeline, filters, { forCount });
 
 	if (forCount) {
-		pipeline.push({ $count: 'total' });
+		if (!compareCounted) pipeline.push({ $count: 'total' });
 		return pipeline;
 	}
 
