@@ -101,6 +101,12 @@ const getHrDepartmentIds = (verticalOptions = []) => new Set(
     .map((opt) => String(opt.value))
 );
 
+// Other departments (e.g. Placement) list the B2C students shifted into them instead of job applications.
+const isJobLeadDepartment = (cycle = {}, verticalOptions = []) => {
+  const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
+  return !selectedDepartmentId || getHrDepartmentIds(verticalOptions).has(selectedDepartmentId);
+};
+
 const shouldIncludeHrLeads = ({
   cycle = {},
   filters = {},
@@ -5391,7 +5397,7 @@ console.log('API Response:', response.data);
     try {
       filters = omitDashboardChipFilters(filters);
       const cycle = cycleOverride || cycleFilters;
-      if (true) {
+      if (isJobLeadDepartment(cycle, verticalOptions)) {
         const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
           headers: { 'x-auth': token },
           params: {
@@ -5560,7 +5566,7 @@ console.log('API Response:', response.data);
       return;
     }
 
-    if (true) {
+    if (isJobLeadDepartment(cycleOverride || cycleFilters, verticalOptions)) {
       const cycle = cycleOverride || cycleFilters;
       try {
         const hrParams = buildHrRequestParams({
@@ -6230,7 +6236,7 @@ console.log('API Response:', response.data);
     const cycle = cycleOverride || cycleFilters;
     const fd = formDataRef.current || formData;
 
-    if (true) {
+    if (isJobLeadDepartment(cycle, verticalOptions)) {
       try {
         const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
           headers: { 'x-auth': token },
@@ -6398,7 +6404,9 @@ console.log('API Response:', response.data);
       }
 
 
-      const visibleIsJobLead = Boolean(visibleProfile?.isHrJobLead || (true && leadId));
+      const visibleIsJobLead = Boolean(visibleProfile
+        ? visibleProfile.isHrJobLead
+        : (isJobLeadDepartment(cycleFilters, verticalOptions) && leadId));
       const response = visibleIsJobLead
         ? await axios.get(`${backendUrl}/college/hr/leads/${leadId}`, {
           headers: { 'x-auth': token }
