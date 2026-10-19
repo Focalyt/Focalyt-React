@@ -83,6 +83,83 @@ export const patchCoordinatorSessionApi = async (backendUrl, token, sessionId, p
   return res.data.data;
 };
 
+const timetableError = (err, fallback) => {
+  const message = err?.response?.data?.message || err?.message || fallback;
+  const error = new Error(message || fallback);
+  error.statusCode = err?.response?.status;
+  return error;
+};
+
+const timetableRequest = async (method, url, token, body) => {
+  try {
+    const res = await axios({ method, url, data: body, headers: authHeaders(token) });
+    if (!res.data?.status) throw new Error(res.data?.message || 'Timetable request failed');
+    return res.data.data;
+  } catch (err) {
+    throw timetableError(err, 'Timetable request failed');
+  }
+};
+
+export const fetchTimetableTemplatesApi = (backendUrl, token, { batchId, courseId, centerId } = {}) => {
+  const params = new URLSearchParams();
+  if (batchId) params.set('batchId', batchId);
+  if (courseId) params.set('courseId', courseId);
+  if (centerId) params.set('centerId', centerId);
+  return timetableRequest('get', `${backendUrl}/college/timetable/templates?${params.toString()}`, token);
+};
+
+export const createTimetableTemplateApi = (backendUrl, token, payload) => (
+  timetableRequest('post', `${backendUrl}/college/timetable/templates`, token, payload)
+);
+
+export const updateTimetableTemplateApi = (backendUrl, token, templateId, payload) => (
+  timetableRequest('put', `${backendUrl}/college/timetable/templates/${templateId}`, token, payload)
+);
+
+export const deleteTimetableTemplateApi = (backendUrl, token, templateId) => (
+  timetableRequest('delete', `${backendUrl}/college/timetable/templates/${templateId}`, token)
+);
+
+export const defaultTimetableTemplateApi = (backendUrl, token, templateId) => (
+  timetableRequest('post', `${backendUrl}/college/timetable/templates/${templateId}/default`, token, {})
+);
+
+export const ensureTimetableDayApi = (backendUrl, token, payload) => (
+  timetableRequest('post', `${backendUrl}/college/timetable/days`, token, payload)
+);
+
+export const updateTimetableDayApi = (backendUrl, token, dayId, payload) => (
+  timetableRequest('put', `${backendUrl}/college/timetable/days/${dayId}`, token, payload)
+);
+
+export const rebuildTimetableDayApi = (backendUrl, token, dayId, payload) => (
+  timetableRequest('post', `${backendUrl}/college/timetable/days/${dayId}/rebuild`, token, payload)
+);
+
+export const fetchTimetableBookingsApi = (backendUrl, token, { batchId, from, to } = {}) => {
+  const params = new URLSearchParams();
+  if (batchId) params.set('batchId', batchId);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return timetableRequest('get', `${backendUrl}/college/timetable/bookings?${params.toString()}`, token);
+};
+
+export const createTimetableBookingApi = (backendUrl, token, payload) => (
+  timetableRequest('post', `${backendUrl}/college/timetable/bookings`, token, payload)
+);
+
+export const updateTimetableBookingApi = (backendUrl, token, bookingId, payload) => (
+  timetableRequest('patch', `${backendUrl}/college/timetable/bookings/${bookingId}`, token, payload)
+);
+
+export const clearTimetableBookingApi = (backendUrl, token, bookingId) => (
+  timetableRequest('delete', `${backendUrl}/college/timetable/bookings/${bookingId}`, token)
+);
+
+export const fetchTimetableSessionsApi = (backendUrl, token, batchId) => (
+  timetableRequest('get', `${backendUrl}/college/timetable/batches/${batchId}/sessions`, token)
+);
+
 export const addTotQuestionApi = async (backendUrl, token, sessionId, payload) => {
   const res = await axios.post(
     `${backendUrl}/college/session-plans/${sessionId}/tot-questions`,

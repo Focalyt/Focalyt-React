@@ -52,6 +52,23 @@ function extractStorageKey(path, bucketUrl) {
   return normalizeStorageKey(key).replace(/^\//, '');
 }
 
+function encodeStorageKey(key) {
+  return String(key)
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+// Session files uploaded from this machine live on the local API, not the remote bucket.
+function localUploadBaseForKey(key) {
+  if (typeof window === 'undefined') return '';
+  const host = window.location.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1') return '';
+  if (!String(key).startsWith('TrainingSession/')) return '';
+  const backend = (process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '');
+  return `${backend}/api/upload`;
+}
+
 /** Avoid mixed-content blocks: use HTTPS / same-origin paths when the app is on HTTPS. */
 function alignMediaUrl(url) {
   if (!url || typeof url !== 'string' || url.startsWith('blob:')) return url;
@@ -84,8 +101,9 @@ export function resolveMediaUrl(bucketUrl, path) {
   if (!key || key.startsWith('blob:')) return key;
   if (/^https?:\/\//i.test(key)) return alignMediaUrl(key);
 
-  const base = getMediaBaseUrl(bucketUrl);
-  return alignMediaUrl(base ? `${base}/${key}` : key);
+  const encodedKey = encodeStorageKey(key);
+  const base = localUploadBaseForKey(key) || getMediaBaseUrl(bucketUrl);
+  return alignMediaUrl(base ? `${base}/${encodedKey}` : encodedKey);
 }
 
 export default resolveMediaUrl;

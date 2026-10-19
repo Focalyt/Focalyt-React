@@ -3221,7 +3221,6 @@ const SessionCard = ({
   token,
   backendUrl,
   onStatusChange,
-  onEvidenceUpload,
   onEditSession,
   onOpenAttendance,
   onAssignmentSubmitted,
@@ -3239,7 +3238,6 @@ const SessionCard = ({
   const [doneModalOpen, setDoneModalOpen] = useState(false);
   const [doneRemark, setDoneRemark] = useState('');
   const [doneSubmitting, setDoneSubmitting] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState(null);
   const [selectedStudyDoc, setSelectedStudyDoc] = useState(null);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
   const sessionMeta = useMemo(
@@ -3270,19 +3268,26 @@ const SessionCard = ({
     { icon: 'fa-times-circle', val: liveStats.absentCandidates || '0', lbl: 'Absent', cls: 'red' },
     { icon: 'fa-percentage', val: liveStats.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
   ]), [liveStats]);
-  const evidenceDocs = activeSession.evidenceDocs || [];
-  const studyMaterials = (activeSession.standardTlm || [])
-    .filter((item) => item && String(item.name || '').trim())
-    .map((item, index) => ({
-      id: String(item.id || item._id || `tlm-${index}`),
-      name: String(item.name).trim(),
-      type: item.type || 'PDF',
-      fileName: item.fileName || '',
-      fileUrl: item.fileUrl || '',
-      uploadedAt: item.uploadedAt || '',
-      status: item.status || (item.fileUrl ? 'Uploaded' : 'Not Uploaded'),
-    }));
+  const mapStudyDocs = (items, source) => (
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item && String(item.name || '').trim())
+      .map((item, index) => ({
+        id: `${source}-${item.id || item._id || index}`,
+        name: String(item.name).trim(),
+        source,
+        type: item.type || 'PDF',
+        fileName: item.fileName || '',
+        fileUrl: item.fileUrl || '',
+        uploadedAt: item.uploadedAt || '',
+        status: item.status || (item.fileUrl ? 'Uploaded' : 'Not Uploaded'),
+      }))
+  );
+  const studyMaterials = mapStudyDocs(activeSession.learningMaterials, 'student');
+  const standardTlmDocs = mapStudyDocs(activeSession.standardTlm, 'standard');
+  const trainerTlmDocs = mapStudyDocs(activeSession.trainerBasedTlm, 'trainer');
   const uploadedStudyCount = studyMaterials.filter((item) => item.fileUrl).length;
+  const uploadedStandardCount = standardTlmDocs.filter((item) => item.fileUrl).length;
+  const uploadedTrainerCount = trainerTlmDocs.filter((item) => item.fileUrl).length;
   const assignmentLabel = activeSession?.totAssignmentSubmission?.submittedAt
     ? (getPendingTotQuestions(activeSession).length
       ? `ToT · ${getPendingTotQuestions(activeSession).length} new`
@@ -3330,7 +3335,9 @@ const SessionCard = ({
     ];
 
   useEffect(() => {
-    if (!totUnlocked && activeTab === 'evidence') setActiveTab('details');
+    if (!totUnlocked && (activeTab === 'evidence' || activeTab === 'standard' || activeTab === 'trainer')) {
+      setActiveTab('details');
+    }
   }, [totUnlocked, activeTab]);
 
   const closeDoneModal = () => {
@@ -3468,6 +3475,99 @@ const SessionCard = ({
     );
   };
 
+  const renderMaterialCards = (docs) => (
+    <div className="tm-reg-docs-grid">
+      {docs.map((doc) => {
+        const fileUrl = doc.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
+        const fileType = getEvidenceFileType(fileUrl, doc.type, doc.fileName);
+        const hasFile = Boolean(fileUrl);
+        const uploadDate = formatDocDate(doc.uploadedAt);
+        const uploadTime = formatDocTime(doc.uploadedAt);
+        return (
+          <div key={doc.id} className="tm-reg-doc-card">
+            <div className="tm-reg-doc-card__preview">
+              {hasFile ? (
+                fileType === 'image' && fileUrl ? (
+                  <img src={fileUrl} alt={doc.name} className="tm-reg-doc-card__image" />
+                ) : fileType === 'pdf' ? (
+                  <div className="tm-reg-doc-card__icon">
+                    <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
+                    <p>PDF Document</p>
+                  </div>
+                ) : (
+                  <div className="tm-reg-doc-card__icon">
+                    <i className={`fas ${fileType === 'video' ? 'fa-video' : 'fa-file'}`} />
+                    <p>{fileType === 'video' ? 'Video' : 'Document'}</p>
+                  </div>
+                )
+              ) : (
+                <div className="tm-reg-doc-card__empty">
+                  <i className="fas fa-book-open" />
+                  <p>Not uploaded yet</p>
+                </div>
+              )}
+              {hasFile && (
+                <div className="tm-reg-doc-card__overlay">
+                  <button type="button" className="tm-reg-preview-btn" onClick={() => setSelectedStudyDoc(doc)}>
+                    <i className="fas fa-search-plus" />
+                    Preview
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="tm-reg-doc-card__info">
+              <div className="tm-reg-doc-card__header">
+                <h4>{doc.name}</h4>
+                {hasFile ? (
+                  <button
+                    type="button"
+                    className="tm-reg-pill tm-reg-pill--verify"
+                    onClick={() => setSelectedStudyDoc(doc)}
+                  >
+                    <i className="fas fa-book-open" />
+                    OPEN
+                  </button>
+                ) : (
+                  <span className="tm-reg-pill tm-reg-pill--wait">Waiting</span>
+                )}
+              </div>
+              <div className="tm-reg-doc-card__meta">
+                <span>
+                  <i className="fas fa-calendar-alt" />
+                  {uploadDate || 'Not uploaded'}
+                </span>
+                {uploadTime && (
+                  <span>
+                    <i className="fas fa-clock" />
+                    {uploadTime}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderMaterialTab = (docs, emptyText) => (
+    <div className="sc-body">
+      {docs.length === 0 ? (
+        <div className="sc-evidence-empty">
+          <i className="far fa-folder-open" />
+          <p>{emptyText}</p>
+        </div>
+      ) : renderMaterialCards(docs)}
+      {selectedStudyDoc && (
+        <DocumentPreviewModal
+          doc={selectedStudyDoc}
+          title={selectedStudyDoc.name}
+          onClose={() => setSelectedStudyDoc(null)}
+        />
+      )}
+    </div>
+  );
+
   return (
     <article className={`sc-wrap${actionsMenuOpen ? ' sc-wrap--menu' : ''}`}>
       <div className="sc-head">
@@ -3566,10 +3666,25 @@ const SessionCard = ({
             {totUnlocked && (
               <button
                 type="button"
-                className={`sc-tab${activeTab === 'evidence' ? ' sc-tab--active' : ''}`}
-                onClick={() => setActiveTab('evidence')}
+                className={`sc-tab${activeTab === 'standard' ? ' sc-tab--active' : ''}`}
+                onClick={() => setActiveTab('standard')}
               >
-                <i className="far fa-image" /> Documents
+                <i className="fas fa-book" /> Senior Trainer (Standard TLM)
+                {standardTlmDocs.length > 0 && (
+                  <span className="sc-tab-count">{uploadedStandardCount}/{standardTlmDocs.length}</span>
+                )}
+              </button>
+            )}
+            {totUnlocked && (
+              <button
+                type="button"
+                className={`sc-tab${activeTab === 'trainer' ? ' sc-tab--active' : ''}`}
+                onClick={() => setActiveTab('trainer')}
+              >
+                <i className="fas fa-file-alt" /> Flexible (Trainer-based TLM)
+                {trainerTlmDocs.length > 0 && (
+                  <span className="sc-tab-count">{uploadedTrainerCount}/{trainerTlmDocs.length}</span>
+                )}
               </button>
             )}
             <button
@@ -3620,198 +3735,28 @@ const SessionCard = ({
             </div>
           )}
 
-          {totUnlocked && activeTab === 'evidence' && (
-            <div className="sc-body">
-              {evidenceDocs.length === 0 ? (
-                <div className="sc-evidence-empty">
-                  <i className="far fa-folder-open" />
-                  <p>No documents defined for this session plan yet. Upload files here once documents are listed.</p>
-                </div>
-              ) : (
-                <div className="tm-reg-docs-grid">
-                  {evidenceDocs.map((doc) => {
-                    const docKey = String(doc._id || doc.id);
-                    const inputId = `${activeSession.id}-${docKey}`;
-                    const fileUrl = doc.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
-                    const fileType = getEvidenceFileType(fileUrl, doc.type, doc.fileName);
-                    const hasFile = Boolean(fileUrl) || (doc.status === 'Uploaded' && Boolean(doc.fileName));
-                    const uploadDate = formatDocDate(doc.uploadedAt);
-                    const uploadTime = formatDocTime(doc.uploadedAt);
-                    return (
-                      <div key={docKey} className="tm-reg-doc-card">
-                        <div className="tm-reg-doc-card__preview">
-                          {hasFile ? (
-                            fileType === 'image' && fileUrl ? (
-                              <img src={fileUrl} alt={doc.name} className="tm-reg-doc-card__image" />
-                            ) : fileType === 'pdf' ? (
-                              <div className="tm-reg-doc-card__icon">
-                                <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
-                                <p>PDF Document</p>
-                              </div>
-                            ) : (
-                              <div className="tm-reg-doc-card__icon">
-                                <i className={`fas ${fileType === 'video' ? 'fa-video' : 'fa-file'}`} />
-                                <p>{fileType === 'video' ? 'Video' : 'Document'}</p>
-                              </div>
-                            )
-                          ) : (
-                            <div className="tm-reg-doc-card__empty">
-                              <i className="fas fa-file-upload" />
-                              <p>No Document</p>
-                            </div>
-                          )}
-                          {hasFile && (
-                            <div className="tm-reg-doc-card__overlay">
-                              <button type="button" className="tm-reg-preview-btn" onClick={() => setSelectedDoc(doc)}>
-                                <i className="fas fa-search-plus" />
-                                Preview
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="tm-reg-doc-card__info">
-                          <div className="tm-reg-doc-card__header">
-                            <h4>{doc.name || 'Untitled document'}</h4>
-                            {hasFile ? (
-                              <button
-                                type="button"
-                                className="tm-reg-pill tm-reg-pill--verify"
-                                onClick={() => setSelectedDoc(doc)}
-                              >
-                                <i className="fas fa-check" />
-                                VERIFY
-                              </button>
-                            ) : (
-                              <label htmlFor={inputId} className="tm-reg-pill tm-reg-pill--upload">
-                                <i className="fas fa-cloud-upload-alt" />
-                                UPLOAD
-                              </label>
-                            )}
-                          </div>
-                          <div className="tm-reg-doc-card__meta">
-                            <span>
-                              <i className="fas fa-calendar-alt" />
-                              {uploadDate || 'Not uploaded'}
-                            </span>
-                            {uploadTime && (
-                              <span>
-                                <i className="fas fa-clock" />
-                                {uploadTime}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <input
-                          id={inputId}
-                          type="file"
-                          className="sc-file-input"
-                          accept={getAcceptForDocType(doc.type)}
-                          onChange={(e) => {
-                            onEvidenceUpload(activeSession.id, docKey, e.target.files?.[0]);
-                            e.target.value = '';
-                            setSelectedDoc(null);
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {selectedDoc && (
-                <DocumentPreviewModal
-                  doc={selectedDoc}
-                  fileInputId={`${activeSession.id}-${String(selectedDoc._id || selectedDoc.id)}`}
-                  onClose={() => setSelectedDoc(null)}
-                />
-              )}
-            </div>
+          {totUnlocked && activeTab === 'standard' && renderMaterialTab(
+            standardTlmDocs,
+            'No Standard TLM added for this session yet.'
+          )}
+
+          {totUnlocked && activeTab === 'trainer' && renderMaterialTab(
+            trainerTlmDocs,
+            'No trainer-based TLM added for this session yet.'
           )}
 
           {activeTab === 'tlm' && (
             <div className="sc-body">
               <div className="tm-study-head">
                 <strong>Study material</strong>
-                <span>Senior trainer uploaded these documents for you to study before the session.</span>
+                <span>Student learning material saved on this session.</span>
               </div>
               {studyMaterials.length === 0 ? (
                 <div className="sc-evidence-empty">
                   <i className="far fa-folder-open" />
-                  <p>No study material yet. It will appear here after the senior trainer uploads Standard TLM.</p>
+                  <p>No student learning material yet.</p>
                 </div>
-              ) : (
-                <div className="tm-reg-docs-grid">
-                  {studyMaterials.map((doc) => {
-                    const fileUrl = doc.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
-                    const fileType = getEvidenceFileType(fileUrl, doc.type, doc.fileName);
-                    const hasFile = Boolean(fileUrl);
-                    const uploadDate = formatDocDate(doc.uploadedAt);
-                    const uploadTime = formatDocTime(doc.uploadedAt);
-                    return (
-                      <div key={doc.id} className="tm-reg-doc-card">
-                        <div className="tm-reg-doc-card__preview">
-                          {hasFile ? (
-                            fileType === 'image' && fileUrl ? (
-                              <img src={fileUrl} alt={doc.name} className="tm-reg-doc-card__image" />
-                            ) : fileType === 'pdf' ? (
-                              <div className="tm-reg-doc-card__icon">
-                                <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
-                                <p>PDF Document</p>
-                              </div>
-                            ) : (
-                              <div className="tm-reg-doc-card__icon">
-                                <i className={`fas ${fileType === 'video' ? 'fa-video' : 'fa-file'}`} />
-                                <p>{fileType === 'video' ? 'Video' : 'Document'}</p>
-                              </div>
-                            )
-                          ) : (
-                            <div className="tm-reg-doc-card__empty">
-                              <i className="fas fa-book-open" />
-                              <p>Not uploaded yet</p>
-                            </div>
-                          )}
-                          {hasFile && (
-                            <div className="tm-reg-doc-card__overlay">
-                              <button type="button" className="tm-reg-preview-btn" onClick={() => setSelectedStudyDoc(doc)}>
-                                <i className="fas fa-search-plus" />
-                                Preview
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="tm-reg-doc-card__info">
-                          <div className="tm-reg-doc-card__header">
-                            <h4>{doc.name}</h4>
-                            {hasFile ? (
-                              <button
-                                type="button"
-                                className="tm-reg-pill tm-reg-pill--verify"
-                                onClick={() => setSelectedStudyDoc(doc)}
-                              >
-                                <i className="fas fa-book-open" />
-                                OPEN
-                              </button>
-                            ) : (
-                              <span className="tm-reg-pill tm-reg-pill--wait">Waiting</span>
-                            )}
-                          </div>
-                          <div className="tm-reg-doc-card__meta">
-                            <span>
-                              <i className="fas fa-calendar-alt" />
-                              {uploadDate || 'Not uploaded'}
-                            </span>
-                            {uploadTime && (
-                              <span>
-                                <i className="fas fa-clock" />
-                                {uploadTime}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              ) : renderMaterialCards(studyMaterials)}
               {selectedStudyDoc && (
                 <DocumentPreviewModal
                   doc={selectedStudyDoc}
@@ -6855,7 +6800,6 @@ const PORTAL_CSS = `
     font-size: 0.9rem;
     font-weight: 700;
     line-height: 1.3;
-    flex: 1;
   }
   .tm-reg-pill {
     border: none;
@@ -6887,6 +6831,9 @@ const PORTAL_CSS = `
     color: #64748b;
     box-shadow: none;
   }
+  .tm-plan-section + .tm-plan-section {
+    margin-top: 18px;
+  }
   .tm-study-head {
     margin-bottom: 12px;
   }
@@ -6903,6 +6850,13 @@ const PORTAL_CSS = `
     font-weight: 600;
     color: #64748b;
     line-height: 1.4;
+  }
+  .tm-study-source {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
   }
   .tm-reg-doc-card__meta {
     display: flex;

@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 import '../ProjectMangement/listView.css';
-import { BLUE, GREEN, AC_SESSIONS_STORAGE_PREFIX, WORKFLOW_STATUS, getOptionLabel, mapApiOptions, getLinkedCourseOptions, formatSessionDate, fetchCoordinatorSessionsApi, patchCoordinatorSessionApi, loadCoordinatorSessions, filterSessionsForSeniorTrainer, applyPathFilters, parseSessionDateKey, isTotSession, appearsOnStudentCalendar, mapSessionForTotCalendar, resolveSessionSelectionId, sortSessionsByDate, ST_CSS } from './seniorTrainer/seniorTrainerShared';
+import { BLUE, GREEN, AC_SESSIONS_STORAGE_PREFIX, WORKFLOW_STATUS, getOptionLabel, mapApiOptions, getLinkedCourseOptions, formatSessionDate, fetchCoordinatorSessionsApi, patchCoordinatorSessionApi, loadCoordinatorSessions, filterSessionsForSeniorTrainer, applyPathFilters, parseSessionDateKey, isTotSession, appearsOnStudentCalendar, mapSessionForTotCalendar, resolveSessionSelectionId, sortSessionsByDate, ST_CSS, fetchTimetableTemplatesApi, createTimetableTemplateApi, updateTimetableTemplateApi, deleteTimetableTemplateApi, defaultTimetableTemplateApi, ensureTimetableDayApi, updateTimetableDayApi, rebuildTimetableDayApi, fetchTimetableBookingsApi, createTimetableBookingApi, updateTimetableBookingApi, clearTimetableBookingApi, fetchTimetableSessionsApi } from './seniorTrainer/seniorTrainerShared';
 import TrainingCalendar from './seniorTrainer/TrainingCalendar';
 import SessionTable from './seniorTrainer/SessionTable';
 import SessionAssignModal from './seniorTrainer/SessionAssignModal';
@@ -10,7 +10,6 @@ import SeniorSessionCard from './seniorTrainer/SeniorSessionCard';
 /* ------------------------------------------------------------------ */
 /*  Timetable helpers                                                  */
 /* ------------------------------------------------------------------ */
-const TEMPLATE_STORAGE_KEY = 'tt_templates_v1';
 const TRACKS = [
   { key: 'course', label: 'Course', icon: 'bi-book-fill' },
   { key: 'placement', label: 'Placement', icon: 'bi-briefcase-fill' },
@@ -52,27 +51,12 @@ const toDateKey = (d) => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
-const fromDateKey = (key) => {
-  const [y, m, d] = String(key).split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
 const startOfWeekMonday = (date) => {
   const d = new Date(date);
   const diff = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - diff);
   return d;
 };
-const loadTemplates = () => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(TEMPLATE_STORAGE_KEY) || '[]');
-    if (Array.isArray(raw) && raw.length) return raw;
-  } catch (e) { /* ignore */ }
-  return [DEFAULT_TEMPLATE];
-};
-const saveTemplates = (list) => {
-  try { localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
-};
-
 /** Build the list of blocks (periods + lunch) for a configuration */
 const buildBlocks = (cfg) => {
   const blocks = [];
@@ -234,18 +218,28 @@ const TT_CSS = `
 /* ------------------------------------------------------------------ */
 /*  Create Timetable Template drawer                                   */
 /* ------------------------------------------------------------------ */
-const TemplateDrawer = ({ onClose, onSave, centerOptions, courseOptions, batchOptions, initial }) => {
+const TemplateDrawer = ({ onClose, onSave, centerOptions, courseOptions, batchOptions, initial, defaults }) => {
   const [form, setForm] = useState(initial || {
-    name: '', center: '', course: '', batch: '', track: 'course', mode: 'period',
+    name: '',
+    center: defaults?.center || '',
+    course: defaults?.course || '',
+    batch: defaults?.batch || '',
+    track: defaults?.track || 'course',
+    mode: 'period',
     startTime: '09:00', endTime: '17:00', periods: 6, duration: 60, lunchStart: '13:00', lunchEnd: '13:45',
   });
   const [error, setError] = useState('');
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   const sum = useMemo(() => summarize(form), [form]);
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.name.trim()) { setError('Template name is required.'); return; }
-    onSave({ ...form, name: form.name.trim(), id: form.id || `tpl-${Date.now()}` });
+    setError('');
+    try {
+      await onSave({ ...form, name: form.name.trim(), id: form.id });
+    } catch (err) {
+      setError(err.message || 'Could not save template');
+    }
   };
 
   return (
@@ -399,104 +393,390 @@ const ManageTemplatesDrawer = ({ templates, onClose, onDelete, onDefault, onEdit
 /* ------------------------------------------------------------------ */
 /*  Session Timetable builder (main new design)                        */
 /* ------------------------------------------------------------------ */
-const SessionTimetableBuilder = ({
-  breadcrumb, sessions, onAssignPeriod, onBack,
-  centerOptions, courseOptions, batchOptions,
-}) => {
-  const [templates, setTemplates] = useState(loadTemplates);
-  const [templateId, setTemplateId] = useState(() => (loadTemplates().find((t) => t.isDefault) || loadTemplates()[0]).id);
-  const activeTemplate = templates.find((t) => t.id === templateId) || templates[0];
+const mapTemplateFromApi = (row) => ({
+  id: String(row._id),
+  name: row.name,
+  center: row.center ? String(row.center) : '',
+  course: row.course ? String(row.course) : '',
+  batch: row.batch ? String(row.batch) : '',
+  track: row.track || 'course',
+  mode: row.mode || 'period',
+  startTime: row.startTime,
+  endTime: row.endTime,
+  periods: row.periodCount,
+  duration: row.periodMinutes,
+  lunchStart: row.lunchStart || '',
+  lunchEnd: row.lunchEnd || '',
+  isDefault: Boolean(row.isDefault),
+});
 
-  const [cfg, setCfg] = useState(activeTemplate);
-  const [showInfo, setShowInfo] = useState(true);
+const cfgFromDay = (day) => ({
+  startTime: day.dayStart,
+  endTime: day.dayEnd,
+  periods: day.periodCount,
+  duration: day.periodMinutes,
+  lunchStart: day.lunchStart || '',
+  lunchEnd: day.lunchEnd || '',
+  mode: day.mode,
+});
+
+const dayMatchesCfg = (day, config) => {
+  if (!day || !config?.startTime) return false;
+  if (day.mode !== config.mode) return false;
+  if (day.dayStart !== config.startTime) return false;
+  if ((day.lunchStart || '') !== (config.lunchStart || '')) return false;
+  if ((day.lunchEnd || '') !== (config.lunchEnd || '')) return false;
+  if (config.mode === 'full') return day.dayEnd === config.endTime;
+  return Number(day.periodCount) === Number(config.periods)
+    && Number(day.periodMinutes) === Number(config.duration);
+};
+
+const SessionTimetableBuilder = ({
+  breadcrumb, onBack,
+  centerOptions, courseOptions, batchOptions,
+  token, backendUrl, batchId, courseId, centerId, onScheduleChange,
+}) => {
+  const [templates, setTemplates] = useState([]);
+  const [templateId, setTemplateId] = useState('');
+  const [cfg, setCfg] = useState({
+    startTime: '09:00', endTime: '17:00', periods: 6, duration: 60,
+    lunchStart: '13:00', lunchEnd: '13:45', mode: 'period',
+  });
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [track, setTrack] = useState('course');
   const [pickedId, setPickedId] = useState('');
-  const [drawer, setDrawer] = useState(null); // 'create' | 'manage' | {edit: tpl}
+  const [drawer, setDrawer] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [dayDoc, setDayDoc] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [pool, setPool] = useState([]);
+  const skipSave = useRef(false);
+  const templateIdRef = useRef(templateId);
+  templateIdRef.current = templateId;
+  const activeTemplate = templates.find((item) => item.id === templateId) || null;
 
-  useEffect(() => { setCfg(activeTemplate); }, [activeTemplate]);
-  useEffect(() => { saveTemplates(templates); }, [templates]);
+  const applyDay = (day) => {
+    skipSave.current = true;
+    setDayDoc(day);
+    setCfg(cfgFromDay(day));
+  };
+
+  const refreshTemplates = useCallback(async () => {
+    if (!token || !batchId) return [];
+    let rows = await fetchTimetableTemplatesApi(backendUrl, token, { batchId, courseId, centerId });
+    if (!rows.length) {
+      const created = await createTimetableTemplateApi(backendUrl, token, {
+        name: DEFAULT_TEMPLATE.name,
+        track: 'course',
+        mode: 'period',
+        startTime: DEFAULT_TEMPLATE.startTime,
+        endTime: DEFAULT_TEMPLATE.endTime,
+        periodCount: DEFAULT_TEMPLATE.periods,
+        periodMinutes: DEFAULT_TEMPLATE.duration,
+        lunchStart: DEFAULT_TEMPLATE.lunchStart,
+        lunchEnd: DEFAULT_TEMPLATE.lunchEnd,
+        isDefault: true,
+      });
+      rows = [created];
+    }
+    const mapped = rows.map(mapTemplateFromApi);
+    setTemplates(mapped);
+    setTemplateId((current) => (
+      mapped.some((item) => item.id === current)
+        ? current
+        : (mapped.find((item) => item.isDefault) || mapped[0]).id
+    ));
+    return mapped;
+  }, [backendUrl, token, batchId, courseId, centerId]);
+
+  const refreshPool = useCallback(async () => {
+    if (!token || !batchId) {
+      setPool([]);
+      return;
+    }
+    const rows = await fetchTimetableSessionsApi(backendUrl, token, batchId);
+    setPool((rows || []).map((row) => ({
+      id: row.sessionId,
+      assignmentId: row.assignmentId,
+      title: row.title,
+      timetableType: row.timetableType || 'course',
+      fieldTrainerName: row.fieldTrainerName || '',
+      hasActiveBooking: Boolean(row.hasActiveBooking),
+    })));
+  }, [backendUrl, token, batchId]);
+
+  const refreshBookings = useCallback(async () => {
+    if (!token || !batchId) {
+      setBookings([]);
+      return;
+    }
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 6);
+    const rows = await fetchTimetableBookingsApi(backendUrl, token, {
+      batchId,
+      from: toDateKey(weekStart),
+      to: toDateKey(end),
+    });
+    setBookings(rows || []);
+  }, [backendUrl, token, batchId, weekStart]);
+
+  useEffect(() => {
+    refreshTemplates().catch((err) => setNotice(err.message));
+  }, [refreshTemplates]);
+
+  useEffect(() => {
+    refreshPool().catch((err) => setNotice(err.message));
+  }, [refreshPool]);
+
+  useEffect(() => {
+    refreshBookings().catch((err) => setNotice(err.message));
+  }, [refreshBookings]);
+
+  useEffect(() => {
+    if (!token || !batchId || !templateId) return undefined;
+    let cancelled = false;
+    const openDay = async () => {
+      setBusy(true);
+      try {
+        const day = await ensureTimetableDayApi(backendUrl, token, {
+          batchId,
+          date: selectedDate,
+          track,
+          templateId: templateIdRef.current,
+        });
+        if (cancelled) return;
+        applyDay(day);
+        setNotice('');
+      } catch (err) {
+        if (!cancelled) setNotice(err.message || 'Could not open this day');
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    };
+    openDay();
+    return () => { cancelled = true; };
+    // templateId is only a gate so the first saved template can create the day.
+    // Later template changes apply through handleTemplateChange and must not reload the day.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendUrl, token, batchId, selectedDate, track, Boolean(templateId)]);
+
+  useEffect(() => {
+    if (!dayDoc || !token) return undefined;
+    if (skipSave.current) {
+      skipSave.current = false;
+      return undefined;
+    }
+    if (dayMatchesCfg(dayDoc, cfg)) return undefined;
+    let cancelledSave = false;
+    const timer = setTimeout(async () => {
+      setBusy(true);
+      try {
+        const day = await updateTimetableDayApi(backendUrl, token, dayDoc._id, {
+          mode: cfg.mode,
+          dayStart: cfg.startTime,
+          dayEnd: cfg.endTime,
+          periodCount: Number(cfg.periods),
+          periodMinutes: Number(cfg.duration),
+          lunchStart: cfg.lunchStart,
+          lunchEnd: cfg.lunchEnd,
+        });
+        if (cancelledSave) return;
+        applyDay(day);
+        setNotice('');
+      } catch (err) {
+        if (!cancelledSave) {
+          setNotice(err.message || 'Could not update this day');
+          if (dayDoc) applyDay(dayDoc);
+        }
+      } finally {
+        if (!cancelledSave) setBusy(false);
+      }
+    }, 450);
+    return () => {
+      cancelledSave = true;
+      clearTimeout(timer);
+    };
+  }, [cfg, dayDoc, token, backendUrl]);
 
   const sum = useMemo(() => summarize(cfg), [cfg]);
-  const setC = (k, v) => setCfg((p) => ({ ...p, [k]: v }));
+  const savedMatches = dayMatchesCfg(dayDoc, cfg);
+  const blocks = useMemo(() => {
+    if (dayDoc && savedMatches && Array.isArray(dayDoc.slots) && dayDoc.slots.length) {
+      return dayDoc.slots.map((slot) => ({
+        key: slot.key,
+        type: slot.type,
+        label: slot.label,
+        start: slot.startTime,
+        end: slot.endTime,
+        minutes: slot.minutes,
+      }));
+    }
+    return sum.blocks;
+  }, [dayDoc, savedMatches, sum.blocks]);
 
-  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
+  const setC = (key, value) => setCfg((prev) => ({ ...prev, [key]: value }));
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(weekStart);
+    day.setDate(day.getDate() + index);
+    return day;
   }), [weekStart]);
-
   const shiftWeek = (dir) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + dir * 7);
-    setWeekStart(d);
-  };
-  const pickDate = (key) => {
-    setSelectedDate(key);
-    setWeekStart(startOfWeekMonday(fromDateKey(key)));
+    const day = new Date(weekStart);
+    day.setDate(day.getDate() + dir * 7);
+    setWeekStart(day);
   };
 
-  const sessionTrack = (s) => s.timetableType || 'course';
+  const sessionTrack = (session) => session.timetableType || 'course';
   const unscheduled = useMemo(
-    () => sessions.filter((s) => !s.sample && !parseSessionDateKey(s) && sessionTrack(s) === track),
-    [sessions, track]
+    () => pool.filter((session) => !session.hasActiveBooking && sessionTrack(session) === track),
+    [pool, track]
   );
-  const scheduledToday = useMemo(
-    () => sessions.filter((s) => !s.sample && parseSessionDateKey(s) === selectedDate && sessionTrack(s) === track),
-    [sessions, selectedDate, track]
+  const todaysBookings = useMemo(
+    () => bookings.filter((booking) => booking.dateKey === selectedDate && booking.track === track),
+    [bookings, selectedDate, track]
   );
   const dayCountMap = useMemo(() => {
     const map = {};
-    sessions.forEach((s) => { const k = parseSessionDateKey(s); if (k) map[k] = (map[k] || 0) + 1; });
+    bookings.forEach((booking) => {
+      if (!booking.dateKey) return;
+      map[booking.dateKey] = (map[booking.dateKey] || 0) + 1;
+    });
     return map;
-  }, [sessions]);
-
-  const sessionLabel = (s) => s.title || s.name || s.topic || 'Untitled session';
+  }, [bookings]);
+  const sessionLabel = (session) => session.title || session.name || 'Untitled session';
 
   const assignToPeriod = async (block) => {
-    if (!pickedId) return;
+    if (!pickedId || !block.key || !dayDoc || !savedMatches) return;
+    const session = pool.find((item) => item.id === pickedId);
+    if (!session?.assignmentId) return;
     setBusy(true);
     try {
-      await onAssignPeriod(pickedId, {
-        assignDate: selectedDate, startTime: block.start, endTime: block.end, timetableType: track,
-      });
-      setPickedId('');
+      const existing = todaysBookings.find((booking) => booking.sessionId === pickedId);
+      if (existing) {
+        await updateTimetableBookingApi(backendUrl, token, existing._id, {
+          slotKeys: [...(existing.slotKeys || []), block.key],
+        });
+      } else {
+        await createTimetableBookingApi(backendUrl, token, {
+          timetableDayId: dayDoc._id,
+          batchSessionAssignmentId: session.assignmentId,
+          slotKeys: [block.key],
+        });
+      }
+      await Promise.all([refreshBookings(), refreshPool()]);
+      if (onScheduleChange) onScheduleChange();
+      setNotice('');
     } catch (err) {
-      console.error('Failed to assign period', err);
-    } finally { setBusy(false); }
+      setNotice(err.message || 'Could not book this period');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const clearPeriod = async (session) => {
+  const clearPeriod = async (booking) => {
+    if (!booking?._id) return;
     setBusy(true);
     try {
-      await onAssignPeriod(session.id, { assignDate: '', startTime: '', endTime: '', timetableType: sessionTrack(session) });
-    } finally { setBusy(false); }
+      await clearTimetableBookingApi(backendUrl, token, booking._id);
+      await Promise.all([refreshBookings(), refreshPool()]);
+      if (onScheduleChange) onScheduleChange();
+      setNotice('');
+    } catch (err) {
+      setNotice(err.message || 'Could not clear this booking');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleSaveTemplate = (tpl) => {
-    setTemplates((prev) => {
-      const exists = prev.some((t) => t.id === tpl.id);
-      const next = exists ? prev.map((t) => (t.id === tpl.id ? { ...t, ...tpl } : t)) : [...prev, { ...tpl, isDefault: prev.length === 0 }];
-      return next;
+  const applyTemplateToDay = async (nextTemplateId) => {
+    if (!dayDoc || !nextTemplateId) return;
+    const day = await rebuildTimetableDayApi(backendUrl, token, dayDoc._id, {
+      applyTemplate: true,
+      templateId: nextTemplateId,
     });
-    setTemplateId(tpl.id);
+    applyDay(day);
+  };
+
+  const handleTemplateChange = async (nextId) => {
+    const previous = templateId;
+    setTemplateId(nextId);
+    if (!dayDoc || String(dayDoc.template) === String(nextId)) return;
+    setBusy(true);
+    try {
+      await applyTemplateToDay(nextId);
+      setNotice('');
+    } catch (err) {
+      setTemplateId(previous);
+      setNotice(err.message || 'Could not apply this template');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRebuild = async () => {
+    if (!dayDoc || !templateId) return;
+    setBusy(true);
+    try {
+      await applyTemplateToDay(templateId);
+      setNotice('');
+    } catch (err) {
+      setNotice(err.message || 'Clear booked periods before rebuilding this day');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const templatePayload = (form) => ({
+    name: form.name,
+    track: form.track,
+    mode: form.mode,
+    startTime: form.startTime,
+    endTime: form.endTime,
+    periodCount: Number(form.periods) || 1,
+    periodMinutes: Number(form.duration) || 60,
+    lunchStart: form.lunchStart || '',
+    lunchEnd: form.lunchEnd || '',
+    center: form.center || null,
+    course: form.course || null,
+    batch: form.batch || null,
+  });
+
+  const handleSaveTemplate = async (form) => {
+    const saved = form.id
+      ? await updateTimetableTemplateApi(backendUrl, token, form.id, templatePayload(form))
+      : await createTimetableTemplateApi(backendUrl, token, templatePayload(form));
+    await refreshTemplates();
     setDrawer(null);
+    setTemplateId(String(saved._id));
+    if (dayDoc && String(dayDoc.template) !== String(saved._id)) {
+      try {
+        await applyTemplateToDay(saved._id);
+      } catch (err) {
+        setTemplateId(String(dayDoc.template));
+        setNotice(err.message || 'Template saved. Clear bookings before applying it to this day.');
+      }
+    }
   };
-  const handleDeleteTemplate = (id) => {
-    setTemplates((prev) => {
-      const rest = prev.filter((t) => t.id !== id);
-      if (!rest.some((t) => t.isDefault) && rest[0]) rest[0] = { ...rest[0], isDefault: true };
-      return rest;
-    });
-    if (templateId === id) setTemplateId('');
-  };
-  const handleDefault = (id) => setTemplates((prev) => prev.map((t) => ({ ...t, isDefault: t.id === id })));
 
-  useEffect(() => {
-    if (!templates.some((t) => t.id === templateId) && templates[0]) setTemplateId(templates[0].id);
-  }, [templates, templateId]);
+  const handleDeleteTemplate = async (id) => {
+    try {
+      await deleteTimetableTemplateApi(backendUrl, token, id);
+      await refreshTemplates();
+    } catch (err) {
+      setNotice(err.message || 'Could not delete template');
+    }
+  };
+
+  const handleDefault = async (id) => {
+    try {
+      await defaultTimetableTemplateApi(backendUrl, token, id);
+      await refreshTemplates();
+    } catch (err) {
+      setNotice(err.message || 'Could not update the default template');
+    }
+  };
 
   return (
     <div className="tt-page">
@@ -515,22 +795,19 @@ const SessionTimetableBuilder = ({
           </div>
         </div>
 
-        {/* Template select */}
         <div style={{ marginTop: 10, maxWidth: 280 }}>
           <label className="tt-label">Select Timetable Template <b>*</b></label>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <select className="tt-select" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-              {templates.map((t) => {
-                const s = summarize(t);
-                return <option key={t.id} value={t.id}>{t.name} ({t.mode === 'full' ? 'Full day' : `${s.periods.length} Periods`})</option>;
+            <select className="tt-select" value={templateId} onChange={(e) => handleTemplateChange(e.target.value)}>
+              {templates.map((item) => {
+                const summary = summarize(item);
+                return <option key={item.id} value={item.id}>{item.name} ({item.mode === 'full' ? 'Full day' : `${summary.periods.length} Periods`})</option>;
               })}
             </select>
             {activeTemplate?.isDefault && <span className="tt-badge">Default</span>}
           </div>
         </div>
 
-
-        {/* Stat cards */}
         <div className="tt-stats">
           <div className="tt-stat"><i className="bi bi-clock" /><div><small>Start Time</small><strong>{cfg.startTime}</strong></div></div>
           <div className="tt-stat"><i className="bi bi-layers" /><div><small>Periods</small><strong>{sum.periods.length}</strong></div></div>
@@ -539,16 +816,15 @@ const SessionTimetableBuilder = ({
           <div className="tt-stat"><i className="bi bi-clock-history" /><div><small>End Time (Auto)</small><strong>{sum.endTime}</strong></div></div>
         </div>
 
-        {/* Date strip */}
         <div className="tt-days">
           <button type="button" className="tt-arrow" onClick={() => shiftWeek(-1)}><i className="bi bi-chevron-left" /></button>
-          {weekDays.map((d) => {
-            const key = toDateKey(d);
+          {weekDays.map((day) => {
+            const key = toDateKey(day);
             const count = dayCountMap[key];
             return (
               <button type="button" key={key} className={`tt-day ${key === selectedDate ? 'active' : ''}`} onClick={() => setSelectedDate(key)}>
-                <small>{DAY_NAMES[d.getDay()]}</small>
-                <strong>{d.getDate()}</strong>
+                <small>{DAY_NAMES[day.getDay()]}</small>
+                <strong>{day.getDate()}</strong>
                 <em>{count ? `${count} session${count > 1 ? 's' : ''}` : '—'}</em>
               </button>
             );
@@ -556,23 +832,22 @@ const SessionTimetableBuilder = ({
           <button type="button" className="tt-arrow" onClick={() => shiftWeek(1)}><i className="bi bi-chevron-right" /></button>
         </div>
 
-        {/* Config row */}
         <div className="tt-config">
           <div><label className="tt-label">Start Time <b>*</b></label>
             <input type="time" className="tt-input" value={cfg.startTime} onChange={(e) => setC('startTime', e.target.value)} /></div>
           <div><label className="tt-label">Number of Periods <b>*</b></label>
             <select className="tt-select" value={cfg.periods} disabled={cfg.mode === 'full'} onChange={(e) => setC('periods', Number(e.target.value))}>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+              {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count}</option>)}
             </select></div>
           <div><label className="tt-label">Duration <b>*</b></label>
             <select className="tt-select" value={cfg.duration} disabled={cfg.mode === 'full'} onChange={(e) => setC('duration', Number(e.target.value))}>
-              {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d} min</option>)}
+              {DURATION_OPTIONS.map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}
             </select></div>
           <div><label className="tt-label">Lunch Start</label>
             <input type="time" className="tt-input" value={cfg.lunchStart || ''} disabled={cfg.mode === 'full'} onChange={(e) => setC('lunchStart', e.target.value)} /></div>
           <div><label className="tt-label">Lunch End</label>
             <input type="time" className="tt-input" value={cfg.lunchEnd || ''} disabled={cfg.mode === 'full'} onChange={(e) => setC('lunchEnd', e.target.value)} /></div>
-          <button type="button" className="tt-btn tt-btn--solid" style={{ height: 30 }} onClick={() => setCfg(activeTemplate)}>
+          <button type="button" className="tt-btn tt-btn--solid" style={{ height: 30 }} onClick={handleRebuild} disabled={busy}>
             <i className="bi bi-arrow-repeat" /> Rebuild
           </button>
         </div>
@@ -580,25 +855,25 @@ const SessionTimetableBuilder = ({
           {sum.periods.length} classes × {cfg.duration} min · {hrsLabel(sum.studyMin).replace(' hr', '')} study hrs
           {sum.lunch ? ` · lunch ${sum.lunch.start}–${sum.lunch.end}` : ''} · ends {sum.endTime}
         </p>
+        {notice && <p className="text-danger" style={{ margin: '8px 0 0', fontSize: 11 }}>{notice}</p>}
 
-        {/* Body */}
         <div className="tt-body">
           <div className="tt-side">
-            {TRACKS.map((t) => (
-              <button type="button" key={t.key} className={`tt-tab ${track === t.key ? 'active' : ''}`}
-                onClick={() => { setTrack(t.key); setPickedId(''); }}>
-                <i className={`bi ${t.icon}`} /> {t.label}
+            {TRACKS.map((item) => (
+              <button type="button" key={item.key} className={`tt-tab ${track === item.key ? 'active' : ''}`}
+                onClick={() => { setTrack(item.key); setPickedId(''); }}>
+                <i className={`bi ${item.icon}`} /> {item.label}
               </button>
             ))}
             <div className="tt-unscheduled">
               <h6>Not scheduled</h6>
-              <p>Click a session, then click Free on a class.</p>
+              <p>Click a session, then click Free on a class. Click the next period to extend it.</p>
               <div className="tt-session-list">
                 {unscheduled.length === 0 && <div className="tt-empty-note">Nothing left to schedule</div>}
-                {unscheduled.map((s, i) => (
-                  <div key={s.id} className={`tt-session-item ${pickedId === s.id ? 'picked' : ''}`}
-                    onClick={() => setPickedId((p) => (p === s.id ? '' : s.id))}>
-                    {String(i + 1).padStart(2, '0')} {sessionLabel(s)}
+                {unscheduled.map((session, index) => (
+                  <div key={session.id} className={`tt-session-item ${pickedId === session.id ? 'picked' : ''}`}
+                    onClick={() => setPickedId((current) => (current === session.id ? '' : session.id))}>
+                    {String(index + 1).padStart(2, '0')} {sessionLabel(session)}
                   </div>
                 ))}
               </div>
@@ -606,10 +881,10 @@ const SessionTimetableBuilder = ({
           </div>
 
           <div className="tt-grid">
-            {sum.blocks.map((block, idx) => {
+            {blocks.map((block, index) => {
               if (block.type === 'lunch') {
                 return (
-                  <div className="tt-period lunch" key={`lunch-${idx}`}>
+                  <div className="tt-period lunch" key={block.key || `lunch-${index}`}>
                     <h6>Lunch Break</h6>
                     <div className="tt-times">
                       <div><small>Start</small><input value={block.start} readOnly /></div>
@@ -620,9 +895,11 @@ const SessionTimetableBuilder = ({
                   </div>
                 );
               }
-              const booked = scheduledToday.find((s) => s.startTime === block.start);
+              const booked = todaysBookings.find((booking) => (
+                (booking.slotKeys || []).includes(block.key) || booking.startTime === block.start
+              ));
               return (
-                <div className="tt-period" key={`p-${idx}`}>
+                <div className="tt-period" key={block.key || `p-${index}`}>
                   {booked && <button type="button" className="x" title="Remove session" onClick={() => clearPeriod(booked)}><i className="bi bi-x-lg" /></button>}
                   <h6>{block.label}</h6>
                   <div className="tt-times">
@@ -633,7 +910,7 @@ const SessionTimetableBuilder = ({
                   {booked ? (
                     <div className="tt-assigned">{sessionLabel(booked)}<small>{booked.fieldTrainerName || 'Trainer not assigned'}</small></div>
                   ) : (
-                    <button type="button" className={`tt-free ${pickedId ? 'ready' : ''}`} disabled={busy}
+                    <button type="button" className={`tt-free ${pickedId && block.key ? 'ready' : ''}`} disabled={busy || !savedMatches || !block.key}
                       onClick={() => assignToPeriod(block)}>
                       {pickedId ? 'Assign here' : 'Free'}
                     </button>
@@ -647,7 +924,8 @@ const SessionTimetableBuilder = ({
 
       {drawer === 'create' && (
         <TemplateDrawer onClose={() => setDrawer(null)} onSave={handleSaveTemplate}
-          centerOptions={centerOptions} courseOptions={courseOptions} batchOptions={batchOptions} />
+          centerOptions={centerOptions} courseOptions={courseOptions} batchOptions={batchOptions}
+          defaults={{ center: centerId, course: courseId, batch: batchId, track }} />
       )}
       {drawer && drawer.edit && (
         <TemplateDrawer initial={drawer.edit} onClose={() => setDrawer(null)} onSave={handleSaveTemplate}
@@ -655,7 +933,7 @@ const SessionTimetableBuilder = ({
       )}
       {drawer === 'manage' && (
         <ManageTemplatesDrawer templates={templates} onClose={() => setDrawer(null)}
-          onDelete={handleDeleteTemplate} onDefault={handleDefault} onEdit={(t) => setDrawer({ edit: t })} />
+          onDelete={handleDeleteTemplate} onDefault={handleDefault} onEdit={(item) => setDrawer({ edit: item })} />
       )}
     </div>
   );
@@ -1009,45 +1287,6 @@ const SeniorTrainerModule = () => {
       }
     }
   }, [trainerOptions, backendUrl, token]);
-
-  const handleAssignPeriod = useCallback(async (sessionId, {
-    assignDate = '',
-    startTime = '',
-    endTime = '',
-    timetableType = 'course',
-  }) => {
-    const sourceId = resolveSessionSelectionId(sessionId);
-    const formattedDate = assignDate ? formatSessionDate(assignDate) : '';
-
-    if (token) {
-      await patchCoordinatorSessionApi(backendUrl, token, sourceId, {
-        sessionDate: assignDate || null,
-        date: formattedDate,
-        startTime,
-        endTime,
-        timetableType,
-      });
-    }
-
-    setSessions((prevSessions) => prevSessions.map((session) => {
-      if (resolveSessionSelectionId(session.id) !== sourceId) return session;
-      return {
-        ...session,
-        sessionDate: assignDate,
-        date: formattedDate,
-        startTime,
-        endTime,
-        timetableType,
-      };
-    }));
-    setAssignmentDrafts((prev) => ({
-      ...prev,
-      [sourceId]: {
-        ...(prev[sourceId] || {}),
-        assignDate,
-      },
-    }));
-  }, [backendUrl, token]);
 
   useEffect(() => {
     const onFocus = () => reloadSessions();
@@ -1526,12 +1765,16 @@ const SeniorTrainerModule = () => {
 
       <SessionTimetableBuilder
         breadcrumb={breadcrumb}
-        sessions={sessions}
-        onAssignPeriod={handleAssignPeriod}
+        token={token}
+        backendUrl={backendUrl}
+        batchId={filters.batch}
+        courseId={filters.course}
+        centerId={filters.center}
+        onScheduleChange={reloadSessions}
         onBack={handleTimetableBack}
-        centerOptions={centerOptions}
-        courseOptions={courseOptions}
-        batchOptions={batchOptions}
+        centerOptions={center.length ? center : centerOptions}
+        courseOptions={course.length ? course : courseOptions}
+        batchOptions={batch.length ? batch : batchOptions}
       />
 
       <div className="st-stats-row">
