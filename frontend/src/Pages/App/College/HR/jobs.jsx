@@ -170,6 +170,7 @@ const buildHrRequestParams = ({
     project: cycle?.project || undefined,
     applyingFor: cycle?.job || undefined,
     statusTitle: selectedStatus?.name && selectedStatus._id !== 'all' ? selectedStatus.name : undefined,
+    approvalStatus: filters?.approvalStatus ? String(filters.approvalStatus).toUpperCase() : undefined,
   };
   if (filters?.hasFollowUpCall === true || filters?.hasFollowUpCall === 'yes') params.hasFollowUpCall = 'true';
   else if (filters?.hasFollowUpCall === false || filters?.hasFollowUpCall === 'no') params.hasFollowUpCall = 'false';
@@ -380,6 +381,7 @@ const mapHrLeadToB2cProfile = (lead) => {
     followupDate: followUpCall?.followupDate || followUpVisit?.followupDate || null,
     followupStats: lead?.followupCounts || null,
     logs: lead?.logs || [],
+    approval: lead?.approval?.status ? lead.approval : { status: 'PENDING' },
     createdAt: lead?.createdAt,
     updatedAt: lead?.updatedAt,
     documents: lead?.documents || [],
@@ -6262,7 +6264,7 @@ console.log('API Response:', response.data);
         updateCrmFiltersFromBackend(
           merged.crmFilterCount,
           filteredTotalCount,
-          { total: hrAll, approved: 0, pending: hrAll, rejected: 0 },
+          hrData.approvalCounts || { total: hrAll, approved: 0, pending: hrAll, rejected: 0 },
           aiCrmFilterCount
         );
       } catch (hrCountErr) {
@@ -7311,8 +7313,11 @@ console.log('API Response:', response.data);
 
   const approveLead = async (profile) => {
     try {
+      const approvalUrl = profile?.isHrJobLead
+        ? `${backendUrl}/college/hr/leads/${profile._id}/approval`
+        : `${backendUrl}/college/appliedCandidates/${profile._id}/approval`;
       const res = await axios.put(
-        `${backendUrl}/college/appliedCandidates/${profile._id}/approval`,
+        approvalUrl,
         { status: 'APPROVED' },
         { headers: { 'x-auth': token } }
       );
@@ -7333,8 +7338,11 @@ console.log('API Response:', response.data);
 
   const rejectLead = async (profile, reason) => {
     try {
+      const approvalUrl = profile?.isHrJobLead
+        ? `${backendUrl}/college/hr/leads/${profile._id}/approval`
+        : `${backendUrl}/college/appliedCandidates/${profile._id}/approval`;
       const res = await axios.put(
-        `${backendUrl}/college/appliedCandidates/${profile._id}/approval`,
+        approvalUrl,
         { status: 'REJECTED', rejectionReason: reason || '' },
         { headers: { 'x-auth': token } }
       );
@@ -7463,7 +7471,7 @@ console.log('API Response:', response.data);
   };
 
   const fetchCrossSaleGroup = useCallback(async (profile) => {
-    if (!profile?._id || !token) return;
+    if (!profile?._id || !token || profile?.isHrJobLead) return;
     const rootId = getProfileGroupRootId(profile);
     if (!rootId) return;
     try {
@@ -7489,8 +7497,11 @@ console.log('API Response:', response.data);
   const fetchReapplyHistory = useCallback(async (profile) => {
     if (!profile?._id || !token) return;
     try {
+      const historyUrl = profile?.isHrJobLead
+        ? `${backendUrl}/college/hr/leads/${profile._id}/reapply-history`
+        : `${backendUrl}/college/applied-courses/${profile._id}/reapply-history`;
       const response = await axios.get(
-        `${backendUrl}/college/applied-courses/${profile._id}/reapply-history`,
+        historyUrl,
         { headers: { 'x-auth': token } }
       );
       if (response.data.success) {
@@ -7509,6 +7520,10 @@ console.log('API Response:', response.data);
 
   const handleCrossSaleSubmit = async () => {
     if (!crossSaleSourceProfile?._id) return;
+    if (crossSaleSourceProfile?.isHrJobLead) {
+      toast.info('Cross-sale applies to course registrations. This lead is an HR job application.');
+      return;
+    }
     if (!crossSaleForm.course || !crossSaleForm.center) {
       alert('Please select course and center');
       return;
@@ -8127,11 +8142,23 @@ console.log('API Response:', response.data);
         return;
       }
 
-      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
-        counselorId: selectedConcernPerson,
-        appliedCourseId: type === 'RefferSingleLead' ? selectedProfile._id : selectedProfiles,
-        type
-      }, {
+      const referIds = type === 'RefferSingleLead' ? [selectedProfile?._id] : selectedProfiles;
+      const hrLeadIds = new Set(
+        (allProfiles || []).filter((profile) => profile.isHrJobLead).map((profile) => String(profile._id))
+      );
+      const referringHrLeads = type === 'RefferSingleLead'
+        ? Boolean(selectedProfile?.isHrJobLead)
+        : referIds.length > 0 && referIds.every((id) => hrLeadIds.has(String(id)));
+      const response = await axios.post(
+        referringHrLeads ? `${backendUrl}/college/hr/leads/refer` : `${backendUrl}/college/refer-leads`,
+        referringHrLeads
+          ? { counselorId: selectedConcernPerson, leadIds: referIds }
+          : {
+            counselorId: selectedConcernPerson,
+            appliedCourseId: type === 'RefferSingleLead' ? selectedProfile._id : selectedProfiles,
+            type,
+          },
+        {
         headers: {
           'x-auth': token,
         },
@@ -18587,7 +18614,9 @@ useEffect(() => {
                   </div>
                   <div className="modal-body reapply-modal__body">
                     <p className="text-muted small mb-3">
-                      When a candidate applies again for the same course—directly or through digital leads—their re-application attempts are listed here.
+                      {reapplyProfile?.isHrJobLead
+                        ? 'Job applications for this candidate are listed here.'
+                        : 'When a candidate applies again for the same course—directly or through digital leads—their re-application attempts are listed here.'}
                     </p>
                     <div className="table-responsive">
                       {(() => {
@@ -18619,7 +18648,7 @@ useEffect(() => {
                               <tr>
                                 <th>S.No</th>
                                 <th>Date & Time</th>
-                                <th>Course</th>
+                                <th>{reapplyProfile?.isHrJobLead ? 'Job' : 'Course'}</th>
                                 <th>Center</th>
                                 <th>Source</th>
                               </tr>

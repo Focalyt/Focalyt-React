@@ -808,6 +808,16 @@ const mapApplyToLead = (apply, statusIndex) => {
     assignedTo: apply.assignedTo || leadOwner,
     followups: apply.followups || [],
     logs: apply.logs || [],
+    approval: apply.approval?.status
+      ? {
+        status: apply.approval.status,
+        approvedBy: apply.approval.approvedBy || null,
+        approvedAt: apply.approval.approvedAt || null,
+        rejectedBy: apply.approval.rejectedBy || null,
+        rejectedAt: apply.approval.rejectedAt || null,
+        rejectionReason: apply.approval.rejectionReason || '',
+      }
+      : { status: 'PENDING' },
     createdAt: apply.createdAt,
     updatedAt: apply.updatedAt,
     candidate: candidate._id || apply._candidate,
@@ -978,7 +988,19 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
     });
   }
 
+  const approvalStatus = String(query.approvalStatus || '').trim().toUpperCase();
+  if (['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) {
+    leads = leads.filter((lead) => String(lead.approval?.status || 'PENDING').toUpperCase() === approvalStatus);
+  }
+
   return { leads, statusIndex };
+};
+
+const canApproveHrLeads = (user) => {
+  if (!user) return false;
+  if (user.permissions?.permission_type === 'Admin') return true;
+  return user.permissions?.permission_type === 'Custom'
+    && user.permissions?.custom_permissions?.can_approve_leads === true;
 };
 
 const loadAppliedLead = async (id, collegeId) => {
@@ -1175,6 +1197,7 @@ router.get('/leads/counts', isCollege, async (req, res) => {
     const counts = { all: leads.length, none: 0 };
     const countsByTitle = {};
     const roles = new Set();
+    const approvalCounts = { total: leads.length, approved: 0, pending: 0, rejected: 0 };
     const followups = {
       call: { done: 0, planned: 0, missed: 0 },
       visit: { done: 0, planned: 0, missed: 0 },
@@ -1188,6 +1211,10 @@ router.get('/leads/counts', isCollege, async (req, res) => {
       if (key === 'none') counts.none += 1;
       const title = String(lead.leadStatus?.title || 'untouch').trim().toLowerCase();
       countsByTitle[title] = (countsByTitle[title] || 0) + 1;
+      const approval = String(lead.approval?.status || 'PENDING').toUpperCase();
+      if (approval === 'APPROVED') approvalCounts.approved += 1;
+      else if (approval === 'REJECTED') approvalCounts.rejected += 1;
+      else approvalCounts.pending += 1;
 
       (lead.followups || []).forEach((item) => {
         const bucketKey = item?.type === 'Visit' ? 'visit' : 'call';
@@ -1202,6 +1229,7 @@ router.get('/leads/counts', isCollege, async (req, res) => {
       data: {
         counts,
         countsByTitle,
+        approvalCounts,
         followups,
         roles: [...roles].sort((a, b) => a.localeCompare(b)),
       },
@@ -2678,6 +2706,115 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
   } catch (error) {
     console.error('[HR leads] document upload error:', error);
     return res.status(500).json({ success: false, message: 'Failed to upload document' });
+  }
+});
+
+router.put('/leads/:id/approval', isCollege, async (req, res) => {
+  try {
+    if (!canApproveHrLeads(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to approve or reject leads',
+      });
+    }
+
+    const normalized = String(req.body?.status || '').toUpperCase();
+    if (!['APPROVED', 'REJECTED'].includes(normalized)) {
+      return res.status(400).json({
+        success: false,
+        message: 'status must be APPROVED or REJECTED',
+      });
+    }
+
+    const loaded = await loadAppliedLead(req.params.id, req.user?.college?._id);
+    if (!loaded) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    const apply = await AppliedJobs.findById(loaded.apply._id);
+    if (!apply) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    const now = new Date();
+    const rejectionReason = req.body?.rejectionReason ? String(req.body.rejectionReason).trim() : '';
+    if (normalized === 'APPROVED') {
+      apply.approval = {
+        status: 'APPROVED',
+        approvedBy: req.user._id,
+        approvedAt: now,
+        rejectedBy: undefined,
+        rejectedAt: undefined,
+        rejectionReason: '',
+      };
+    } else {
+      apply.approval = {
+        status: 'REJECTED',
+        rejectedBy: req.user._id,
+        rejectedAt: now,
+        rejectionReason,
+        approvedBy: undefined,
+        approvedAt: undefined,
+      };
+    }
+
+    apply.logs = apply.logs || [];
+    apply.logs.push({
+      user: req.user._id,
+      timestamp: now,
+      action: `Lead approval set to ${apply.approval.status}`,
+      remarks: normalized === 'REJECTED' ? rejectionReason : '',
+    });
+    await apply.save();
+
+    return res.json({
+      success: true,
+      data: { approval: apply.approval },
+      message: 'Lead approval updated successfully',
+    });
+  } catch (error) {
+    console.error('[HR leads] approval error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update lead approval' });
+  }
+});
+
+router.get('/leads/:id/reapply-history', isCollege, async (req, res) => {
+  try {
+    const loaded = await loadAppliedLead(req.params.id, req.user?.college?._id);
+    if (!loaded) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    const candidateId = loaded.candidate?._id || loaded.apply?._candidate;
+    const jobTitle = loaded.job?.title || loaded.lead?.applyingFor || '';
+    const applications = candidateId
+      ? await AppliedJobs.find({
+        _candidate: candidateId,
+        isDeleted: { $ne: true },
+      })
+        .populate('_job', 'title')
+        .sort({ createdAt: -1 })
+        .lean()
+      : [];
+
+    return res.json({
+      success: true,
+      data: {
+        courseName: jobTitle,
+        reEnquiries: applications.map((item) => ({
+          _id: item._id,
+          reEnquireDate: item.createdAt,
+          createdAt: item.createdAt,
+          source: item.source || 'Job apply',
+          course: { name: item._job?.title || jobTitle },
+          appliedCourse: {},
+        })),
+      },
+      message: 'Job applications retrieved successfully',
+    });
+  } catch (error) {
+    console.error('[HR leads] reapply history error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve job applications' });
   }
 });
 
