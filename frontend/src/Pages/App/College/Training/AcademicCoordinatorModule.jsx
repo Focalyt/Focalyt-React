@@ -219,6 +219,10 @@ const mapApiSessionToUi = (api = {}) => {
       id: item.id || item._id || `item-${i}`,
       name: item.name || "",
       type: item.type || "Document",
+      fileUrl: item.fileUrl || "",
+      fileName: item.fileName || "",
+      status: item.status || "",
+      uploadedAt: item.uploadedAt || "",
     }));
 
   return {
@@ -306,6 +310,20 @@ const namedItems = (items) => (items || []).filter((item) => item.name?.trim()).
   name: item.name.trim(),
   type: item.type || "Document",
 }));
+
+const packTlmItems = (items) => (items || []).filter((item) => item.name?.trim()).map((item) => ({
+  id: item.id,
+  name: item.name.trim(),
+  type: item.type || "Document",
+  fileUrl: item.fileUrl || "",
+  fileName: item.fileName || "",
+  status: item.status || "",
+  uploadedAt: item.uploadedAt || "",
+}));
+
+const collectTlmFiles = (items, field) => (items || [])
+  .filter((item) => item.file && item.name?.trim() && item.id)
+  .map((item) => ({ field, id: item.id, file: item.file }));
 
 const RESOURCE_UPLOAD_TYPES = ["Image", "PDF", "Video", "Document", "Presentation"];
 
@@ -603,12 +621,40 @@ const AcademicCoordinatorMockup = () => {
   const [incomingBatchId] = useState(() => new URLSearchParams(window.location.search).get("batchId") || "");
   const [toast, setToast] = useState(null);
   const persistTimer = useRef(null);
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const [permissions, setPermissions] = useState();
+  const [user] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("user") || "{}");
+    } catch (_) {
+      return {};
+    }
+  });
+  const token = user?.token;
   const [outline, setOutline] = useState([]);
   const [outlineModal, setOutlineModal] = useState(null); // { kind: 'unit' | 'chapter', ... }
   const [preset, setPreset] = useState(null);
   const [savingResources, setSavingResources] = useState(false);
 
+
+  const updatedPermission = async () => {
+    try {
+      const respose = await axios.get(`${backendUrl}/college/permission`, {
+        headers: { 'x-auth': token }
+      });
+      if (respose.data.status) {
+        setPermissions(respose.data.permissions);
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+    }
+  }
+
+  useEffect(() => {
+    console.log('user', user)
+    console.log("permissions", permissions)
+  }, [permissions])
   useEffect(() => {
     setOutline(selectedCourseId ? loadOutline(selectedCourseId) : []);
   }, [selectedCourseId]);
@@ -881,14 +927,27 @@ const AcademicCoordinatorMockup = () => {
     }
     setSavingSession(true);
     try {
+      const { tlmFiles, ...addonValues } = values || {};
       const base = buildSessionPayload(selected, activityTypes);
-      const merged = { ...base, ...values };
+      const merged = { ...base, ...addonValues };
       const payload = {
         ...merged,
         course: selectedCourseId,
         activityIds: (merged.sessionActivities || []).map((item) => item.id).filter(Boolean),
       };
-      const saved = await updateSessionApi(token, selected.id, payload);
+      let saved = await updateSessionApi(token, selected.id, payload);
+      const files = (Array.isArray(tlmFiles) ? tlmFiles : []).filter((row) => row?.file && row.id && row.field);
+      for (const row of files) {
+        const form = new FormData();
+        form.append("file", row.file);
+        const res = await axios.post(
+          `${BACKEND_URL}/college/session-plans/${selected.id}/material-file/${row.field}/${encodeURIComponent(row.id)}`,
+          form,
+          { headers: authHeaders(token) }
+        );
+        if (!res.data?.status) throw new Error(res.data?.message || "Failed to upload file");
+        saved = res.data.data;
+      }
       const mapped = mapApiSessionToUi(saved);
       setSessions((prev) => prev.map((item) => (item.id === mapped.id ? mapped : item)));
       setModal(null);
@@ -1115,6 +1174,7 @@ const AcademicCoordinatorMockup = () => {
           onEdit={() => openCreate(selected)}
           onDelete={() => deleteSession(selected.id)}
           onRefer={() => setReferOpen(true)}
+          permissions={permissions}
           onSetActivity={() => setModal("sessionActivity")}
           onAddTot={() => setModal("tot")}
           onAddTlm={() => setModal("tlm")}
@@ -1240,7 +1300,7 @@ const Workspace = (props) => {
     display, distribution, search, setSearch, tree, courseStructure, showNewPlan,
     onAddUnit, onAddChapter, onAddSession, onRemoveUnit, onRemoveChapter,
     selectedId, setSelectedId, selected, activityTypes, onNewPlan, onEdit,
-    onDelete, onRefer, onSetActivity, onAddTot, onAddTlm, onManageActivities,
+    onDelete, onRefer, permissions, onSetActivity, onAddTot, onAddTlm, onManageActivities,
     onManageResources, resourceCount,
   } = props;
 
@@ -1328,6 +1388,7 @@ const Workspace = (props) => {
           onEdit={onEdit}
           onDelete={onDelete}
           onRefer={onRefer}
+          permissions={permissions}
           onSetActivity={onSetActivity}
           onAddTot={onAddTot}
           onAddTlm={onAddTlm}
@@ -1773,7 +1834,7 @@ const ReferSessionModal = ({ session, courseId, preferredBatchId = "", saving, o
   );
 };
 
-const DetailPanel = ({ display, session, onEdit, onDelete, onRefer, onSetActivity, onAddTot, onAddTlm, activityTypes }) => {
+const DetailPanel = ({ display, session, onEdit, onDelete, onRefer, permissions, onSetActivity, onAddTot, onAddTlm, activityTypes }) => {
   if (!session) {
     return (
       <div style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 16, padding: 30, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 260, textAlign: "center" }}>
@@ -1945,13 +2006,16 @@ const DetailPanel = ({ display, session, onEdit, onDelete, onRefer, onSetActivit
         >
           Edit
         </button>
-        <button
-          type="button"
-          onClick={onRefer}
-          style={{ flex: 1, height: 40, borderRadius: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.ink, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-        >
-          Assign
-        </button>
+        {((permissions?.permission_type === 'Custom' && (permissions?.custom_permissions?.can_be_senior_trainer)) || permissions?.permission_type === 'Admin') && (
+              <button
+              type="button"
+              onClick={onRefer}
+              style={{ flex: 1, height: 40, borderRadius: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.ink, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >
+              Assign
+            </button>
+              )}
+        
         <button
           disabled={isAssigned}
           onClick={onDelete}
@@ -2560,9 +2624,14 @@ const TlmModal = ({ display, session, onClose, onSave, saving }) => {
   const handleSave = () => {
     if (saving) return;
     onSave({
-      learningMaterials: namedItems(studentMaterial),
-      standardTlm: namedItems(standardTlm),
-      trainerBasedTlm: namedItems(trainerTlm),
+      learningMaterials: packTlmItems(studentMaterial),
+      standardTlm: packTlmItems(standardTlm),
+      trainerBasedTlm: packTlmItems(trainerTlm),
+      tlmFiles: [
+        ...collectTlmFiles(studentMaterial, "learningMaterials"),
+        ...collectTlmFiles(standardTlm, "standardTlm"),
+        ...collectTlmFiles(trainerTlm, "trainerBasedTlm"),
+      ],
     });
   };
 

@@ -120,6 +120,9 @@ module.exports.ChatHistory = require("./chatHistory");
 
 
 module.exports.TrainerTimeTable = require("./trainerTimeTable");
+module.exports.TimetableTemplate = require("./timetableTemplate");
+module.exports.TimetableDay = require("./timetableDay");
+module.exports.TimetableBooking = require("./timetableBooking");
 module.exports.Curriculum = require("./curriculum");
 module.exports.DailyDiary = require("./dailydiary");
 module.exports.TrainingSession = require("./trainingSession");

@@ -71,6 +71,15 @@ const mergeMaterialUploads = (incoming = [], existing = []) => {
   });
 };
 
+const storedMaterialId = (item) => {
+  if (!item) return '';
+  if (typeof item.toObject === 'function') {
+    const plain = item.toObject({ virtuals: false });
+    return String(plain.id || '');
+  }
+  return String(item.id || '');
+};
+
 const findMaterialItem = (items, itemId) => {
   const id = String(itemId || '');
   if (!id || !items) return null;
@@ -78,7 +87,9 @@ const findMaterialItem = (items, itemId) => {
     const bySubId = typeof items.id === 'function' ? items.id(id) : null;
     if (bySubId) return bySubId;
   } catch (_) { /* non-ObjectId keys fall through */ }
-  return [...items].find((item) => String(item._id) === id || String(item.id) === id) || null;
+  return [...items].find((item) => (
+    String(item._id || '') === id || storedMaterialId(item) === id
+  )) || null;
 };
 
 const inferTlmTypeFromFile = (fileName = '', mimeType = '') => {
@@ -88,6 +99,12 @@ const inferTlmTypeFromFile = (fileName = '', mimeType = '') => {
   if (mime.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv'].includes(ext)) return 'Video';
   if (mime === 'application/pdf' || ext === 'pdf') return 'PDF';
   return 'Document';
+};
+
+const MATERIAL_FILE_FIELDS = {
+  learningMaterials: 'learning-materials',
+  standardTlm: 'standard-tlm',
+  trainerBasedTlm: 'trainer-tlm',
 };
 
 const getUploadedTlmFile = (req) => {
@@ -100,6 +117,39 @@ const getUploadedTlmFile = (req) => {
     originalName: uploaded.originalname || uploaded.name || 'tlm-file',
     mimeType: uploaded.mimetype || 'application/octet-stream',
   };
+};
+
+const uploadSessionMaterialFile = async (session, field, itemId, file, userId) => {
+  const folder = MATERIAL_FILE_FIELDS[field];
+  if (!folder) {
+    const error = new Error('Unknown material field');
+    error.statusCode = 400;
+    throw error;
+  }
+  const tlmItem = findMaterialItem(session[field], itemId);
+  if (!tlmItem) {
+    const error = new Error('Material item not found in this session');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const safeName = String(file.originalName || 'tlm-file').replace(/[/\\]/g, '_');
+  const key = `TrainingSession/${session._id}/${folder}/${itemId}/${uuid()}-${safeName}`;
+  await s3.upload({
+    Bucket: bucketName,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimeType,
+  }).promise();
+
+  tlmItem.status = 'Uploaded';
+  tlmItem.fileName = file.originalName;
+  tlmItem.fileUrl = key;
+  tlmItem.type = inferTlmTypeFromFile(file.originalName, file.mimeType) || tlmItem.type || 'Document';
+  tlmItem.uploadedBy = userId || null;
+  tlmItem.uploadedAt = new Date();
+  await session.save();
+  return session;
 };
 
 const TOT_PASS_PERCENT_DEFAULT = 40;
@@ -394,7 +444,7 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
 
     evidenceDocs: body.evidenceDocs ? normalizeMaterials(body.evidenceDocs) : (existing?.evidenceDocs || []),
     learningMaterials: body.learningMaterials
-      ? normalizeMaterials(body.learningMaterials)
+      ? mergeMaterialUploads(normalizeMaterials(body.learningMaterials), existing?.learningMaterials)
       : (existing?.learningMaterials || []),
     preSessionRequirements: body.preSessionRequirements
       ? normalizeMaterials(body.preSessionRequirements)
@@ -784,6 +834,8 @@ router.patch('/:id', async (req, res) => {
     if (body.centerName !== undefined && body.center === undefined) existing.centerName = body.centerName || '';
     if (body.courseName !== undefined && body.course === undefined) existing.courseName = body.courseName || '';
     if (body.batchCode !== undefined && body.batch === undefined) existing.batchCode = body.batchCode || '';
+    // Kept for academic coordinator, trainer, batch monitoring, and candidate
+    // screens. The senior-trainer period grid reads and writes TimetableBooking.
     if (body.sessionDate !== undefined) {
       existing.sessionDate = toDate(body.sessionDate);
     }
@@ -971,8 +1023,7 @@ router.post('/:id/tot-questions', async (req, res) => {
   }
 });
 
-// POST /college/session-plans/:id/standard-tlm/:itemId — senior trainer uploads study material
-router.post('/:id/standard-tlm/:itemId', async (req, res) => {
+const handleMaterialFileUpload = (fieldFromRoute) => async (req, res) => {
   try {
     const college = await resolveCollege(req);
     const session = await SessionPlan.findOne({
@@ -984,6 +1035,7 @@ router.post('/:id/standard-tlm/:itemId', async (req, res) => {
       return res.status(404).json({ status: false, message: 'Session not found' });
     }
 
+    const field = fieldFromRoute || String(req.params.field || '').trim();
     const itemId = String(req.params.itemId || req.body?.itemId || req.query?.itemId || '').trim();
     const file = getUploadedTlmFile(req);
     if (!itemId) {
@@ -993,26 +1045,7 @@ router.post('/:id/standard-tlm/:itemId', async (req, res) => {
       return res.status(400).json({ status: false, message: 'File is required' });
     }
 
-    const tlmItem = findMaterialItem(session.standardTlm, itemId);
-    if (!tlmItem) {
-      return res.status(404).json({ status: false, message: 'Standard TLM item not found in this session' });
-    }
-
-    const key = `TrainingSession/${session._id}/standard-tlm/${itemId}/${uuid()}-${file.originalName}`;
-    await s3.upload({
-      Bucket: bucketName,
-      Key: key,
-      Body: file.buffer,
-      ContentType: file.mimeType,
-    }).promise();
-
-    tlmItem.status = 'Uploaded';
-    tlmItem.fileName = file.originalName;
-    tlmItem.fileUrl = key;
-    tlmItem.type = inferTlmTypeFromFile(file.originalName, file.mimeType) || tlmItem.type || 'Document';
-    tlmItem.uploadedBy = req.user?._id || null;
-    tlmItem.uploadedAt = new Date();
-    await session.save();
+    await uploadSessionMaterialFile(session, field, itemId, file, req.user?._id || null);
 
     return res.json({
       status: true,
@@ -1020,10 +1053,18 @@ router.post('/:id/standard-tlm/:itemId', async (req, res) => {
       data: mapSessionToClient(session),
     });
   } catch (err) {
-    console.error('POST /college/session-plans/:id/standard-tlm', err);
-    return res.status(400).json({ status: false, message: err.message || 'Failed to upload study material' });
+    console.error('POST /college/session-plans material file', err);
+    const statusCode = err.statusCode || 400;
+    return res.status(statusCode).json({ status: false, message: err.message || 'Failed to upload study material' });
   }
-});
+};
+
+// POST /college/session-plans/:id/material-file/:field/:itemId
+// fields: learningMaterials | standardTlm | trainerBasedTlm
+router.post('/:id/material-file/:field/:itemId', handleMaterialFileUpload());
+
+// POST /college/session-plans/:id/standard-tlm/:itemId — senior trainer uploads study material
+router.post('/:id/standard-tlm/:itemId', handleMaterialFileUpload('standardTlm'));
 
 // DELETE /college/session-plans/:id
 router.delete('/:id', async (req, res) => {
