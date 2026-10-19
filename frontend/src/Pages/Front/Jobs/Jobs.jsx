@@ -4344,7 +4344,7 @@ button.close span {
         )}
 
         {/* Single AI Chatbot Widget - Right Side with Full Functionality & FAQ Support */}
-         <ChatbotWidget 
+         {/* <ChatbotWidget 
           position="bottom-right"
           title="AI Job Search Assistant"
           // Pass existing functionality handlers
@@ -4358,7 +4358,7 @@ button.close span {
           onAddToCompare={handleAddToCompare}
           voiceSupported={aiVoiceSupported}
           onVoiceInput={startVoiceInput}
-        />
+        /> */}
       </FrontLayout>
 
     </>

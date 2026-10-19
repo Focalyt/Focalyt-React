@@ -195,6 +195,115 @@ import axios from 'axios';
 import moment from 'moment';
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
+const CANDIDATE_JOB_THUMB = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+
+function formatCandidateJobExperience(job) {
+  const years = Number(job?.experience) || 0;
+  const months = Number(job?.experienceMonths) || 0;
+  if (years === 0 && months === 0) return "Fresher";
+  const parts = [];
+  if (years > 0) parts.push(`${years} ${years === 1 ? "Year" : "Years"}`);
+  if (months > 0) parts.push(`${months} ${months === 1 ? "Month" : "Months"}`);
+  return parts.join(" ") || "Fresher";
+}
+
+function candidateJobLocation(job) {
+  const city = Array.isArray(job?.city) ? job.city[0]?.name : job?.city?.name;
+  const state = Array.isArray(job?.state) ? job.state[0]?.name : job?.state?.name;
+  if (city && state) return `(${city}, ${state})`;
+  return city || state || "NA";
+}
+
+function CandidateSearchJobCard({ job, bucketUrl, onPlayVideo, onShare }) {
+  const company = job.displayCompanyName || job._company?.[0]?.name || "";
+  const qualification = job.qualifications?.[0]?.name || job._qualification?.name || "N/A";
+  const expLabel = formatCandidateJobExperience(job);
+  const loc = candidateJobLocation(job);
+  const work = job.work || "N/A";
+  const lastDate = job.validity
+    ? moment(job.validity).utcOffset("+05:30").format("DD MMM YYYY")
+    : "NA";
+  const badgeLabel = job.courseType === "coursejob" ? "Course + Jobs" : "Jobs";
+  const thumbUrl = job.jobVideoThumbnail
+    ? resolveMediaUrl(bucketUrl, job.jobVideoThumbnail) || CANDIDATE_JOB_THUMB
+    : CANDIDATE_JOB_THUMB;
+
+  return (
+    <article className="csj-card">
+      <div className="csj-thumb">
+        {job.jobVideo ? (
+          <button
+            type="button"
+            className="csj-thumb-media"
+            data-bs-toggle="modal"
+            data-bs-target="#videoModal"
+            onClick={() => onPlayVideo(job.jobVideo)}
+            aria-label={`Play video for ${job.title || "job"}`}
+          >
+            <img src={thumbUrl} alt={job.title || "Job"} />
+            <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="" className="csj-play" />
+          </button>
+        ) : (
+          <img src={thumbUrl} alt={job.title || "Job"} />
+        )}
+        <div className="csj-verified">
+          <span className="csj-wave csj-wave-1" />
+          <span className="csj-wave csj-wave-2" />
+          <span className="csj-wave csj-wave-3" />
+          <img src="/Assets/public_assets/images/verified.png" alt="" className="csj-verified-img" />
+        </div>
+        <div className="csj-badge">{badgeLabel}</div>
+      </div>
+
+      <div className="csj-body">
+        <div className="csj-title" title={job.title || "Job"}>{job.title || "Job"}</div>
+        {company ? <div className="csj-company" title={company}>({company})</div> : null}
+
+        <div className="csj-details">
+          <div className="csj-cell" title={`Qualification: ${qualification}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 8-4.1V15h2V8L12 3zm-6 9.2V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-3.8l-6 3-6-3z"/></svg>
+            <span>{qualification}</span>
+          </div>
+          <div className="csj-cell" title={`Experience: ${expLabel}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 .01 20.01A10 10 0 0 0 12 2zm1 11H7v-2h4V6h2v7z"/></svg>
+            <span>{expLabel}</span>
+          </div>
+          <div className="csj-cell" title={`Location: ${loc}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
+            <span>{loc}</span>
+          </div>
+          <div className="csj-cell" title={`Work: ${work}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11h-5v-6H9v6H4zm7 0v-4h2v4h-2z"/></svg>
+            <span>{work}</span>
+          </div>
+          <div className="csj-cell csj-cell-wide" title={`Last date for apply: ${lastDate}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm12 8H5v10h14V10zM5 8h14V6H5v2z"/></svg>
+            <span>{lastDate}</span>
+          </div>
+        </div>
+
+        <div className="csj-actions">
+          <Link className="csj-btn csj-btn-fill" to={`/candidate/job/${job._id}`}>Apply Now</Link>
+          <button
+            type="button"
+            className="csj-btn csj-btn-outline"
+            onClick={() => onShare(job._id, job.title, company)}
+          >
+            Share
+          </button>
+        </div>
+      </div>
+
+      {/* <div className="csj-footer">
+        <Link to={`/candidate/job/${job._id}`} className="csj-learn">
+          <span>Learn More</span>
+          <img src="/Assets/public_assets/images/link.png" alt="" />
+        </Link>
+      </div> */}
+    </article>
+  );
+}
+
 const CandidatesJobs = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -993,268 +1102,70 @@ const CandidatesJobs = () => {
 
       {/* Jobs listing section */}
       <section className="searchjobspage" style={{ display: isMapView ? 'none' : 'block' }}>
-        <div className="">
-          <div className="pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
-            <div className="course_nw mb-3">
-              <div className="row justify-content-sm-center justify-content-md-start">
-                {jobs && jobs.length > 0 ? (
-                  jobs.map((job, index) => (
-                    <div className="col-xl-6 col-lg-6 col-md-6 col-sm-10 mx-auto" key={job._id || index}>
-                      <div className="cr_nw_in">
-                        <a
-                          href="#"
-                          data-bs-toggle="modal"
-                          data-bs-target="#videoModal"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleVideoClick(job.jobVideo || "");
-
-                          }}
-                          className="video-bttn position-relative d-block"
-                        >
-                          <img
-                            src={job.jobVideoThumbnail ? resolveMediaUrl(bucketUrl, job.jobVideoThumbnail) : "/Assets/images/pages/video_thum1.png"}
-                            className="video_thum img-fluid"
-                            alt="Job Thumbnail"
-                          />
-
-                        </a>
-
-                        <div className="course_inf">
-                          <Link to={`/candidate/job/${job._id}`}>
-                            <h5>{job.displayCompanyName || job._company[0]?.name}</h5>
-                            <span className="job_cate">{job.title || 'NA'}</span>
-                            <div className="row">
-                              {/* Salary */}
-                              <div className="col-6">
-                                <div className="course_spec">
-                                  <div className="spe_icon">
-                                    <i className="la la-money"></i>
-                                  </div>
-                                  <div className="spe_detail">
-                                    <h3 className="jobDetails-wrap">
-                                      ₹ {job.isFixed ? (job.amount || 'NA') :
-                                        ((job.min || 'NA') + ' - ' + (job.max || 'NA'))}
-                                    </h3>
-                                    <span className="text-capitalize jobDetails-wrap">
-                                      Minimum Salary / न्यूनतम वेतन
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Experience */}
-                              <div className="col-6">
-                                <div className="course_spec">
-                                  <div className="spe_icon">
-                                    <i className="la la-shield"></i>
-                                  </div>
-                                  <div className="spe_detail">
-                                    <h3 className="jobDetails-wrap">
-                                    {(job.experience == 0 && job.experienceMonths == 0) || (job.experience == 0 && !job.experienceMonths )
-                                                ? "Fresher"
-                                                : `${job.experience > 0 ? `${job.experience} ${job.experience === 1 ? 'Year' : 'Years'}` : ''} ${job.experienceMonths > 0 ? `${job.experienceMonths} ${job.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
-                                    </h3>
-                                    <span className="jobDetails-wrap">
-                                      Experience / अनुभव
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Qualification */}
-                              <div className="col-6">
-                                <div className="course_spec">
-                                  <div className="spe_icon">
-                                    <i className="la la-shield"></i>
-                                  </div>
-                                  <div className="spe_detail">
-                                    <h3 className="jobDetails-wrap">
-                                      {job.qualifications?.[0]?.name || 'NA'}
-                                    </h3>
-                                    <span className="text-capitalize jobDetails-wrap">
-                                      Qualification / योग्यता
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Location */}
-                              <div className="col-6">
-                                <div className="course_spec">
-                                  <div className="spe_icon">
-                                    <i className="la la-map"></i>
-                                  </div>
-                                  <div className="spe_detail">
-                                    <h3 className="jobDetails-wrap">Location</h3>
-                                    <span className="text-capitalize jobDetails-wrap">
-                                      {Math.round(job.distance)} Kms, {job.city?.[0]?.name}, {job.state?.[0]?.name}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </Link>
-
-                          {/* Action Buttons */}
-                          <div className="act_btn mt-2 row">
-                            <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-xl-0 mb-lg-0 mb-md-0 mb-sm-2 mb-2">
-                              <Link
-                                className="apply-thisjob text-left apply-padding same-plane call-btn px-1"
-                                to={`/candidate/job/${job._id}`}
-                                title="Call Now"
-                              >
-                                <i className="la la-phone plane-font"></i> Call Now
-                              </Link>
-                            </div>
-                            <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                              <Link
-                                className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
-                                to={`/candidate/job/${job._id}`}
-                                title="Apply for Job"
-                                style={{ fontWeight: 'bold' }}
-                              >
-                                <i className="la la-paper-plane"></i>
-                                Apply for Job 
-                              </Link>
-                            </div>
-                            <div className="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 offset-xl-3 offset-lg-3 mt-3">
-                              <button
-                                className="apply-thisjob text-center px-1 apply-padding mb-0 mt-0 w-100"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleShareJob(
-                                    job._id,
-                                    job.title,
-                                    job.displayCompanyName || job._company?.[0]?.name
-                                  );
-                                }}
-                                title="Share Job"
-                              >
-                                <i className="la la-share"></i>
-                                Share
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <h4 className="text-center">No Jobs found</h4>
-                )}
-              </div>
+        <div className="csj-page">
+          {jobs && jobs.length > 0 ? (
+            <div className="csj-grid">
+              {jobs.map((job) => (
+                <CandidateSearchJobCard
+                  key={job._id}
+                  job={job}
+                  bucketUrl={bucketUrl}
+                  onPlayVideo={handleVideoClick}
+                  onShare={handleShareJob}
+                />
+              ))}
             </div>
-          </div>
-        </div>
-
-        {/* Mobile view jobs listing */}
-        <div className="forsmallscrn d-none">
-          <div className="container search-page pt-xl-5 pt-lg-0 pt-md-0 pt-sm-0 pt-0">
-            {jobs && jobs.length > 0 ? (
-              jobs.map((job, index) => (
-                <div className="row pointer" key={job._id || index}>
-                  <div className="card-body px-0">
-                    <div className="col-lg-8 col-md-7 column">
-                      <div className="job-single-sec">
-                        <div className="job-single-head border-0 pb-0">
-                          <div className="job-head-info">
-                            <h6 className="text-capitalize font-weight-bolder">
-                              {job.title || 'NA'}
-                            </h6>
-                            <span className="text-capitalize set-lineh">
-                              {job.displayCompanyName || job._company?.[0]?.name}
-                            </span>
-                          </div>
-                        </div>
-                        <Link to={`/candidate/job/${job._id}`}>
-                          <div className="job-overview mt-1">
-                            <ul className="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
-                              <li>
-                                <i className="la la-money"></i>
-                                <h3 className="jobDetails-wrap">
-                                  ₹ {job.isFixed ? (job.amount || 'NA') :
-                                    ((job.min || 'NA') + ' - ' + (job.max || 'NA'))}
-                                </h3>
-                                <span className="text-capitalize jobDetails-wrap">
-                                  Minimum Salary / न्यूनतम वेतन
-                                </span>
-                              </li>
-                              <li>
-                                <i className="la la-shield"></i>
-                                <h3 className="jobDetails-wrap">
-                                {(job.experience == 0 && job.experienceMonths == 0) || (job.experience == 0 && !job.experienceMonths )
-                                                ? "Fresher"
-                                                : `${job.experience > 0 ? `${job.experience} ${job.experience === 1 ? 'Year' : 'Years'}` : ''} ${job.experienceMonths > 0 ? `${job.experienceMonths} ${job.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
-                                  
-                                </h3>
-                                <span className="jobDetails-wrap">
-                                  Experience / अनुभव
-                                </span>
-                              </li>
-                              <li>
-                                <i className="la la-line-chart"></i>
-                                <h3 className="jobDetails-wrap">
-                                  {job.qualifications?.[0]?.name || 'NA'}
-                                </h3>
-                                <span className="text-capitalize jobDetails-wrap">
-                                  Qualification / योग्यता
-                                </span>
-                              </li>
-                              <li>
-                                <i className="la la-map"></i>
-                                <h3 className="jobDetails-wrap">
-                                  Location
-                                </h3>
-                                <span className="text-capitalize jobDetails-wrap">
-                                  {Math.round(job.distance)} Kms, {job.city?.[0]?.name}, {job.state?.[0]?.name}
-                                </span>
-                              </li>
-                            </ul>
-                          </div>
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="col-lg-4 col-md-5 column mt-xl-4 mt-lg-5 mt-md-5 mt-sm-3 mt-2">
-                      <Link
-                        className="apply-thisjob text-left px-0 d-xl-block d-lg-block d-md-block d-sm-none d-none apply-padding text-center"
-                        to={`/candidate/job/${job._id}`}
-                        title="Apply for Job"
-                      >
-                        <i className="la la-paper-plane"></i>
-                        Apply for Job / नौकरी के लिए आवेदन
-                      </Link>
-
-                      <div className="row">
-                        <div className="col-6 same-plane mt-2">
-                          <Link
-                            className="apply-thisjob text-center py-1 px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block w-100 same-plane"
-                            to={`/candidate/job/${job._id}`}
-                            title="Apply"
-                          >
-                            <i className="la la-paper-plane ml-xl-3 mt-lg-3 mt-md-2 mt-sm-0 ml-xl-0 ml-lg-0 ml-md-1 ml-sm-2 ml-0 text-center-sm text-center-md text-center-lg text-center-xl plane-font"></i>
-                            Apply / आवेदन
-                          </Link>
-                        </div>
-                        <div className="col-6 same-plane mt-2">
-                          <Link
-                            className="apply-thisjob text-center py-1 px-0 d-xl-none d-lg-none d-md-none d-sm-block d-block w-100 same-plane call-btn"
-                            title="Call"
-                            to={`/candidate/job/${job._id}`}
-                          >
-                            <i className="la la-phone ml-xl-3 mt-lg-3 mt-md-2 mt-sm-0 ml-xl-0 ml-lg-0 ml-md-1 ml-sm-2 ml-0 text-center-sm text-center-md text-center-lg text-center-xl plane-font"></i>
-                            Call / कॉल
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <h4 className="text-center">No Jobs found</h4>
-            )}
-          </div>
+          ) : (
+            <div className="csj-empty">
+              <h3>No jobs found</h3>
+              <p>Try adjusting your search or filters.</p>
+            </div>
+          )}
+          <style>{`
+.csj-page { --csj-cyan: #1ba7ff; --csj-red: #ff2daa; --csj-navy: #0d2146; --csj-navy-2: #163565; --csj-bg: #f6f8fc; --csj-surface: #fff; --csj-text: #102033; --csj-muted: #5b6b7c; --csj-border: rgba(4, 25, 45, .12); padding: 8px 0 4px; }
+.csj-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 768px) { .csj-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1200px) { .csj-grid { grid-template-columns: repeat(3, 1fr); } }
+.csj-card { background: var(--csj-surface); border: 1px solid color-mix(in srgb, var(--csj-accent, var(--csj-cyan)) 22%, var(--csj-border)); border-radius: 16px; overflow: hidden; position: relative; display: flex; flex-direction: column; min-height: 100%; box-shadow: 0 10px 28px color-mix(in srgb, var(--csj-accent, var(--csj-cyan)) 12%, rgba(0,0,0,.06)); transition: transform .25s ease, box-shadow .25s ease; }
+.csj-card:hover { transform: translateY(-3px); box-shadow: 0 14px 36px color-mix(in srgb, var(--csj-accent, var(--csj-cyan)) 18%, rgba(0,0,0,.08)); }
+.csj-grid .csj-card:nth-child(4n + 1) { --csj-accent: var(--csj-cyan); border-radius: 14px 20px 14px 16px; }
+.csj-grid .csj-card:nth-child(4n + 2) { --csj-accent: var(--csj-red); border-radius: 18px 12px 22px 14px; }
+.csj-grid .csj-card:nth-child(4n + 3) { --csj-accent: color-mix(in srgb, var(--csj-cyan) 55%, var(--csj-red)); border-radius: 12px 18px 14px 20px; }
+.csj-grid .csj-card:nth-child(4n) { --csj-accent: color-mix(in srgb, var(--csj-red) 70%, #7c3aed); border-radius: 18px 14px 16px 18px; }
+.csj-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--csj-accent, var(--csj-cyan)), color-mix(in srgb, var(--csj-accent, var(--csj-cyan)) 35%, transparent)); z-index: 2; pointer-events: none; }
+.csj-thumb { height: 160px; background: #eef3f8; position: relative; overflow: visible; }
+.csj-thumb > img, .csj-thumb-media img:first-child { width: 100%; height: 100%; object-fit: cover; display: block; }
+.csj-thumb-media { display: block; width: 100%; height: 100%; padding: 0; border: none; background: transparent; cursor: pointer; position: relative; overflow: hidden; }
+.csj-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 52px; height: 52px; z-index: 1; pointer-events: none; }
+.csj-thumb::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(11,18,32,.35)); pointer-events: none; }
+.csj-verified { position: absolute; top: 10px; right: 7px; width: 15px; height: 15px; z-index: 4; pointer-events: none; }
+.csj-verified-img { position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%); border-radius: 50%; object-fit: contain; z-index: 2; animation: csj-pulse 2s ease-in-out infinite; box-shadow: 0 2px 8px rgba(0,0,0,.2), 0 0 12px rgba(76,175,80,.45); }
+.csj-wave { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; border-radius: 50%; border: 2px solid rgba(76,175,80,.6); transform: translate(-50%, -50%); pointer-events: none; animation: csj-wave 2s cubic-bezier(.25,.46,.45,.94) infinite; }
+.csj-wave-2 { animation-delay: .7s; border-color: rgba(76,175,80,.4); }
+.csj-wave-3 { animation-delay: 1.4s; border-color: rgba(76,175,80,.3); }
+@keyframes csj-pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.08); } }
+@keyframes csj-wave { 0% { opacity: .7; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(3); } }
+.csj-badge { position: absolute; left: 12px; top: 12px; z-index: 3; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--csj-border); background: rgba(255,255,255,.92); color: var(--csj-text); }
+.csj-body { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 6px; text-align: center; }
+.csj-title { font-size: 18px; font-weight: 700; color: var(--csj-text); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csj-company { font-size: 13px; font-weight: 600; color: var(--csj-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csj-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; }
+.csj-cell { display: flex; align-items: center; gap: 6px; background: var(--csj-bg); border: 1px solid var(--csj-border); border-radius: 10px; padding: 8px; min-width: 0; }
+.csj-cell svg { width:18px; height:18px; min-width:18px; flex:0 0 18px; display:block; fill:#0d2146; }
+.csj-cell span { font-size: 11px; font-weight: 500; color: var(--csj-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.csj-cell-wide { grid-column: 1 / -1; }
+.csj-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.csj-btn { border-radius: 50px; font-weight: 600; padding: 8px 10px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; width: 100%; }
+.csj-btn-fill { background: var(--csj-navy); color: #fff; border: 1px solid var(--csj-navy); }
+.csj-btn-fill:hover { background: var(--csj-navy-2); color: #fff; }
+.csj-btn-outline { background: #fff; color: var(--csj-navy); border: 1px solid var(--csj-navy); }
+.csj-btn-outline:hover { background: var(--csj-navy-2); color: #fff; border-color: var(--csj-navy-2); }
+.csj-footer { background: var(--csj-navy); text-align: center; padding: 8px 10px; margin-top: auto; }
+.csj-learn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; color: #fff; font-size: 13px; font-weight: 600; }
+.csj-learn img { width: 18px; height: auto; display: block; }
+.csj-empty { text-align: center; padding: 48px 16px; color: var(--csj-muted); }
+.csj-empty h3 { color: var(--csj-text); margin-bottom: 8px; }
+`}</style>
         </div>
 
         {/* Pagination */}

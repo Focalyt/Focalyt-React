@@ -988,19 +988,20 @@ router.get("/searchjob", [isCandidate], async (req, res) => {
     name,
   } = req.query;
 
-  // Step 1: Get the logged-in candidate using mobile from token
-  const candidate = await Candidate.findOne({ mobile: req.user.mobile });
+  // Same open jobs as the public /joblisting page.
+  let filter = {
+    status: true,
+    _company: { $ne: null },
+    validity: { $gte: moment().utcOffset("+05:30").toDate() },
+    verified: true,
+    $or: [
+      { postingType: "Public" },
+      { postingType: { $exists: false } },
+      { postingType: null },
+    ],
+  };
 
-  // Step 2: Build base filter
-  let filter = { status: true, validity: { $gte: new Date() }, verified: true };
-
-  // Step 3: Exclude applied jobs
-  if (candidate?.appliedJobs?.length > 0) {
-    const appliedJobIds = candidate.appliedJobs.map(j => j.jobId || j._id); // adjust key as needed
-    filter._id = { $nin: appliedJobIds };
-  }
-
-  // Step 4: Additional filters
+  // Additional filters
   if (qualification) filter['_qualification'] = qualification;
   if (industry) filter['_industry'] = industry;
   if (state) filter['state.0._id'] = state;
@@ -5128,6 +5129,10 @@ if (Array.isArray(experiences) && experiences.length > 0) {
       { new: true, runValidators: true }
     );
 
+    if (name && String(user.name || "").trim() !== String(name).trim()) {
+      await User.updateOne({ _id: user._id }, { $set: { name: String(name).trim() } });
+    }
+
     // console.log('\n📊 ===== PROFILE UPDATE RESULT =====');
     // console.log('updatedProfile Root Fields:');
     // console.log('  - latitude:', updatedProfile?.latitude, `(type: ${typeof updatedProfile?.latitude})`);
@@ -5220,6 +5225,12 @@ router.get('/getProfile', [isCandidate, authenti], async (req, res) => {
       console.error('❌ Candidate not found!');
       console.log('='.repeat(60) + '\n');
       return res.status(404).json({ status: false, message: "Candidate not found" });
+    }
+
+    const accountName = String(user.name || "").trim();
+    if (accountName && candidate.name !== accountName) {
+      candidate.name = accountName;
+      await Candidate.updateOne({ _id: candidate._id }, { $set: { name: accountName } });
     }
 
     // console.log('\n📍 ===== CANDIDATE LOCATION DATA =====');

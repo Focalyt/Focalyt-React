@@ -1,4 +1,5 @@
 const express = require('express');
+const moment = require('moment');
 const router = express.Router();
 const JobAssignmentRule = require('../../models/jobAssignmentRule');
 const Vacancy = require('../../models/vacancy');
@@ -119,7 +120,10 @@ router.get('/', isCollege, async (req, res) => {
 
 router.get('/job-names', isCollege, async (req, res) => {
   try {
-    const filter = { status: true };
+    const filter = {
+      status: true,
+      validity: { $gte: moment().utcOffset('+05:30').toDate() },
+    };
     const categoryIds = String(req.query.categoryIds || '')
       .split(',')
       .map((id) => id.trim())

@@ -1264,7 +1264,9 @@ const AddCourse = () => {
                           <option value="">Select Sector</option>
                           {Array.isArray(sectors) && sectors.length > 0 ? (
                             sectors.map((sector, i) => (
-                              <option key={sector._id || i} value={sector._id}>{sector.name}</option>
+                              <option key={sector._id || i} value={sector._id}>
+                                {sector.name ? sector.name.charAt(0).toUpperCase() + sector.name.slice(1) : ''}
+                              </option>
                             ))
                           ) : (
                             <option disabled>No sectors available</option>

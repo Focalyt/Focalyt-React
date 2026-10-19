@@ -1258,6 +1258,12 @@ const CandidateProfile = () => {
       });
 
       if (res.data.status) {
+        const storedUser = sessionStorage.getItem('user');
+        if (storedUser && cvPayload.name) {
+          const parsed = JSON.parse(storedUser);
+          parsed.name = cvPayload.name;
+          sessionStorage.setItem('user', JSON.stringify(parsed));
+        }
         alert('CV Saved Successfully!');
         // window.location.reload();
 
@@ -6304,13 +6310,93 @@ max-width: 600px;
     }
     .form-select{
         background-position: right .1rem center;
-        font-size: clamp(15px, 1.5vw, 22px);
+        font-size: 13px;
         padding: 1px 20px 1px 10px;
         margin-bottom: 7px;
     }
     `
   }
 </style>
+<style>{`
+.resume-builder-container,
+.resume-builder-container h1,
+.resume-builder-container h2,
+.resume-builder-container h3,
+.resume-builder-container h4,
+.resume-builder-container h5,
+.resume-builder-container h6,
+.resume-builder-container p,
+.resume-builder-container span,
+.resume-builder-container label,
+.resume-builder-container a,
+.resume-builder-container button,
+.resume-builder-container input,
+.resume-builder-container select,
+.resume-builder-container textarea,
+.resume-builder-container [contenteditable="true"] {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.resume-builder-container .resume-builder-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.resume-builder-container .profile-name,
+.resume-builder-container .profile-name [contenteditable="true"] {
+  font-size: 18px !important;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.resume-builder-container .profile-title,
+.resume-builder-container .profile-title [contenteditable="true"] {
+  font-size: 14px !important;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.resume-builder-container .section-title,
+.resume-builder-container .resume-section-title,
+.resume-builder-container .resume-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.resume-builder-container .profile-summary,
+.resume-builder-container .profile-summary [contenteditable="true"],
+.resume-builder-container .job-title,
+.resume-builder-container .degree-select,
+.resume-builder-container .strength-badge,
+.resume-builder-container .resume-title {
+  font-size: 14px !important;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.resume-builder-container label,
+.resume-builder-container .form-label,
+.resume-builder-container .company-name,
+.resume-builder-container .university,
+.resume-builder-container .strength-label,
+.resume-builder-container .strength-level,
+.resume-builder-container .contact-item,
+.resume-builder-container .date-range,
+.resume-builder-container .passing-year,
+.resume-builder-container .job-description,
+.resume-builder-container .skill-level,
+.resume-builder-container .nav-tabs .nav-link,
+.resume-builder-container .form-control,
+.resume-builder-container .form-select,
+.resume-builder-container [contenteditable="true"],
+.resume-builder-container .audio-intro-btn,
+.resume-builder-container .upload-resume,
+.resume-builder-container .save-resume,
+.resume-builder-container .preview-resume,
+.resume-builder-container .resume-document,
+.resume-builder-container .resume-contact-item,
+.resume-builder-container .resume-summary p {
+  font-size: 13px !important;
+  font-weight: 500;
+  line-height: 1.45;
+}
+`}</style>
     </div>
   );
 };
