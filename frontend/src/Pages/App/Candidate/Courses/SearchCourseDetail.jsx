@@ -189,11 +189,7 @@ const CourseDetails = () => {
       // Close modal
 
         
-      document.getElementById('apply').classList.remove('show');
-      document.getElementsByClassName('modal-backdrop')[0]?.remove();
-      document.body.classList.remove('modal-open');
-      document.body.style.removeProperty('overflow');
-      document.body.style.removeProperty('padding-right');
+      closeApplyModal();
 
       // Check if registration charges exist
       if (course.registrationCharges > 0) {
@@ -308,14 +304,32 @@ const CourseDetails = () => {
     document.getElementsByClassName('modal-backdrop')[0]?.remove();
   };
 
+  const closeApplyModal = () => {
+    const applyModal = document.getElementById('apply');
+    if (applyModal) {
+      applyModal.classList.remove('show');
+      applyModal.style.display = 'none';
+    }
+    document.querySelectorAll('.modal-backdrop').forEach((node) => node.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+  };
+
   const openApplyModal = () => {
-    
     setNextbtnVisible(centerRequired);
     const applyModal = document.getElementById('apply');
     if (!applyModal) return;
     applyModal.classList.add('show');
     applyModal.style.display = 'block';
     document.body.classList.add('modal-open');
+    document.body.style.overflow = 'hidden';
+    if (!document.querySelector('.modal-backdrop')) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop fade show';
+      backdrop.addEventListener('click', closeApplyModal);
+      document.body.appendChild(backdrop);
+    }
   };
 
   useEffect(() => {
@@ -382,10 +396,7 @@ const CourseDetails = () => {
       });
 
       // ⛔️ CLOSE the complete profile modal
-      document.getElementById('apply').classList.remove('show');
-      document.getElementById('apply').style.display = 'none';
-      document.body.classList.remove('modal-open');
-      document.getElementsByClassName('modal-backdrop')[0]?.remove();
+      closeApplyModal();
 
       setShowCongratulationModal(true);
       // window.location.reload();
@@ -397,7 +408,7 @@ const CourseDetails = () => {
   return (
     <>
 
-      <section className="ml-3">
+      <section className="ml-3 course-detail-page">
         <div className="container-fluid px-1">
           <div className="card">
             <div className="card-body">
@@ -1206,165 +1217,137 @@ const CourseDetails = () => {
       </section>
 
       <div className="modal fade" id="apply" tabIndex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered" role="document">
+        <div className="modal-dialog modal-dialog-centered reg-modal-dialog" role="document">
           {canApply ? (
-            <div className="modal-content p-0">
-              <div className="modal-header">
-                <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">REGISTRATION</h5>
+            <div className="modal-content reg-modal">
+              <div className="reg-modal__head">
+                <div>
+                  <h5 id="exampleModalLongTitle">Registration</h5>
+                  <p>{nextbtnVisible ? "Choose a training center to continue." : "Confirm your course registration."}</p>
+                </div>
                 <button
                   type="button"
-                  className="close"
-                  onClick={() => {
-                    document.getElementById('apply').classList.remove('show');
-                    document.getElementById('apply').style.display = 'none';
-                    document.body.classList.remove('modal-open');
-                    document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                  }}
+                  className="reg-modal__close"
+                  aria-label="Close"
+                  onClick={closeApplyModal}
                 >
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
-              <div className="modal-body pt-1" id="popup-body">
+              <div className="reg-modal__body" id="popup-body">
                 {nextbtnVisible && (
-                  <select onChange={(e) => setSelectedCenter(e.target.value)} className="form-control" value={selectedCenter}>
-                    <option value="" disabled>Select Center</option>
-
-                    {course.center.map((q) => (
-                      <option value={q._id}>{q.name}</option>))}
-
-                  </select>)}
+                  <label className="reg-modal__field">
+                    Training center
+                    <select onChange={(e) => setSelectedCenter(e.target.value)} className="form-control" value={selectedCenter}>
+                      <option value="" disabled>Select center</option>
+                      {course.center.map((q) => (
+                        <option key={q._id} value={q._id}>{q.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {!nextbtnVisible && (
-                  <h5 className="pb-1 mb-0">
-                    Register for this Course
-                  </h5>)}
-
+                  <p className="reg-modal__note">You are about to register for this course.</p>
+                )}
               </div>
-              <div className="modal-footer">
+              <div className="reg-modal__foot">
                 {nextbtnVisible && (
                   <button
-
-                    className="btn btn-primary"
+                    type="button"
+                    className="reg-modal__btn"
                     id="next-btn"
                     onClick={() => nextBtnClick()}
                   >
                     Next
-                  </button>)}
+                  </button>
+                )}
                 {!nextbtnVisible && (
                   <>
                     {centerRequired && (
                       <button
-                        className="btn btn-primary"
+                        type="button"
+                        className="reg-modal__btn reg-modal__btn--ghost"
                         id="back-btn"
                         onClick={() => backBtnClick()}
                       >
                         Back
-                      </button>)}
+                      </button>
+                    )}
                     <button
-                      className="btn btn-primary"
+                      type="button"
+                      className="reg-modal__btn"
                       id="apply-btn"
                       onClick={(e) => { e.preventDefault(); applyCourse(course._id); }}
                     >
                       Proceed
                     </button>
-                  </>)}
+                  </>
+                )}
               </div>
             </div>
-          ) : 
-          (
-
-            <div className="modal-content p-0">
-              <div className="modal-header">
-                <h5 className="modal-title text-white text-uppercase" id="exampleModalLongTitle">COMPLETE PROFILE</h5>
+          ) : (
+            <div className="modal-content reg-modal">
+              <div className="reg-modal__head">
+                <div>
+                  <h5 id="exampleModalLongTitle">Complete profile</h5>
+                  <p>Add the missing details before you apply.</p>
+                </div>
                 <button
                   type="button"
-                  className="close"
-                  onClick={() => {
-                    document.getElementById('apply').classList.remove('show');
-                    document.getElementById('apply').style.display = 'none';
-                    document.body.classList.remove('modal-open');
-                    document.getElementsByClassName('modal-backdrop')[0]?.remove();
-                  }}
-                  
-
-
+                  className="reg-modal__close"
+                  aria-label="Close"
+                  onClick={closeApplyModal}
                 >
-                  {/* */}
                   <span aria-hidden="true">&times;</span>
                 </button>
               </div>
-              <div className="modal-body pt-1" id="popup-body">
-                <h5 className="pb-1 mb-0">
-                  Please complete your profile before applying
-                </h5>
-                <p>You need to complete your profile details to apply for this course.</p>
-              </div>
-              <div className="row">
-
-
-                <div className="form-group mb-2">
+              <div className="reg-modal__body" id="popup-body">
+                <label className="reg-modal__field">
+                  Gender
                   <select onChange={(e) => setSex(e.target.value)} className="form-control" value={sex}>
                     <option value="">Your Gender / आपका लिंग</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                   </select>
-                </div>
-
-                <div className="form-group  mb-2">
+                </label>
+                <label className="reg-modal__field">
+                  Date of birth
                   <input onChange={(e) => setDob(e.target.value)} type="date" className="form-control" placeholder="Date of Birth / जन्म तिथि" value={dob} />
-                </div>
-
-                <div className="form-group mb-2">
+                </label>
+                <label className="reg-modal__field">
+                  Experience
                   <select onChange={(e) => setTotalExperience(e.target.value)} className="form-control" value={totalExperience}>
                     <option value="">Experience / अनुभव</option>
                     <option value="0">Fresher</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
-                    <option value="10">10</option>
-                    <option value="11">11</option>
-                    <option value="12">12</option>
-                    <option value="13">13</option>
-                    <option value="14">14</option>
-                    <option value="15">15</option>
-
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
                   </select>
-                </div>
-                <div className="form-group mb-2">
-                  <select onChange={(e) => setHighestQualification(e.target.value)} className="form-control" value={highestQualification} >
+                </label>
+                <label className="reg-modal__field">
+                  Highest qualification
+                  <select onChange={(e) => setHighestQualification(e.target.value)} className="form-control" value={highestQualification}>
                     <option value="">Highest Qualification / उच्चतम योग्यता</option>
                     {highestQualificationdata.map((q) => (
-                      <option value={q._id}>{q.name}</option>))}
-
-
+                      <option key={q._id} value={q._id}>{q.name}</option>
+                    ))}
                   </select>
-                </div>
-                <div className="form-group mb-2">
+                </label>
+                <label className="reg-modal__field">
+                  City
                   <input
                     type="text"
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
                     value={candidate.personalInfo.currentAddress.fullAddress}
-
                     onChange={(e) => setAddress(e.target.value)}
-
                   />
-
-
-                </div>
-
+                </label>
               </div>
-
-              <div className="modal-footer">
-                <button onClick={() => handleProfileSubmit()} id='updateAndApply' className="btn btn-primary" >Update and Apply</button>
+              <div className="reg-modal__foot">
+                <button type="button" onClick={() => handleProfileSubmit()} id="updateAndApply" className="reg-modal__btn">Update and Apply</button>
               </div>
-
             </div>
           )}
         </div>
@@ -7005,6 +6988,185 @@ max-width: 100%;
 `
   }
 </style>
+<style>{`
+.course-detail-page,
+.course-detail-page h3,
+.course-detail-page h4,
+.course-detail-page h5,
+.course-detail-page h6,
+.course-detail-page p,
+.course-detail-page span,
+.course-detail-page a,
+.course-detail-page strong,
+.course-detail-page button,
+.course-detail-page .apply-thisjob {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.course-detail-page .curs_description > h3 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.course-detail-page .job_cate {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.course-detail-page .curs_description h6,
+.course-detail-page .cr_detail_in h3 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.course-detail-page .cr_detail_in .course_dt h6 {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+.course-detail-page .cr_detail_in .course_dt p,
+.course-detail-page .cr_detail_in .course_dt p span {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #64748b;
+}
+.course-detail-page .jobDetails-wrap {
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.course-detail-page .spe_detail h3 {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+}
+.course-detail-page .spe_detail span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #64748b;
+}
+.course-detail-page .feature-widget-7-row h5,
+.course-detail-page .feature-widget-7 h5,
+.course-detail-page .feature-widget-7__title,
+.course-detail-page .feature-widget-7-row p {
+  font-size: 14px !important;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.course-detail-page .extra-job-info > span,
+.course-detail-page .extra-job-info > span strong {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.course-detail-page .apply-thisjob {
+  font-size: 14px;
+  font-weight: 600;
+}
+#apply.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  overflow-y: auto;
+  background: transparent;
+}
+.modal-backdrop.show {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 1;
+}
+#apply .reg-modal {
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+  font-family: Inter, system-ui, sans-serif;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+}
+#apply .reg-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 8px;
+  background: #fff;
+}
+#apply .reg-modal__head h5 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #102033;
+}
+#apply .reg-modal__head p,
+#apply .reg-modal__note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+#apply .reg-modal__close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #102033;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#apply .reg-modal__body {
+  padding: 8px 18px 4px;
+}
+#apply .reg-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  text-transform: none;
+}
+#apply .reg-modal__field .form-control {
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #102033;
+}
+#apply .reg-modal__foot {
+  display: flex;
+  gap: 8px;
+  padding: 8px 18px 18px;
+}
+#apply .reg-modal__btn {
+  flex: 1;
+  height: 42px;
+  border: none;
+  border-radius: 999px;
+  background: #FC2B5A;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+#apply .reg-modal__btn--ghost {
+  background: #fff;
+  color: #102033;
+  border: 1px solid #e2e8f0;
+}
+`}</style>
     </>
   );
 };

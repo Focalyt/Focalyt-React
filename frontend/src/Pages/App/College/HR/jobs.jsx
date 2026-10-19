@@ -15449,7 +15449,7 @@ useEffect(() => {
           ))}
         </select>
       </div>
-      <div className="b2b-cycle-filters__item b2b-cycle-filters__item--job">
+      <div className="b2b-cycle-filters__item">
         <label className="b2b-cycle-filters__label" htmlFor={mobile ? 'adm-filter-job-mobile' : 'adm-filter-job'}>
           <i className="fas fa-briefcase" aria-hidden="true" /> Job
         </label>
@@ -17346,10 +17346,6 @@ useEffect(() => {
             flex: 1 1 0;
             max-width: 70px;
           }
-          .b2b-cycle-filters__item--job{
-            max-width: 150px;
-            flex: 1.4 1 110px;
-          }
           .b2b-cycle-filters__label{
             font-size: 8px;
             font-weight: 700;
@@ -17412,9 +17408,6 @@ useEffect(() => {
           .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
             flex: 0 0 auto;
             width: 82px;
-          }
-          .b2b-cycle-filters--mobile .b2b-cycle-filters__item--job{
-            width: 140px;
           }
           .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
             width: 100%;

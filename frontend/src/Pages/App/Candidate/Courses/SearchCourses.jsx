@@ -1,14 +1,130 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import moment from "moment";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
+
+const COURSE_THUMB = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+const COURSE_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
+  "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Lakshadweep",
+  "Puducherry", "Ladakh", "Jammu and Kashmir",
+];
+
+function courseSectorLabel(course) {
+  const names = (course?.sectors || []).map((sector) => sector?.name).filter(Boolean);
+  return names.join(", ");
+}
+
+function CandidateCourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback }) {
+  const thumb = course?.thumbnail ? resolveMediaUrl(bucketUrl, course.thumbnail) || COURSE_THUMB : COURSE_THUMB;
+  const videoPath = course?.videos?.[0] || "";
+  const loc = course?.city ? `${course.city}, ${course.state || ""}`.replace(/, $/, "") : "NA";
+  const lastDate = course?.lastDateForApply
+    ? moment(course.lastDateForApply).utcOffset("+05:30").format("MMM DD, YYYY")
+    : "NA";
+  const badgeLabel = course?.courseType === "coursejob" ? "Course + Jobs" : "Course";
+  const sectorLabel = courseSectorLabel(course);
+
+  return (
+    <article className="csc-card">
+      <div className="csc-thumb">
+        {videoPath ? (
+          <button
+            type="button"
+            className="csc-thumb-media"
+            data-bs-toggle="modal"
+            data-bs-target="#videoModal"
+            onClick={() => onPlayVideo(videoPath)}
+            aria-label={`Play video for ${course?.name || "course"}`}
+          >
+            <img src={thumb} alt={course?.name || "Course"} />
+            <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="" className="csc-play" />
+          </button>
+        ) : (
+          <img src={thumb} alt={course?.name || "Course"} />
+        )}
+        <div className="csc-badge">{badgeLabel}</div>
+        {course?.courseFeeType ? (
+          <div className={`csc-fee-badge csc-fee-badge--${String(course.courseFeeType).toLowerCase()}`}>
+            {course.courseFeeType}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="csc-body">
+        <div className="csc-title" title={course?.name}>{course?.name || "Course"}</div>
+        {sectorLabel ? <div className="csc-sector" title={sectorLabel}>{sectorLabel}</div> : null}
+        <div className="csc-meta">
+          <div title={`Eligibility: ${course?.qualification || "N/A"}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 8-4.1V15h2V8L12 3zm-6 9.2V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-3.8l-6 3-6-3z"/></svg>
+            <span>{course?.qualification || "N/A"}</span>
+          </div>
+          <div title={`Duration: ${course?.duration || "N/A"}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 .01 20.01A10 10 0 0 0 12 2zm1 11H7v-2h4V6h2v7z"/></svg>
+            <span>{course?.duration || "N/A"}</span>
+          </div>
+          <div title={`Location: ${loc}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>
+            <span>{loc}</span>
+          </div>
+          <div title={`Mode: ${course?.trainingMode || "N/A"}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11h-5v-6H9v6H4zm7 0v-4h2v4h-2z"/></svg>
+            <span>{course?.trainingMode || "N/A"}</span>
+          </div>
+          <div className="csc-meta-wide" title={`Last date to apply: ${lastDate}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2zm12 8H5v10h14V10zM5 8h14V6H5v2z"/></svg>
+            <span>{lastDate}</span>
+          </div>
+        </div>
+        <div className="csc-actions">
+          <Link className="csc-btn csc-btn-fill" to={`/candidate/course/${course._id}`}>Apply Now</Link>
+          <button type="button" className="csc-btn csc-btn-outline" onClick={() => onShare(course)}>Share</button>
+        </div>
+        {/* <button
+          type="button"
+          className="csc-btn csc-btn-outline csc-callback"
+          data-bs-toggle="modal"
+          data-bs-target="#callbackModal"
+          onClick={() => onRequestCallback(course)}
+        >
+          Request for Call Back
+        </button> */}
+      </div>
+
+      
+    </article>
+  );
+}
 
 const SearchCourses = () => {
   const [courses, setCourses] = useState([]);
   const [videoSrc, setVideoSrc] = useState(""); // ✅ Store the video URL
   const videoRef = useRef(null); // ✅ Reference to the video element
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [feeFilter, setFeeFilter] = useState("all");
+  const [callbackForm, setCallbackForm] = useState({
+    name: "",
+    state: "",
+    mobile: "",
+    email: "",
+    message: "",
+    courseName: "",
+    sectorName: "",
+    projectName: "",
+    typeOfProject: "",
+  });
+  const [callbackLoading, setCallbackLoading] = useState(false);
+  const [callbackMessage, setCallbackMessage] = useState("");
+  const [callbackError, setCallbackError] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -31,12 +147,6 @@ const SearchCourses = () => {
     }
   };
 
-  // ✅ Get course thumbnail image
-  const getCourseImageUrl = (course) => {
-    if (!course.thumbnail) return "/Assets/public_assets/images/newjoblisting/course_img.svg";
-    return resolveMediaUrl(bucketUrl, course.thumbnail);
-  };
-
   const handleVideoClick = (videoUrl) => {
     setVideoSrc(resolveMediaUrl(bucketUrl, videoUrl));
     if (videoRef.current) {
@@ -57,24 +167,113 @@ const SearchCourses = () => {
     };
   }, []);
 
-  const openChatbot = () => {
-    console.log("On click start")
-    const chatContainer = document.getElementById("iframe-box");
-    if (chatContainer) {
-      chatContainer.classList.toggle("active");
-      console.log("class added")
-    } else {
-      console.error("Chat container (iframe-box) not found!");
-    }
+  const uniqueSectors = useMemo(() => {
+    const seen = new Map();
+    courses.forEach((course) => {
+      (course.sectors || []).forEach((sector) => {
+        const id = sector?._id ? String(sector._id) : "";
+        if (id && sector?.name && !seen.has(id)) seen.set(id, { _id: id, name: sector.name });
+      });
+    });
+    return Array.from(seen.values());
+  }, [courses]);
 
-    // Trigger the bootm-box click event to initialize the chat
-    const bootmBox = document.getElementById("bootm-box");
-    if (bootmBox) {
-      bootmBox.click();
-    } else {
-      console.error("Element with ID 'bootm-box' not found!");
+  const filteredCourses = useMemo(() => {
+    let list = Array.isArray(courses) ? [...courses] : [];
+    if (activeFilter !== "all") {
+      list = list.filter((course) =>
+        (course.sectors || []).some((sector) => String(sector?._id || "") === activeFilter)
+      );
     }
-  }
+    const term = searchTerm.trim().toLowerCase();
+    if (term) {
+      list = list.filter((course) => {
+        const sectorMatch = (course.sectors || []).some((sector) =>
+          String(sector?.name || "").toLowerCase().includes(term)
+        );
+        return [
+          course.name,
+          course.qualification,
+          course.duration,
+          course.city,
+          course.state,
+          course.trainingMode,
+          course.courseType,
+        ].some((value) => String(value || "").toLowerCase().includes(term)) || sectorMatch;
+      });
+    }
+    if (feeFilter !== "all") {
+      list = list.filter((course) => String(course.courseFeeType || "").toLowerCase() === feeFilter);
+    }
+    return list;
+  }, [courses, activeFilter, searchTerm, feeFilter]);
+
+  const selectedSectorName = activeFilter === "all"
+    ? "All"
+    : uniqueSectors.find((sector) => sector._id === activeFilter)?.name || "All";
+
+  const handleShare = async (course) => {
+    const courseUrl = `${window.location.origin}/coursedetails/${course._id}`;
+    const shareText = `Check out this course: ${course.name || "Course"}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: course.name || "Course", text: shareText, url: courseUrl });
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${shareText}\n${courseUrl}`);
+      alert("Course link copied!");
+    } catch {
+      alert(courseUrl);
+    }
+  };
+
+  const handleRequestCallback = (course) => {
+    setCallbackMessage("");
+    setCallbackError("");
+    setCallbackForm((prev) => ({
+      ...prev,
+      courseName: course?.name || "",
+      sectorName: courseSectorLabel(course) || "N/A",
+      projectName: course?.projectName || "N/A",
+      typeOfProject: course?.typeOfProject || "N/A",
+    }));
+  };
+
+  const handleCallbackChange = (event) => {
+    const { name, value } = event.target;
+    setCallbackForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCallbackSubmit = async (event) => {
+    event.preventDefault();
+    setCallbackLoading(true);
+    setCallbackMessage("");
+    setCallbackError("");
+    try {
+      const response = await axios.post(`${backendUrl}/callback`, callbackForm, {
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.status === 200 || response.status === 201) {
+        setCallbackMessage("Request submitted successfully!");
+        setCallbackForm((prev) => ({
+          ...prev,
+          name: "",
+          state: "",
+          mobile: "",
+          email: "",
+          message: "",
+        }));
+      }
+    } catch {
+      setCallbackError("Failed to submit. Please try again.");
+    } finally {
+      setCallbackLoading(false);
+    }
+  };
 
   return (
     <div className="">
@@ -119,151 +318,189 @@ const SearchCourses = () => {
           </li>
         </ul> */}
 
-        <section className="searchjobspage mt-3">
-          <div className="row justify-content-sm-center justify-content-md-start">
-            {courses.length > 0 ? (
-              courses.map((course) => (
-
-                <div
-                  className="col-xl-6 col-lg-6 col-md-6 col-sm-10 mx-auto"
-                  key={course._id}
+        <section className="csc-page">
+          <div className="csc-filters">
+            <div className="csc-filters-row">
+              <div>
+                <span className="csc-filters-tag">Filter by Sector</span>
+                <span className="csc-filters-active">{selectedSectorName}</span>
+              </div>
+              <div className="csc-search">
+                <input
+                  type="text"
+                  className="csc-search-input"
+                  placeholder="Search courses..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  aria-label="Search courses"
+                />
+                <span className="csc-search-icon" aria-hidden="true">
+                  <FontAwesomeIcon icon={faSearch} />
+                </span>
+              </div>
+            </div>
+            <div className="csc-chips">
+              <button
+                type="button"
+                className={`csc-chip${activeFilter === "all" ? " active" : ""}`}
+                onClick={() => setActiveFilter("all")}
+              >
+                All <span>{courses.length}</span>
+              </button>
+              {uniqueSectors.map((sector) => {
+                const count = courses.filter((course) =>
+                  (course.sectors || []).some((item) => String(item?._id || "") === sector._id)
+                ).length;
+                return (
+                  <button
+                    key={sector._id}
+                    type="button"
+                    className={`csc-chip${activeFilter === sector._id ? " active" : ""}`}
+                    onClick={() => setActiveFilter(sector._id)}
+                  >
+                    {sector.name} <span>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="csc-fee">
+              <span>Course Type:</span>
+              {["all", "paid", "free"].map((fee) => (
+                <button
+                  key={fee}
+                  type="button"
+                  className={`csc-chip csc-chip-sm${feeFilter === fee ? " active" : ""}`}
+                  onClick={() => setFeeFilter(fee)}
                 >
-
-                  <div className="cr_nw_in position-relative">
-                    <div className="right_obj shadow">
-                      {course.courseType === "coursejob" ? "Course + Job" : "Course"}
-                    </div>
-
-                    <a
-                      href="#"
-                      data-bs-toggle="modal"
-                      data-bs-target="#videoModal"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleVideoClick(course.videos?.[0] || "");
-                      }}
-                      className="video-bttn position-relative d-block"
-                    >
-                      <img
-                        src={getCourseImageUrl(course)}
-                        className="video_thum img-fluid"
-                        alt="Course Thumbnail"
-                      />
-
-                    </a>
-
-                    <div className="course_inf pt-0 card-height">
-                      <div className="card-details">
-                      <Link to={`/candidate/course/${course._id}`}>
-
-                        <h5>{course.name || "N/A"}</h5>
-                        <span className="job_cate">
-                          {course.sectors?.length > 0 && course.sectors[0]?.name
-                            ? course.sectors[0].name
-                            : "N/A"}
-                        </span>
-
-
-                        <div className="row">
-                          <div className="col-md-6 col-sm-6 col-6">
-                            <div class="course_spec">
-                              <div class="spe_icon">
-                                <figure className="text-end">
-                                  <img src="/Assets/public_assets/images/newicons/eligibility.png" className="img-fluid p-0 width" alt="Eligibility" />
-                                </figure>
-                              </div>
-                              <div class="spe_detail">
-                                <p className="mb-0 text-black">Eligibility</p>
-                                <p className="mb-0 text-black">
-                                  <small className="sub_head">({course.qualification || "N/A"})</small>
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="col-md-6 col-sm-6 col-6">
-                            <div class="course_spec">
-                              <div class="spe_icon">
-                                <figure className="text-end">
-                                  <img src="/Assets/public_assets/images/newicons/duration.png" className="img-fluid p-0 width" alt="Duration" />
-                                </figure>
-                              </div>
-                              <div class="spe_detail">
-                                <p className="mb-0 text-black">Duration</p>
-                                <p className="mb-0 text-black">
-                                  <small className="sub_head">({course.duration || "N/A"})</small>
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="col-md-6 col-sm-6 col-6">
-                            <div class="course_spec">
-                              <div class="spe_icon">
-                                <figure className="text-end">
-                                  <img src="/Assets/public_assets/images/newicons/location.png" className="img-fluid p-0 width" alt="Location" />
-                                </figure>
-                              </div>
-                              <div class="spe_detail">
-                                <p className="mb-0 text-black">Location</p>
-                                <p className="mb-0 text-black">
-                                  <small className="sub_head">({course.city ? `${course.city}, ${course.state}` : "N/A"})</small>
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="col-md-6 col-sm-6 col-6">
-                            <div class="course_spec">
-                              <div class="spe_icon">
-                                <figure className="text-end">
-                                  <img src="/Assets/public_assets/images/newicons/job-mode.png" className="img-fluid p-0 width" alt="Mode" />
-                                </figure>
-                              </div>
-                              <div class="spe_detail">
-                                <p className="mb-0 text-black">Mode</p>
-                                <p className="mb-0 text-black">
-                                  <small className="sub_head">({course.trainingMode || "N/A"})</small>
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        </Link>
-                      </div>
-
-                      <div className="row mt-1">
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                          <Link
-                            className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
-                            to={`/candidate/course/${course._id}`}
-                          >
-                            <i className="la la-paper-plane ml-2"></i>
-                            Apply Now
-                          </Link>
-                        </div>
-                        <div className="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                          {/*
-<a
-  className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0"
-  href="https://wa.me/918699017301?text=hi"
->
-  <i className="la la-phone plane-font ml-2"></i>
-  Chat Now
-</a>
-*/}
-                          <button onClick={() => openChatbot()} className="apply-thisjob text-left px-1 apply-padding mb-0 mt-0">
-                            Chat Now
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <h4 className="text-center w-100">No Courses Found</h4>
-            )}
+                  {fee === "all" ? "All" : fee.charAt(0).toUpperCase() + fee.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {filteredCourses.length > 0 ? (
+            <div className="csc-grid">
+              {filteredCourses.map((course) => (
+                <CandidateCourseCard
+                  key={course._id}
+                  course={course}
+                  bucketUrl={bucketUrl}
+                  onPlayVideo={handleVideoClick}
+                  onShare={handleShare}
+                  onRequestCallback={handleRequestCallback}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="csc-empty">
+              <h3>No courses found</h3>
+              <p>Try adjusting your search or filters.</p>
+            </div>
+          )}
         </section>
 
+        <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title" id="callbackModalLabel">Request for Call Back</h5>
+                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+              </div>
+              <div className="modal-body">
+                <form onSubmit={handleCallbackSubmit}>
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label">Name</label>
+                      <input type="text" className="form-control" name="name" value={callbackForm.name} onChange={handleCallbackChange} required placeholder="Your name" />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label">State</label>
+                      <select className="form-control" name="state" value={callbackForm.state} onChange={handleCallbackChange} required>
+                        <option value="" disabled>Select state</option>
+                        {COURSE_STATES.map((state) => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label">Contact Number</label>
+                      <input type="tel" className="form-control" name="mobile" value={callbackForm.mobile} onChange={handleCallbackChange} required pattern="[0-9]{10}" placeholder="10-digit mobile" />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label">Email</label>
+                      <input type="email" className="form-control" name="email" value={callbackForm.email} onChange={handleCallbackChange} required placeholder="Your email" />
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Message</label>
+                    <textarea className="form-control" name="message" value={callbackForm.message} onChange={handleCallbackChange} required rows={3} placeholder="Your message" />
+                  </div>
+                  <button type="submit" className="btn btn-primary w-100" disabled={callbackLoading}>
+                    {callbackLoading ? "Submitting..." : "Submit"}
+                  </button>
+                  {callbackMessage ? <p className="text-success mt-2 mb-0">{callbackMessage}</p> : null}
+                  {callbackError ? <p className="text-danger mt-2 mb-0">{callbackError}</p> : null}
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <style>{`
+.csc-page { --csc-cyan:#1ba7ff; --csc-red:#ff2daa; --csc-navy:#0d2146; --csc-navy-2:#163565; --csc-bg:#f6f8fc; --csc-surface:#fff; --csc-text:#102033; --csc-muted:#5b6b7c; --csc-border:rgba(4,25,45,.12); }
+.csc-filters { background:#fff; border:1px solid var(--csc-border); border-radius:16px; padding:18px; margin-bottom:18px; }
+.csc-filters-row { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.csc-filters-tag { display:block; font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--csc-cyan); }
+.csc-filters-active { font-size:14px; font-weight:600; color:var(--csc-text); }
+.csc-search { position:relative; min-width:220px; flex:1; max-width:360px; }
+.csc-search-input { width:100%; padding:10px 14px 10px 36px; border:1px solid var(--csc-border); border-radius:999px; background:var(--csc-bg); color:var(--csc-text); font-size:14px; }
+.csc-search-input:focus { outline:none; border-color:var(--csc-cyan); box-shadow:0 0 0 3px rgba(27,167,255,.12); }
+.csc-search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--csc-muted); font-size:14px; }
+.csc-chips, .csc-fee { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.csc-fee { margin-top:12px; }
+.csc-fee > span { font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--csc-muted); margin-right:4px; }
+.csc-chip { border:1px solid var(--csc-border); background:var(--csc-bg); color:var(--csc-text); border-radius:999px; padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+.csc-chip span { margin-left:6px; opacity:.85; font-size:11px; }
+.csc-chip-sm { padding:6px 12px; font-size:11px; }
+.csc-chip.active { background:linear-gradient(90deg, var(--csc-cyan), var(--csc-red)); color:#fff; border-color:transparent; }
+.csc-grid { display:grid; grid-template-columns:1fr; gap:16px; }
+@media (min-width:768px) { .csc-grid { grid-template-columns:repeat(2, 1fr); } }
+@media (min-width:1200px) { .csc-grid { grid-template-columns:repeat(3, 1fr); } }
+.csc-card { background:#fff; border:1px solid color-mix(in srgb, var(--csc-accent, var(--csc-cyan)) 22%, var(--csc-border)); border-radius:16px; overflow:hidden; position:relative; display:flex; flex-direction:column; min-height:100%; box-shadow:0 10px 28px color-mix(in srgb, var(--csc-accent, var(--csc-cyan)) 12%, rgba(0,0,0,.06)); transition:transform .25s ease, box-shadow .25s ease; }
+.csc-card:hover { transform:translateY(-3px); box-shadow:0 14px 36px color-mix(in srgb, var(--csc-accent, var(--csc-cyan)) 18%, rgba(0,0,0,.08)); }
+.csc-grid .csc-card:nth-child(4n + 1) { --csc-accent:var(--csc-cyan); border-radius:14px 20px 14px 16px; }
+.csc-grid .csc-card:nth-child(4n + 2) { --csc-accent:var(--csc-red); border-radius:18px 12px 22px 14px; }
+.csc-grid .csc-card:nth-child(4n + 3) { --csc-accent:color-mix(in srgb, var(--csc-cyan) 55%, var(--csc-red)); border-radius:12px 18px 14px 20px; }
+.csc-grid .csc-card:nth-child(4n) { --csc-accent:color-mix(in srgb, var(--csc-red) 70%, #7c3aed); border-radius:18px 14px 16px 18px; }
+.csc-card::before { content:""; position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg, var(--csc-accent, var(--csc-cyan)), transparent); z-index:2; pointer-events:none; }
+.csc-thumb { height:160px; background:#eef3f8; position:relative; overflow:hidden; }
+.csc-thumb > img, .csc-thumb-media img:first-child { width:100%; height:100%; object-fit:cover; display:block; }
+.csc-thumb-media { display:block; width:100%; height:100%; padding:0; border:none; background:transparent; cursor:pointer; position:relative; }
+.csc-play { position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); width:52px; height:52px; z-index:1; pointer-events:none; }
+.csc-badge { position:absolute; left:12px; top:12px; z-index:3; font-size:10px; font-weight:600; text-transform:uppercase; padding:6px 10px; border-radius:999px; border:1px solid var(--csc-border); background:rgba(255,255,255,.92); color:var(--csc-text); }
+.csc-fee-badge { position:absolute; right:12px; bottom:12px; z-index:3; font-size:10px; font-weight:600; padding:6px 10px; border-radius:999px; background:rgba(255,255,255,.92); border:1px solid var(--csc-border); }
+.csc-fee-badge--paid { color:var(--csc-red); }
+.csc-body { padding:12px 12px 8px; display:flex; flex-direction:column; gap:8px; }
+.csc-title { font-size:16px; font-weight:700; color:var(--csc-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.csc-sector { font-size:12px; color:var(--csc-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.csc-meta { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.csc-meta > div { display:flex; align-items:center; gap:6px; background:var(--csc-bg); border:1px solid var(--csc-border); border-radius:12px; padding:8px; min-width:0; }
+.csc-meta svg { width:18px; height:18px; min-width:18px; flex:0 0 18px; display:block; fill:#0d2146; }
+.csc-meta span { font-size:12px; font-weight:500; color:var(--csc-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.csc-meta-wide { grid-column:1 / -1; }
+.csc-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.csc-btn { border-radius:50px; font-weight:600; padding:8px 10px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; width:100%; }
+.csc-btn-fill { background:var(--csc-navy); color:#fff; border:1px solid var(--csc-navy); }
+.csc-btn-fill:hover { background:var(--csc-navy-2); color:#fff; }
+.csc-btn-outline { background:#fff; color:var(--csc-navy); border:1px solid var(--csc-navy); }
+.csc-btn-outline:hover { background:var(--csc-navy-2); color:#fff; }
+.csc-callback { margin-top:2px; }
+.csc-footer { background:var(--csc-navy); text-align:center; padding:8px 10px; margin-top:auto; }
+.csc-learn { display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; color:#fff; font-size:13px; font-weight:600; }
+.csc-learn img { width:18px; height:auto; display:block; }
+.csc-empty { text-align:center; padding:48px 16px; color:var(--csc-muted); }
+.csc-empty h3 { color:var(--csc-text); margin-bottom:8px; }
+`}</style>
 
 
         {/* ✅ Video Modal */}
