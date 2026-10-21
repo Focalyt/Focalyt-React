@@ -68,6 +68,18 @@ const appliedJobsSchema = new Schema(
         remarks: { type: String, default: "" },
       },
     ],
+    approval: {
+      status: {
+        type: String,
+        enum: ["PENDING", "APPROVED", "REJECTED"],
+        default: "PENDING",
+      },
+      approvedBy: { type: ObjectId, ref: "User" },
+      approvedAt: { type: Date },
+      rejectedBy: { type: ObjectId, ref: "User" },
+      rejectedAt: { type: Date },
+      rejectionReason: { type: String, trim: true, default: "" },
+    },
     isDeleted: { type: Boolean, default: false },
   },
   {
