@@ -1,4 +1,23 @@
-const { metaLeadAds } = require('../../config');
+const path = require('path');
+
+// config.js skips dotenv when NODE_ENV is already production, then snapshots
+// META_* before routes load backend/.env. Read the file here and copy values
+// from process.env on each call so webhook verification sees the live token.
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
+function currentMetaSettings() {
+  return {
+    appId: process.env.META_APP_ID,
+    appSecret: process.env.META_APP_SECRET,
+    graphApiVersion: process.env.META_GRAPH_API_VERSION,
+    adAccountId: process.env.META_AD_ACCOUNT_ID,
+    adsAccessToken: process.env.META_ADS_ACCESS_TOKEN,
+    pageId: process.env.META_PAGE_ID,
+    pageAccessToken: process.env.META_PAGE_ACCESS_TOKEN,
+    verifyToken: process.env.META_VERIFY_TOKEN,
+    businessId: process.env.META_BUSINESS_ID,
+  };
+}
 
 const GRAPH_HOST = 'https://graph.facebook.com';
 
@@ -33,7 +52,7 @@ function isGraphVersionValid(version) {
 }
 
 function readSettings(override) {
-  const source = override || metaLeadAds || {};
+  const source = override || currentMetaSettings();
   return {
     appId: clean(source.appId),
     appSecret: clean(source.appSecret),
