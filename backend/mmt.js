@@ -221,7 +221,10 @@ app.use(bodyParser.json({
 	limit: "15mb",
 	verify: (req, _res, buf) => {
 		const pathOnly = String(req.originalUrl || '').split('?')[0];
-		if (pathOnly === '/api/meta/webhook') req.rawBody = Buffer.from(buf);
+		// Nginx strips `/api`, so production receives /meta/webhook.
+		if (pathOnly === '/api/meta/webhook' || pathOnly === '/meta/webhook') {
+			req.rawBody = Buffer.from(buf);
+		}
 	},
 }));
 app.use(expSanitizer());
