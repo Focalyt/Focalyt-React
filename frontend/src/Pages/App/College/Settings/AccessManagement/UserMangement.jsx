@@ -366,7 +366,7 @@ const UserManagement = ({
   if (viewMode === 'matrix') {
     return (
       <div>
-        <div className="d-flex justify-content-between align-items-center mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-4 am-user-toolbar">
           <div className="d-flex align-items-center gap-3">
             <h4 className="mb-0">User Management</h4>
             <div className="btn-group" role="group">
@@ -401,7 +401,7 @@ const UserManagement = ({
   return (
     <div>
       {/* Desktop/Medium Screen Header */}
-      <div className="d-none d-md-flex justify-content-between align-items-center mb-4">
+      <div className="d-none d-md-flex justify-content-between align-items-center mb-4 am-user-toolbar">
         <div className="d-flex align-items-center gap-3">
           <h4 className="mb-0">User Management</h4>
           <div className="btn-group" role="group">
@@ -437,14 +437,14 @@ const UserManagement = ({
             <Plus size={16} />
             <span>Add User</span>
           </button>
-          <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+          {/* <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
             <Filter size={16} />
             <span>Filter</span>
-          </button>
-          <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
+          </button> */}
+          {/* <button className="btn btn-outline-secondary d-flex align-items-center gap-2">
             <Download size={16} />
             <span>Export</span>
-          </button>
+          </button> */}
         </div>
       </div>
 

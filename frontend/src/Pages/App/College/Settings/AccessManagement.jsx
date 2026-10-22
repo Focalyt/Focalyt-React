@@ -22,7 +22,7 @@ import Settings from './AccessManagement/Settings';
 import LeadAssignmentRule from './leadAssignmentRule';
 import JobAssignmentRule from './jobAssignmentRule';
 import EditUserModal from './AccessManagement/Modals/EditUserModal';
-import qs from 'query-string';
+import './AccessManagement/accessManagement.css';
 
 
 
@@ -473,7 +473,7 @@ const fetchBatches = async () => {
   };
 
   return (
-    <div className="min-vh-100 bg-light">
+    <div className="min-vh-100 am-page">
       <style>
         {`
           @media (max-width: 768px) {
@@ -497,9 +497,9 @@ const fetchBatches = async () => {
       {/* Header */}
       <div className="bg-white shadow-sm border-bottom">
         <div className="container-fluid">
-          <div className="d-flex justify-content-between align-items-center py-4">
+          <div className="d-flex justify-content-between align-items-center am-header">
             <div>
-              <h1 className="h2 fw-bold text-dark mb-1">Access Management</h1>
+              <h1>Access Management</h1>
               <p className="text-muted mb-0">Complete permission system with hierarchical content management & lead-based access control</p>
             </div>
             

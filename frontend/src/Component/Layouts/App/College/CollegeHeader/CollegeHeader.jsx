@@ -43,7 +43,10 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const { t } = useTranslation();
   const [collegeAccountNo, setCollegeAccountNo] = useState(null);
   const [userName, setUserName] = useState('');
-  const { isScrolled, scrollY } = useScrollBlur();
+  const navRef = useRef(null);
+  const [navBox, setNavBox] = useState({ left: 0, width: 0, height: 88 });
+  const { isScrolled, scrollY } = useScrollBlur(navBox.height);
+  const blurIntensity = Math.min(scrollY / 10, 15);
   const blurStrength = Math.min(18, 6 + scrollY / 24);
   const headerBackground = isScrolled
     ? 'rgba(252, 43, 90, 0.78)'
@@ -51,6 +54,28 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const containerBackground = isScrolled
     ? 'rgba(255, 255, 255, 0.12)'
     : 'rgba(255, 255, 255, 0.08)';
+
+  useEffect(() => {
+    const measureNav = () => {
+      if (!navRef.current) return;
+      const rect = navRef.current.getBoundingClientRect();
+      setNavBox({
+        left: rect.left,
+        width: rect.width,
+        height: navRef.current.offsetHeight || 88,
+      });
+    };
+
+    measureNav();
+    const handleResize = () => window.setTimeout(measureNav, 100);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', measureNav, { passive: true });
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', measureNav);
+    };
+  }, [isSidebarOpen]);
 
   useEffect(() => {
     const userData = sessionStorage.getItem('user');
@@ -124,7 +149,31 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
 
   return (
     <>
+      <div
+        className="content-blur-overlay"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: navBox.left,
+          width: navBox.width || '100%',
+          height: `${navBox.height + 50}px`,
+          background: `linear-gradient(
+            180deg,
+            rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
+            rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
+            rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
+            transparent 100%
+          )`,
+          backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+          WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
+          pointerEvents: 'none',
+          zIndex: 11,
+          transition: 'opacity 0.3s ease, backdrop-filter 0.3s ease',
+          opacity: isScrolled ? 1 : 0,
+        }}
+      />
       <nav
+        ref={navRef}
         className={`header-navbar navbar-expand-lg navbar navbar-with-menu floating-nav navbar-theme navbar-shadow ${isScrolled ? 'header-navbar-blurred' : ''}`}
         style={{
           background: headerBackground,
