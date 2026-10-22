@@ -1487,6 +1487,14 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">{t('access_management')}</span>
                     </Link>
                   </li>
+                  {permissions?.permission_type === 'Admin' && (
+                    <li className={`nav-item ${location.pathname === '/institute/meta-lead-ads' ? 'active' : ''}`}>
+                      <Link to="/institute/meta-lead-ads" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faBullhorn} />
+                        <span className="menu-title">Meta Lead Ads</span>
+                      </Link>
+                    </li>
+                  )}
               {(permissions?.permission_type === 'Admin' || permissions?.custom_permissions?.can_change_lead_status_b2b) && (
 
                   <li className={`nav-item ${location.pathname === '/institute/statusdesign' ? 'active' : ''}`}>

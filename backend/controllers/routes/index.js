@@ -31,6 +31,7 @@ const { resolvePublicUrl } = require('../../helpers/s3Storage');
 const AppliedCourses = require('../models/appliedCourses');
 const commonFunc = require('./functions/common');
 const publicLrpLeadRoutes = require('./publicLrpLead');
+const metaRoutes = require('./meta');
 
 // Production nginx often strips `/api` before Node — mirror OTP routes at root.
 router.post('/sendOtp', commonFunc.sendOtp);
@@ -45,6 +46,7 @@ router.use('/public', publicLrpLeadRoutes);
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
+router.use('/api/meta', metaRoutes);
 router.use('/api', apiRoutes);
 router.use('/api/certificates', certificatesApiRoutes);
 router.use('/api/ai', aiRoutes); // AI-powered job recommendations

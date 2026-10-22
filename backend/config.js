@@ -58,5 +58,17 @@ module.exports = {
   baseUrl: process.env.BASE_URL,
   blackListIps: process.env.BLACK_LIST_IPS,
   chat_service_api: process.env.MIPIE_CHAT_SERVICE_KEY,
-  sheetId: process.env.sheetId
+  sheetId: process.env.sheetId,
+  // Backend-only Meta Lead Ads settings. Empty values must not prevent startup.
+  metaLeadAds: {
+    appId: process.env.META_APP_ID,
+    appSecret: process.env.META_APP_SECRET,
+    graphApiVersion: process.env.META_GRAPH_API_VERSION,
+    adAccountId: process.env.META_AD_ACCOUNT_ID,
+    adsAccessToken: process.env.META_ADS_ACCESS_TOKEN,
+    pageId: process.env.META_PAGE_ID,
+    pageAccessToken: process.env.META_PAGE_ACCESS_TOKEN,
+    verifyToken: process.env.META_VERIFY_TOKEN,
+    businessId: process.env.META_BUSINESS_ID,
+  },
 };
