@@ -1112,6 +1112,47 @@ module.exports.centerList = async (req, res) => {
   }
 };
 
+function applicantAge(dob) {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const month = today.getMonth() - birth.getMonth();
+  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
+
+module.exports.jobApplyRules = async (req, res) => {
+  try {
+    const vacancy = await Vacancy.findById(req.params.id)
+      .select('ageMin ageMax _qualification docsRequired')
+      .populate({ path: '_qualification', select: 'name' })
+      .lean();
+    if (!vacancy) {
+      return res.send({ status: false, message: 'Job not found.' });
+    }
+    const docs = (Array.isArray(vacancy.docsRequired) ? vacancy.docsRequired : [])
+      .filter((doc) => doc && doc.status !== false && doc.mandatory && (doc.Name || doc.name))
+      .map((doc) => ({
+        _id: doc._id,
+        name: doc.Name || doc.name,
+      }));
+    return res.send({
+      status: true,
+      data: {
+        ageMin: vacancy.ageMin ?? null,
+        ageMax: vacancy.ageMax ?? null,
+        qualificationId: vacancy._qualification?._id ? String(vacancy._qualification._id) : '',
+        qualificationName: vacancy._qualification?.name || '',
+        docs,
+      },
+    });
+  } catch (err) {
+    return res.send({ status: false, message: err.message || 'Failed to load job requirements.' });
+  }
+};
+
 module.exports.publicApply = async (req, res) => {
   try {
     const { mobile, kind, id, source, isNewUser } = req.body || {};
@@ -1143,9 +1184,35 @@ module.exports.publicApply = async (req, res) => {
     };
 
     if (kind === 'job') {
-      const vacancy = await Vacancy.findById(id).select('_id _company collegeAcNo').lean();
+      const vacancy = await Vacancy.findById(id)
+        .select('_id _company collegeAcNo ageMin ageMax _qualification')
+        .lean();
       if (!vacancy) {
         return res.send({ status: false, message: 'Job not found.' });
+      }
+
+      const hasAgeRule = vacancy.ageMin != null && vacancy.ageMax != null;
+      if (hasAgeRule) {
+        const age = applicantAge(candidate.dob);
+        if (age == null || age < Number(vacancy.ageMin) || age > Number(vacancy.ageMax)) {
+          return res.send({
+            status: false,
+            message: `This job requires age between ${vacancy.ageMin} and ${vacancy.ageMax} years.`,
+          });
+        }
+      }
+
+      if (vacancy._qualification) {
+        const requiredQualification = String(vacancy._qualification);
+        const candidateQualification = candidate.highestQualification
+          ? String(candidate.highestQualification)
+          : '';
+        if (candidateQualification !== requiredQualification) {
+          return res.send({
+            status: false,
+            message: 'Your qualification does not match the qualification required for this job.',
+          });
+        }
       }
 
       await Candidate.findOneAndUpdate(

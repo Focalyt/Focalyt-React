@@ -169,6 +169,7 @@ commonRoutes.get("/sectorList", commonFunc.sectorList);
 commonRoutes.get("/centerList", commonFunc.centerList);
 commonRoutes.get("/boards", commonFunc.educationBoardList);
 commonRoutes.get("/educationslist", commonFunc.education);
+commonRoutes.get("/jobApplyRules/:id", commonFunc.jobApplyRules);
 commonRoutes.get("/courselist/:qualificationId", commonFunc.educationCoursesList);
 commonRoutes.get("/specializations/:courseId", commonFunc.courseSpecializationsList);
 

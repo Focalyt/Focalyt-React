@@ -991,6 +991,47 @@ function CollegeLayout({ children }) {
                 </ul>
               </li>
               )}
+              {/*Jobs */}
+              <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('jobs')}>
+                  <FontAwesomeIcon icon={faBookOpen} />
+                  <span className="menu-title">{t('Job')}</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`chevron-icon ${openSubmenu.jobs ? 'rotate-90' : ''}`}
+                    />
+                  </span>
+                </a>
+                <ul
+                  ref={menuRefs.jobs}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.jobs,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.jobs === '0px' ? 0 : 1
+                  }}
+                >
+                  <li className={`nav-item ${location.pathname === '/institute/addjob' ? 'active' : ''}`}>
+                    <Link to="/institute/addjob" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon
+                        icon={faPlusCircle}
+                        style={{
+                          color: location.pathname === '/institute/addjob' ? 'white' : 'black'
+                        }}
+                      />
+                      <span className="menu-title">{t('Add Job')}</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/viewjob' ? 'active' : ''}`}>
+                    <Link to="/institute/viewjob" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faEye} />
+                      <span className="menu-title">{t('View Job')}</span>
+                    </Link>
+                  </li>
+                </ul>
+              </li>
               {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>

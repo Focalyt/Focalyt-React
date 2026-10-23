@@ -3970,7 +3970,6 @@ const CRMDashboard = () => {
   const [aiStatusCounts, setAiStatusCounts] = useState({});
   const [activeAiPerformanceId, setActiveAiPerformanceId] = useState(null);
   const [leadMilestones, setLeadMilestones] = useState([]);
-  const [reachedMilestoneLeadCount, setReachedMilestoneLeadCount] = useState(0);
   const [activeMilestoneId, setActiveMilestoneId] = useState(null);
   const aiPerformanceFilters = useMemo(
     () => performanceFilters.map((filter) => ({
@@ -4250,7 +4249,6 @@ const CRMDashboard = () => {
       });
       if (response.data.success) {
         setLeadMilestones(response.data.data || []);
-        setReachedMilestoneLeadCount(Number(response.data.reachedLeadCount) || 0);
       }
     } catch (error) {
       console.error('Error fetching milestones:', error);
@@ -7452,11 +7450,33 @@ console.log('API Response:', response.data);
     }
     return Number(crmFilters.find((filter) => filter._id === 'all' || !filter._id)?.count) || performanceTotalCount || 0;
   })();
-  const milestonePerformanceChips = leadMilestones.map((milestone) => ({
-    ...milestone,
-    count: Number(milestone.leadCount) || 0,
-  }));
-  const milestonePerformanceTotal = reachedMilestoneLeadCount;
+  const milestoneProjectId = String(cycleFilters.project || '');
+  const milestoneProjectChoices = useMemo(() => {
+    const assignedIds = new Set();
+    (leadMilestones || []).forEach((milestone) => {
+      (milestone.assignedProjects || []).forEach((projectId) => assignedIds.add(String(projectId)));
+    });
+    const choices = (cycleProjectOptions || []).filter((option) => assignedIds.has(String(option.value)));
+    if (milestoneProjectId && !choices.some((option) => String(option.value) === milestoneProjectId)) {
+      const current = (cycleProjectOptions || []).find((option) => String(option.value) === milestoneProjectId);
+      if (current) choices.unshift(current);
+    }
+    return choices;
+  }, [leadMilestones, cycleProjectOptions, milestoneProjectId]);
+  const milestonePerformanceChips = useMemo(() => {
+    if (!milestoneProjectId) return [];
+    const positionOf = (milestone) => {
+      const position = Number(milestone.projectPositions?.[milestoneProjectId]);
+      return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+    };
+    return (leadMilestones || [])
+      .filter((milestone) => (milestone.assignedProjects || []).map(String).includes(milestoneProjectId))
+      .sort((a, b) => positionOf(a) - positionOf(b))
+      .map((milestone) => ({
+        ...milestone,
+        count: Number(milestone.leadCount) || 0,
+      }));
+  }, [leadMilestones, milestoneProjectId]);
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action, AI Call)
   useEffect(() => {
@@ -15054,8 +15074,18 @@ useEffect(() => {
       formDataRef.current = updated;
       return updated;
     });
+    let nextFilters = filterData;
+    if (key === 'department' || key === 'project') {
+      setActiveMilestoneId(null);
+      nextFilters = { ...filterData };
+      delete nextFilters.milestoneId;
+      delete nextFilters.reachedMilestone;
+      delete nextFilters.milestoneTitle;
+      filterDataRef.current = nextFilters;
+      setFilterData(nextFilters);
+    }
     setCurrentPage(1);
-    fetchProfileData(filterData, 1, next);
+    fetchProfileData(nextFilters, 1, next);
   };
 
   useEffect(() => {
@@ -16356,30 +16386,26 @@ useEffect(() => {
         </div>
       </div>
       <div className="b2b-dash-section mt-3">
-        <span className="b2b-dash-section__label">Milestone</span>
-        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
-          <button
-            type="button"
-            className="b2b-perf-chip"
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '999px',
-              cursor: 'pointer',
-              color: !activeMilestoneId ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: !activeMilestoneId ? 'rgb(250, 85, 121)' : '#fff',
-              border: !activeMilestoneId ? 'none' : '1.5px solid rgb(250, 85, 121)',
-            }}
-            onClick={() => handleMilestoneChipClick(null)}
+        <label className="b2b-dash-section__label" htmlFor="b2bMilestoneProject">Project</label>
+        <div className="b2b-milestone-row d-flex flex-nowrap gap-2 align-items-center pt-1">
+          <select
+            id="b2bMilestoneProject"
+            className="b2b-milestone-project"
+            aria-label="Project"
+            value={milestoneProjectId}
+            onChange={(event) => handleCycleFilterChange('project', event.target.value)}
           >
-            All ({milestonePerformanceTotal})
-          </button>
-          {milestonePerformanceChips.map((milestone, index) => {
-            const isSelected = activeMilestoneId === milestone._id;
-            return (
+            <option value="">Select project</option>
+            {milestoneProjectChoices.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          {!milestoneProjectId && (
+            <span className="b2b-milestone-project-hint">Choose a project to see its milestones</span>
+          )}
+          {milestoneProjectId && (
+            <div className="b2b-milestone-chips b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center">
               <button
-                key={milestone._id || index}
                 type="button"
                 className="b2b-perf-chip"
                 style={{
@@ -16388,16 +16414,44 @@ useEffect(() => {
                   fontWeight: 600,
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
-                  backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
-                  border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                  color: filterData.reachedMilestone === 'true' && !activeMilestoneId ? '#fff' : 'rgb(250, 85, 121)',
+                  backgroundColor: filterData.reachedMilestone === 'true' && !activeMilestoneId ? 'rgb(250, 85, 121)' : '#fff',
+                  border: filterData.reachedMilestone === 'true' && !activeMilestoneId ? 'none' : '1.5px solid rgb(250, 85, 121)',
                 }}
-                onClick={() => handleMilestoneChipClick(milestone)}
+                onClick={() => handleMilestoneChipClick(null)}
               >
-                {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                All
               </button>
-            );
-          })}
+              {milestonePerformanceChips.length === 0 && (
+                <span className="text-muted" style={{ fontSize: 12, fontWeight: 600 }}>
+                  No milestones on this project
+                </span>
+              )}
+              {milestonePerformanceChips.map((milestone, index) => {
+                const isSelected = activeMilestoneId === milestone._id;
+                return (
+                  <button
+                    key={milestone._id || index}
+                    type="button"
+                    className="b2b-perf-chip"
+                    style={{
+                      padding: '6px 14px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                      cursor: 'pointer',
+                      color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
+                      backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
+                      border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                    }}
+                    onClick={() => handleMilestoneChipClick(milestone)}
+                  >
+                    {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -16876,6 +16930,47 @@ useEffect(() => {
             font-weight: 600;
             color: #333;
             line-height: 1.2;
+          }
+          .b2b-crm-dashboard .b2b-milestone-row {
+            flex-wrap: nowrap;
+            min-width: 0;
+          }
+          .b2b-crm-dashboard .b2b-milestone-project {
+            width: 118px;
+            min-width: 118px;
+            max-width: 118px;
+            height: 32px;
+            padding: 0 26px 0 10px;
+            border-radius: 999px;
+            border: 1.5px solid rgb(250, 85, 121);
+            color: rgb(250, 85, 121);
+            font-weight: 600;
+            font-size: 12px;
+            line-height: 30px;
+            background-color: #fff;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fa5579' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 10px 7px;
+            appearance: none;
+            outline: none;
+            cursor: pointer;
+            flex: 0 0 118px;
+          }
+          .b2b-crm-dashboard .b2b-milestone-project:focus {
+            box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.16);
+          }
+          .b2b-crm-dashboard .b2b-milestone-project-hint {
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chips {
+            flex: 1 1 auto;
+            min-width: 0;
+            flex-wrap: nowrap;
+            overflow-x: auto;
           }
           .b2b-crm-dashboard .b2b-dash-stat-card {
             border-radius: 8px;

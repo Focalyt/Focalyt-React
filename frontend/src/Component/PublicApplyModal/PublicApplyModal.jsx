@@ -16,6 +16,17 @@ import { parseAddressComponents, getCoordinates, isValidPlace } from "../../util
 import { trackMetaConversion } from "../../utils/conversionTrakingRoutes";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+
+function ageFromDob(value) {
+  if (!value) return null;
+  const birth = new Date(value);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const month = today.getMonth() - birth.getMonth();
+  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
 const PublicApplyContext = createContext(null);
 
 export function isCandidateLoggedIn() {
@@ -72,6 +83,15 @@ export function buildJobApplyTarget(job, bucketUrl) {
     extra: job?.displayCompanyName || job?._company?.name || job?.work || "",
     badge: job?.courseType === "coursejob" ? "Course + Jobs" : "Job",
     applyPath: `/candidate/job/${id}?apply=1`,
+    ageMin: job?.ageMin ?? null,
+    ageMax: job?.ageMax ?? null,
+    qualificationId: job?._qualification?._id
+      ? String(job._qualification._id)
+      : (typeof job?._qualification === "string" ? job._qualification : ""),
+    qualificationName: job?._qualification?.name || "",
+    docs: (Array.isArray(job?.docsRequired) ? job.docsRequired : [])
+      .filter((doc) => doc && doc.status !== false && doc.mandatory && (doc.Name || doc.name))
+      .map((doc) => ({ _id: String(doc._id), name: doc.Name || doc.name })),
   };
 }
 
@@ -162,6 +182,13 @@ function PublicApplyModal() {
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [qualifications, setQualifications] = useState([]);
+  const [qualification, setQualification] = useState("");
+  const [jobRules, setJobRules] = useState(null);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [educationConfirmed, setEducationConfirmed] = useState(false);
+  const [docFiles, setDocFiles] = useState({});
   const [isNewUser, setIsNewUser] = useState(true);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
@@ -170,6 +197,7 @@ function PublicApplyModal() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [applied, setApplied] = useState(false);
   const [mobileTab, setMobileTab] = useState("apply");
 
   const resetForm = useCallback(() => {
@@ -186,6 +214,12 @@ function PublicApplyModal() {
     setLatitude("");
     setLongitude("");
     setConfirmed(false);
+    setQualification("");
+    setJobRules(null);
+    setRulesLoading(false);
+    setAgeConfirmed(false);
+    setEducationConfirmed(false);
+    setDocFiles({});
     setIsNewUser(true);
     setOtpSent(false);
     setOtpVerified(false);
@@ -195,6 +229,7 @@ function PublicApplyModal() {
     submittingRef.current = false;
     setError("");
     setSuccess("");
+    setApplied(false);
   }, []);
 
   useEffect(() => {
@@ -209,6 +244,46 @@ function PublicApplyModal() {
   }, [target, resetForm]);
 
   const showProfileFields = Boolean(target) && otpVerified && isNewUser;
+
+  useEffect(() => {
+    if (!target) return undefined;
+    let cancelled = false;
+    axios.get(`${backendUrl}/api/educationslist`)
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.data?.data?.education;
+        setQualifications(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setQualifications([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [target, backendUrl]);
+
+  useEffect(() => {
+    if (!target || target.kind !== "job" || !target.id) {
+      setJobRules(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setRulesLoading(true);
+    axios.get(`${backendUrl}/api/jobApplyRules/${target.id}`)
+      .then((res) => {
+        if (cancelled) return;
+        setJobRules(res.data?.status ? res.data.data : null);
+      })
+      .catch(() => {
+        if (!cancelled) setJobRules(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRulesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [target, backendUrl]);
 
   useEffect(() => {
     if (!showProfileFields) return undefined;
@@ -363,6 +438,26 @@ function PublicApplyModal() {
     }
   };
 
+  const uploadMandatoryDocs = async () => {
+    const docs = Array.isArray(jobRules?.docs) ? jobRules.docs : [];
+    if (!docs.length || target?.kind !== "job") return;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("Application saved, but the documents could not be uploaded. Please log in and upload them.");
+    }
+    for (const doc of docs) {
+      const file = docFiles[doc._id];
+      const form = new FormData();
+      form.append("file", file);
+      form.append("docsId", doc._id);
+      form.append("docsName", doc.name);
+      form.append("jobId", target.id);
+      await axios.post(`${backendUrl}/candidate/jobDocs/${target.id}`, form, {
+        headers: { "x-auth": token },
+      });
+    }
+  };
+
   const loginAndContinue = async ({ treatAsExisting = !isNewUser } = {}) => {
     const applyRes = await axios.post(`${backendUrl}/api/publicApply`, {
       mobile,
@@ -381,8 +476,12 @@ function PublicApplyModal() {
       // Session is optional; CRM lead is already saved, including role-3 user for existing numbers.
     }
 
+    await uploadMandatoryDocs();
+
     setSuccess(applyRes.data.message || "Application submitted successfully.");
-    window.setTimeout(() => closeApply(), 1200);
+    setApplied(true);
+    submittingRef.current = false;
+    setSubmitting(false);
   };
 
   const submitExistingApplication = async () => {
@@ -414,9 +513,49 @@ function PublicApplyModal() {
     setError("");
     setSuccess("");
 
+    if (applied) return;
     if (!otpVerified) {
       setError("Please verify the OTP before submitting.");
       return;
+    }
+    if (target.kind === "job") {
+      if (rulesLoading) {
+        setError("Checking this job's requirements...");
+        return;
+      }
+      if (!jobRules) {
+        setError("Could not load this job's requirements. Please close and try again.");
+        return;
+      }
+      const docs = Array.isArray(jobRules.docs) ? jobRules.docs : [];
+      if (jobRules.ageMin != null && jobRules.ageMax != null) {
+        if (!ageConfirmed) {
+          setError("Please confirm that your age is eligible for this job.");
+          return;
+        }
+        if (isNewUser) {
+          const age = ageFromDob(dob);
+          if (age == null || age < Number(jobRules.ageMin) || age > Number(jobRules.ageMax)) {
+            setError(`This job requires age between ${jobRules.ageMin} and ${jobRules.ageMax} years.`);
+            return;
+          }
+        }
+      }
+      if (jobRules.qualificationId) {
+        if (!educationConfirmed) {
+          setError(`Please confirm your qualification is ${jobRules.qualificationName || "the required qualification"}.`);
+          return;
+        }
+        if (isNewUser && String(qualification) !== String(jobRules.qualificationId)) {
+          setError(`This job requires ${jobRules.qualificationName || "the listed qualification"}. Choose that qualification exactly.`);
+          return;
+        }
+      }
+      const missingDoc = docs.find((doc) => !docFiles[doc._id]);
+      if (missingDoc) {
+        setError(`Please upload ${missingDoc.name}.`);
+        return;
+      }
     }
     if (!isNewUser) {
       await submitExistingApplication();
@@ -448,6 +587,10 @@ function PublicApplyModal() {
         setError("Please select your gender.");
         return;
       }
+      if (!qualification) {
+        setError("Please select your qualification.");
+        return;
+      }
       if (!address.trim() || !latitude || !longitude || !state) {
         setError("Please select your complete address from the suggestions.");
         return;
@@ -463,6 +606,7 @@ function PublicApplyModal() {
           sex: gender,
           email: email.trim(),
           dob,
+          highestQualification: qualification,
           personalInfo: {
             currentAddress: {
               type: "Point",
@@ -490,12 +634,18 @@ function PublicApplyModal() {
         const registerRes = await axios.post(`${backendUrl}/candidate/register`, body);
         if (registerRes.data?.status !== "success") {
           const errorMsg = registerRes.data?.error;
-          const alreadyExists = /already exist|already registered/i.test(String(errorMsg || ""));
-          if (!alreadyExists) {
-            setError(typeof errorMsg === "string" ? errorMsg : errorMsg?.message || "Registration failed.");
+          const errorText = typeof errorMsg === "string"
+            ? errorMsg
+            : errorMsg?.message || "Registration failed.";
+          if (/email already exist/i.test(errorText)) {
+            setError("This email is already registered. Apply with the mobile number linked to this email, or use a different email.");
             return;
           }
-          await loginAndContinue({ treatAsExisting: true });
+          if (/mobile already registered/i.test(errorText)) {
+            await loginAndContinue({ treatAsExisting: true });
+            return;
+          }
+          setError(errorText);
           return;
         }
         await trackMetaConversion({ eventName: "Signup", sourceUrl: window.location.href });
@@ -728,6 +878,18 @@ function PublicApplyModal() {
           </label>
 
           <label className="pam-line">
+            <span>Qualification <i>*</i></span>
+            <div className="pam-select-wrap">
+              <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
+                <option value="">Select qualification</option>
+                {qualifications.map((item) => (
+                  <option key={item._id} value={item._id}>{item.name}</option>
+                ))}
+              </select>
+            </div>
+          </label>
+
+          <label className="pam-line">
             <span>Address <i>*</i></span>
             <Field icon={MapPin}>
               <input
@@ -741,22 +903,71 @@ function PublicApplyModal() {
               />
             </Field>
           </label>
+          </>
+          ) : null}
 
+          {otpVerified && target.kind === "job" ? (
+            <div className="pam-job-rules">
+              {rulesLoading ? <p className="pam-rules-note">Checking this job's requirements...</p> : null}
+              {jobRules?.ageMin != null && jobRules?.ageMax != null ? (
+                <label className="pam-check">
+                  <input
+                    type="checkbox"
+                    checked={ageConfirmed}
+                    onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  />
+                  <span>I confirm that my age is eligible for this job.</span>
+                </label>
+              ) : null}
+              {jobRules?.qualificationId ? (
+                <label className="pam-check">
+                  <input
+                    type="checkbox"
+                    checked={educationConfirmed}
+                    onChange={(e) => setEducationConfirmed(e.target.checked)}
+                  />
+                  <span>My qualification is {jobRules.qualificationName || "the required qualification"}.</span>
+                </label>
+              ) : null}
+              {Array.isArray(jobRules?.docs) && jobRules.docs.length ? (
+                <div className="pam-docs">
+                  <p>Upload the documents required for this job.</p>
+                  {jobRules.docs.map((doc) => (
+                    <label className="pam-line" key={doc._id}>
+                      <span>{doc.name} <i>*</i></span>
+                      <input
+                        className="pam-file"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setDocFiles((prev) => ({ ...prev, [doc._id]: file }));
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {otpVerified && isNewUser ? (
+          <>
           <label className="pam-check">
             <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
             <span>I confirm that the above information is correct and I agree to be contacted.</span>
           </label>
 
-          <button type="submit" className="pam-submit" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Application"}
+          <button type="submit" className="pam-submit" disabled={submitting || applied}>
+            {applied ? "Application submitted" : submitting ? "Submitting..." : "Submit Application"}
             <span aria-hidden="true">→</span>
           </button>
           </>
           ) : null}
 
           {otpVerified && !isNewUser ? (
-            <button type="submit" className="pam-submit" disabled={submitting}>
-              {submitting ? "Submitting..." : "Submit Application"}
+            <button type="submit" className="pam-submit" disabled={submitting || applied}>
+              {applied ? "Application submitted" : submitting ? "Submitting..." : "Submit Application"}
               <span aria-hidden="true">→</span>
             </button>
           ) : null}
@@ -1095,6 +1306,17 @@ function PublicApplyModal() {
   color: #475569 !important;
 }
 .pam-check input { margin-top: 3px; }
+.pam-job-rules { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 4px; }
+.pam-rules-note, .pam-docs p { margin: 0; color: #64748b; font-size: 13px; }
+.pam-docs { display: flex; flex-direction: column; gap: 10px; }
+.pam-file {
+  width: 100%;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  font-size: 13px;
+}
 .pam-submit {
   width: 100%;
   border: 0;
