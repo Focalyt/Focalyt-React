@@ -3458,7 +3458,6 @@ const CRMDashboard = () => {
       if (!whatsapp) errors.push('Please enter WhatsApp number');
       if (whatsapp && !/^\d{10}$/.test(whatsapp)) errors.push('WhatsApp number must be 10 digits');
       if (!sex) errors.push('Please select Gender');
-      if (!dobRaw) errors.push('Please select Date of Birth');
       if (!highestQualification) errors.push('Please select Highest Qualification');
       if (email && !/^\S+@\S+\.\S+$/.test(email)) errors.push('Please enter a valid Email');
 
@@ -11877,14 +11876,13 @@ useEffect(() => {
 
               <div className="mb-3">
                 <label htmlFor="candidateDob" className="form-label fw-semibold text-dark mb-2">
-                  Date Of Birth <span className="text-danger">*</span>
+                  Date Of Birth
                 </label>
                 <input
                   type="date"
                   id="candidateDob"
                   className="form-control border-0 shadow-sm"
                   value={candidateFormData.dob}
-                  required
                   onChange={(e) => handleInputChange('dob', e.target.value)}
                   style={{
                     height: '48px',
@@ -23861,12 +23859,11 @@ useEffect(() => {
 
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
-                        Date Of Birth <span className="text-danger">*</span>
+                        Date Of Birth
                       </label>
                       <input
                         type="date"
                         className="form-control"
-                        required
                         value={candidateFormData.dob}
                         onChange={(e) => handleInputChange('dob', e.target.value)}
                       />
