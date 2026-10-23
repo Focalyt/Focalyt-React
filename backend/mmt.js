@@ -217,7 +217,16 @@ app.use('/api/upload', serveUploadMiddleware);
 app.use(express.static(path.resolve(__dirname, "public")));
 app.use(session(sess));
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json({ limit: "15mb" }));
+app.use(bodyParser.json({
+	limit: "15mb",
+	verify: (req, _res, buf) => {
+		const pathOnly = String(req.originalUrl || '').split('?')[0];
+		// Nginx strips `/api`, so production receives /meta/webhook.
+		if (pathOnly === '/api/meta/webhook' || pathOnly === '/meta/webhook') {
+			req.rawBody = Buffer.from(buf);
+		}
+	},
+}));
 app.use(expSanitizer());
 app.use(methodOverride());
 app.use(compression());

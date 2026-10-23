@@ -31,8 +31,16 @@ const { resolvePublicUrl } = require('../../helpers/s3Storage');
 const AppliedCourses = require('../models/appliedCourses');
 const commonFunc = require('./functions/common');
 const publicLrpLeadRoutes = require('./publicLrpLead');
+const metaRoutes = require('./meta');
+const {
+  verifyMetaWebhook,
+  receiveMetaWebhook,
+} = require('./meta/webhookHandlers');
 
 // Production nginx often strips `/api` before Node — mirror OTP routes at root.
+// Meta's callback is https://focalyt.com/api/meta/webhook, which arrives here as /meta/webhook.
+router.get('/meta/webhook', verifyMetaWebhook);
+router.post('/meta/webhook', receiveMetaWebhook);
 router.post('/sendOtp', commonFunc.sendOtp);
 router.post('/otpCollegeLogin', commonFunc.loginAsCollege);
 router.post('/verifyOtp', commonFunc.verifyOtp);
@@ -45,6 +53,7 @@ router.use('/public', publicLrpLeadRoutes);
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
+router.use('/api/meta', metaRoutes);
 router.use('/api', apiRoutes);
 router.use('/api/certificates', certificatesApiRoutes);
 router.use('/api/ai', aiRoutes); // AI-powered job recommendations

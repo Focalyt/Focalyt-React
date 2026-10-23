@@ -167,6 +167,7 @@ import TermsOfService from './Pages/App/College/Register/termsOfService';
 import Attendance from './Pages/App/College/Attendance/Attendance';
 import CalenderFolowupB2C from './Pages/App/College/Course/CalenderFolowupB2C';
 import Source from './Pages/App/College/Settings/Source/Source';
+import MetaLeadAds from './Pages/App/College/MetaLeadAds/MetaLeadAds';
 import Partners from './Pages/App/College/Settings/Partners/Partners';
 import MisReport from './Pages/App/College/MisReport/MisReport';
 import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
@@ -392,6 +393,7 @@ const Layout = () => {
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
+          <Route path='meta-lead-ads' element={<MetaLeadAds />} />
           <Route path='partners' element={<Partners/>}/>
           <Route path='misreport/:batchId' element={<MisReport/>}/>
           <Route path='dripmarketing' element={<DripMarketing/>}/>
