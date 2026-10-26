@@ -32,10 +32,10 @@ export function mergeMappingRows(mappings, unmapped) {
       formId: form.formId,
       formName: form.formName || '',
       mappingId: form.mappingId || null,
-      projectId: '',
-      projectName: '',
       courseId: '',
       courseName: '',
+      jobId: '',
+      jobName: '',
       leadSourceId: '',
       leadSource: '',
       defaultStatusId: '',
@@ -79,8 +79,8 @@ export function filterMappingRows(rows, { status, search }) {
       row.pageId,
       row.formId,
       row.formName,
-      row.projectName,
       row.courseName,
+      row.jobName,
       row.leadSource,
       row.defaultStatus,
       row.defaultSubstatus,
@@ -102,8 +102,8 @@ export function emptySelection(form) {
     formId: form.formId || '',
     formName: form.formName || '',
     mappingId: form.mappingId || null,
-    projectId: '',
     courseId: '',
+    jobId: '',
     leadSource: '',
     defaultStatus: '',
     defaultSubstatus: '',
@@ -117,8 +117,8 @@ export function selectionFromMapping(mapping) {
     formId: mapping.formId || '',
     formName: mapping.formName || '',
     mappingId: mapping.id || mapping.mappingId || null,
-    projectId: mapping.projectId || '',
     courseId: mapping.courseId || '',
+    jobId: mapping.jobId || '',
     leadSource: mapping.leadSourceId || '',
     defaultStatus: mapping.defaultStatusId || '',
     defaultSubstatus: mapping.defaultSubstatusId || '',
@@ -128,11 +128,8 @@ export function selectionFromMapping(mapping) {
 
 export function nextSelection(current, patch) {
   const next = { ...current, ...patch };
-  if (Object.prototype.hasOwnProperty.call(patch, 'projectId') && patch.projectId !== current.projectId) {
-    next.courseId = '';
-    next.defaultStatus = '';
-    next.defaultSubstatus = '';
-  }
+  if (patch.courseId) next.jobId = '';
+  if (patch.jobId) next.courseId = '';
   if (Object.prototype.hasOwnProperty.call(patch, 'defaultStatus') && patch.defaultStatus !== current.defaultStatus) {
     next.defaultSubstatus = '';
   }
@@ -145,9 +142,11 @@ export function substatusesFor(statuses, statusId) {
 }
 
 const FIELD_CODES = {
-  project_not_found: 'projectId',
   course_not_found: 'courseId',
-  course_project_mismatch: 'courseId',
+  job_not_found: 'jobId',
+  target_required: 'courseId',
+  target_conflict: 'courseId',
+  project_not_used: 'courseId',
   lead_source_not_found: 'leadSource',
   lead_source_inactive: 'leadSource',
   status_not_found: 'defaultStatus',
@@ -161,25 +160,29 @@ export function fieldError(code) {
 }
 
 export function selectionIsCurrent(selection, options) {
-  if (!selection.projectId || !selection.courseId || !selection.leadSource) return false;
-  if (!selection.defaultStatus || !selection.defaultSubstatus) return false;
-  const courseOk = (options.courses || []).some(course => course.id === selection.courseId);
+  const hasCourse = Boolean(selection.courseId);
+  const hasJob = Boolean(selection.jobId);
+  if (hasCourse === hasJob) return false;
+  if (!selection.leadSource || !selection.defaultStatus || !selection.defaultSubstatus) return false;
+  const courseOk = !hasCourse || (options.courses || []).some(course => course.id === selection.courseId);
+  const jobOk = !hasJob || (options.jobs || []).some(job => job.id === selection.jobId);
   const sourceOk = (options.leadSources || []).some(source => source.id === selection.leadSource);
   const status = (options.statuses || []).find(item => item.id === selection.defaultStatus);
   const subOk = Boolean(status && (status.substatuses || []).some(sub => sub.id === selection.defaultSubstatus));
-  return courseOk && sourceOk && subOk;
+  return courseOk && jobOk && sourceOk && subOk;
 }
 
 export function mappingPayload(selection) {
-  return {
+  const payload = {
     pageId: selection.pageId,
     formId: selection.formId,
-    projectId: selection.projectId,
-    courseId: selection.courseId,
     leadSource: selection.leadSource,
     defaultStatus: selection.defaultStatus,
     defaultSubstatus: selection.defaultSubstatus,
   };
+  if (selection.jobId) payload.jobId = selection.jobId;
+  else payload.courseId = selection.courseId;
+  return payload;
 }
 
 export function discoveryLabel(status) {

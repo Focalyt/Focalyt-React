@@ -3,13 +3,15 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 // One CRM destination for a discovered Meta lead form.
-// Project and course names are read from those collections when a response is built.
-// defaultSubstatus is the embedded substatus _id on Status, matching AppliedCourses._leadSubStatus.
+// A form maps to a course or a job, never both, and the applicant record has no project.
+// defaultSubstatus is the embedded substatus _id on Status.
 const metaFormMappingSchema = new Schema({
   pageId: { type: String, required: true, trim: true },
   formId: { type: String, required: true, trim: true },
-  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
-  courseId: { type: Schema.Types.ObjectId, ref: 'courses', required: true },
+  collegeId: { type: Schema.Types.ObjectId, ref: 'College' },
+  projectId: { type: Schema.Types.ObjectId, ref: 'Project' },
+  courseId: { type: Schema.Types.ObjectId, ref: 'courses' },
+  jobId: { type: Schema.Types.ObjectId, ref: 'Vacancy' },
   leadSource: { type: Schema.Types.ObjectId, ref: 'Source', required: true },
   defaultStatus: { type: Schema.Types.ObjectId, ref: 'Status', required: true },
   defaultSubstatus: { type: Schema.Types.ObjectId, required: true },

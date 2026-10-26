@@ -191,16 +191,16 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
     else showNotice('Connection test finished. Review the status below.', 'success');
   }
 
+  const emptyOptions = { leadSources: [], courses: [], jobs: [], statuses: [] };
+
   async function openCreate(row) {
-    const projectsResult = await client.projects();
     const optionsResult = await client.options();
     setModal({
       selection: emptySelection(row),
-      projects: projectsResult.ok && projectsResult.body ? projectsResult.body.data || [] : [],
-      options: optionsResult.ok && optionsResult.body ? optionsResult.body : { leadSources: [], courses: [], statuses: [] },
+      options: optionsResult.ok && optionsResult.body ? optionsResult.body : emptyOptions,
       loadingOptions: false,
       saving: false,
-      fieldErrors: {},
+      fieldErrors: optionsResult.ok ? {} : { form: resultMessage(optionsResult, 'Mapping options could not be loaded.') },
     });
   }
 
@@ -211,45 +211,21 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
       return;
     }
     const selection = selectionFromMapping(result.body.mapping);
-    const [projectsResult, optionsResult] = await Promise.all([
-      client.projects(),
-      client.options(selection.projectId),
-    ]);
+    const optionsResult = await client.options();
     setModal({
       selection,
-      projects: projectsResult.ok && projectsResult.body ? projectsResult.body.data || [] : [],
-      options: optionsResult.ok && optionsResult.body ? optionsResult.body : { leadSources: [], courses: [], statuses: [] },
+      options: optionsResult.ok && optionsResult.body ? optionsResult.body : emptyOptions,
       loadingOptions: false,
       saving: false,
-      fieldErrors: {},
+      fieldErrors: optionsResult.ok ? {} : { form: resultMessage(optionsResult, 'Mapping options could not be loaded.') },
     });
   }
 
-  async function changeSelection(patch) {
-    const selection = nextSelection(modal.selection, patch);
-    const projectChanged = Object.prototype.hasOwnProperty.call(patch, 'projectId')
-      && patch.projectId !== modal.selection.projectId;
-    setModal({ ...modal, selection, fieldErrors: {}, loadingOptions: projectChanged });
-    if (!projectChanged) return;
-    if (!patch.projectId) {
-      const optionsResult = await client.options();
-      setModal(current => ({
-        ...current,
-        selection,
-        loadingOptions: false,
-        options: optionsResult.body || { leadSources: [], courses: [], statuses: [] },
-      }));
-      return;
-    }
-    const optionsResult = await client.options(patch.projectId);
+  function changeSelection(patch) {
     setModal(current => ({
       ...current,
-      selection,
-      loadingOptions: false,
-      options: optionsResult.ok && optionsResult.body
-        ? optionsResult.body
-        : { leadSources: [], courses: [], statuses: [] },
-      fieldErrors: optionsResult.ok ? {} : { projectId: resultMessage(optionsResult, 'Project options could not be loaded.') },
+      selection: nextSelection(current.selection, patch),
+      fieldErrors: {},
     }));
   }
 
@@ -450,7 +426,7 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
                         <th>Facebook Page ID</th>
                         <th>Facebook Form Name</th>
                         <th>Form ID</th>
-                        <th>Project</th>
+                        <th>Job</th>
                         <th>Course</th>
                         <th>Lead Source</th>
                         <th>Default Status</th>
@@ -466,11 +442,11 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
                           <td>
                             {row.formName || '—'}
                             {row.metadataStatus === 'unavailable' && <div className="text-warning">Form details unavailable</div>}
-                            {row.projectId && !row.projectName && <div className="text-warning">Project no longer available</div>}
+                            {row.jobId && !row.jobName && <div className="text-warning">Job no longer available</div>}
                             {row.courseId && !row.courseName && <div className="text-warning">Course no longer available</div>}
                           </td>
                           <td>{row.formId}</td>
-                          <td>{row.projectName || '—'}</td>
+                          <td>{row.jobName || '—'}</td>
                           <td>{row.courseName || '—'}</td>
                           <td>{row.leadSource || '—'}</td>
                           <td>{row.defaultStatus || '—'}</td>
@@ -533,7 +509,6 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
       {modal && (
         <MappingModal
           selection={modal.selection}
-          projects={modal.projects}
           options={modal.options}
           loadingOptions={modal.loadingOptions}
           saving={modal.saving}

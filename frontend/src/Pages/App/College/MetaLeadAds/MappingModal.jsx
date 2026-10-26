@@ -6,9 +6,78 @@ function FieldError({ name, errors }) {
   return <div className="invalid-feedback d-block">{errors[name]}</div>;
 }
 
+function namedItems(items) {
+  return (items || []).filter(item => item && item.id && String(item.name || '').trim());
+}
+
+function ChoiceMenu({
+  id,
+  label,
+  value,
+  placeholder,
+  items,
+  disabled,
+  emptyText,
+  errorName,
+  fieldErrors,
+  onChange,
+}) {
+  const [open, setOpen] = React.useState(false);
+  const choices = namedItems(items);
+  const selected = choices.find(item => item.id === value);
+
+  return (
+    <div>
+      <label className="form-label" htmlFor={id}>{label}</label>
+      <button
+        id={id}
+        type="button"
+        className="form-select text-start"
+        disabled={disabled}
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+      >
+        {selected ? selected.name : placeholder}
+      </button>
+      {open && !disabled && (
+        <div
+          className="dropdown-menu show w-100 position-static mt-1"
+          style={{ maxHeight: 220, overflowY: 'auto' }}
+          role="listbox"
+          aria-label={label}
+        >
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => { onChange(''); setOpen(false); }}
+          >
+            {placeholder}
+          </button>
+          {choices.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              role="option"
+              aria-selected={item.id === value}
+              className={`dropdown-item${item.id === value ? ' active' : ''}`}
+              onClick={() => { onChange(item.id); setOpen(false); }}
+            >
+              {item.name}
+            </button>
+          ))}
+          {!choices.length && <div className="dropdown-item text-muted">{emptyText}</div>}
+        </div>
+      )}
+      {!open && !choices.length && !disabled && (
+        <div className="form-text">{emptyText}</div>
+      )}
+      <FieldError name={errorName} errors={fieldErrors} />
+    </div>
+  );
+}
+
 export default function MappingModal({
   selection,
-  projects,
   options,
   loadingOptions,
   saving,
@@ -44,39 +113,36 @@ export default function MappingModal({
                 <input className="form-control" value={selection.formName || 'Unavailable'} readOnly />
               </div>
             </div>
-            <div className="mb-3">
-              <label className="form-label" htmlFor="meta-project">Project</label>
-              <select
-                id="meta-project"
-                className="form-select"
-                value={selection.projectId}
-                onChange={event => onChange({ projectId: event.target.value })}
-              >
-                <option value="">Select a project</option>
-                {projects.map(project => (
-                  <option key={project._id} value={project._id}>{project.name}</option>
-                ))}
-              </select>
-              <FieldError name="projectId" errors={fieldErrors} />
-            </div>
-            <div className="mb-3">
-              <label className="form-label" htmlFor="meta-course">Course</label>
-              <select
-                id="meta-course"
-                className="form-select"
-                value={selection.courseId}
-                disabled={!selection.projectId || loadingOptions}
-                onChange={event => onChange({ courseId: event.target.value })}
-              >
-                <option value="">Select a course</option>
-                {(options.courses || []).map(course => (
-                  <option key={course.id} value={course.id}>{course.name}</option>
-                ))}
-              </select>
-              {selection.projectId && !loadingOptions && !(options.courses || []).length && (
-                <div className="form-text">This project has no courses.</div>
-              )}
-              <FieldError name="courseId" errors={fieldErrors} />
+            <p className="text-muted">This ad is for a course or a job. Choosing one clears the other. The applicant is not stored against a project.</p>
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <ChoiceMenu
+                  id="meta-course"
+                  label="Course"
+                  value={selection.courseId}
+                  placeholder="Select a course"
+                  items={options.courses}
+                  disabled={loadingOptions}
+                  emptyText="No courses are available."
+                  errorName="courseId"
+                  fieldErrors={fieldErrors}
+                  onChange={courseId => onChange({ courseId })}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <ChoiceMenu
+                  id="meta-job"
+                  label="Job"
+                  value={selection.jobId}
+                  placeholder="Select a job"
+                  items={options.jobs}
+                  disabled={loadingOptions}
+                  emptyText="No jobs are available."
+                  errorName="jobId"
+                  fieldErrors={fieldErrors}
+                  onChange={jobId => onChange({ jobId })}
+                />
+              </div>
             </div>
             <div className="mb-3">
               <label className="form-label" htmlFor="meta-source">Lead Source</label>
@@ -100,7 +166,7 @@ export default function MappingModal({
                   id="meta-status"
                   className="form-select"
                   value={selection.defaultStatus}
-                  disabled={!selection.projectId || loadingOptions}
+                  disabled={loadingOptions}
                   onChange={event => onChange({ defaultStatus: event.target.value })}
                 >
                   <option value="">Select a status</option>
@@ -108,8 +174,8 @@ export default function MappingModal({
                     <option key={status.id} value={status.id}>{status.title}</option>
                   ))}
                 </select>
-                {selection.projectId && !loadingOptions && !statuses.length && (
-                  <div className="form-text">This project has no statuses available.</div>
+                {!loadingOptions && !statuses.length && (
+                  <div className="form-text">No statuses are available.</div>
                 )}
                 <FieldError name="defaultStatus" errors={fieldErrors} />
               </div>
