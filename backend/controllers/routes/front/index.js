@@ -643,6 +643,15 @@ function toAbsoluteHttpsImageUrl(value, baseUrl) {
 	return "";
 }
 
+function encodeSocialImageUrl(url) {
+	const value = String(url || "");
+	try {
+		return new URL(value).href;
+	} catch (e) {
+		return value.replace(/ /g, "%20");
+	}
+}
+
 function selectSocialPreviewImage(candidates, baseUrl) {
 	for (const raw of candidates) {
 		const ext = imageExtension(raw);
@@ -727,7 +736,7 @@ router.get("/coursedetails/:id", async (req, res) => {
 		/WhatsApp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|SkypeUriPreview/i.test(userAgent);
 
 	if (isSocialCrawler) {
-		const baseUrl = `${req.protocol}://${req.get('host')}`;
+		const baseUrl = "https://focalyt.com";
 		const courseUrl = `${baseUrl}/coursedetails/${id}`;
 		const courseTitle = `${course.name || "Course"} - Focalyt`;
 		const courseDescription =
@@ -748,7 +757,7 @@ router.get("/coursedetails/:id", async (req, res) => {
 		const safeTitle = escapeHtml(courseTitle);
 		const safeDescription = escapeHtml(courseDescription);
 		const safeUrl = escapeHtml(courseUrl);
-		const safeImage = escapeHtml(courseImageUrl);
+		const safeImage = escapeHtml(encodeSocialImageUrl(courseImageUrl));
 		const safeImageType = escapeHtml(courseImageType);
 
 		const htmlContent = `<!DOCTYPE html>

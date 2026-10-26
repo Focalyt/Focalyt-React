@@ -8,7 +8,7 @@ import FrontLayout from "../../../Component/Layouts/Front";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
 import { buildCourseApplyTarget, usePublicApply } from "../../../Component/PublicApplyModal/PublicApplyModal";
 
-const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.jpg";
 
 export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback }) {
   const { openApply } = usePublicApply();
