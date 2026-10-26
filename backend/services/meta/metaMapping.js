@@ -3,6 +3,8 @@ const MetaForm = require('../../controllers/models/metaForm');
 const MetaFormMapping = require('../../controllers/models/metaFormMapping');
 const Project = require('../../controllers/models/Project');
 const Course = require('../../controllers/models/courses');
+const Vacancy = require('../../controllers/models/vacancy');
+const College = require('../../controllers/models/college');
 const Source = require('../../controllers/models/source');
 const Status = require('../../controllers/models/status');
 const B2cStatusAssignment = require('../../controllers/models/b2cStatusAssignment');
@@ -10,7 +12,7 @@ const B2cStatusAssignment = require('../../controllers/models/b2cStatusAssignmen
 const OBJECT_ID = /^[a-fA-F0-9]{24}$/;
 const META_ID = /^\d{1,32}$/;
 const FORBIDDEN_FIELDS = ['accessToken', 'access_token', 'pageAccessToken', 'appSecret'];
-const CRM_FIELDS = ['projectId', 'courseId', 'leadSource', 'defaultStatus', 'defaultSubstatus'];
+const CRM_FIELDS = ['leadSource', 'defaultStatus', 'defaultSubstatus'];
 
 class MetaMappingError extends Error {
   constructor(code, message, status = 400) {
@@ -42,10 +44,6 @@ function isMetaId(value) {
 function visible(doc, collegeId) {
   if (!collegeId || !doc || !doc.college) return true;
   return idString(doc.college) === idString(collegeId);
-}
-
-function includesId(list, id) {
-  return (list || []).some(item => idString(item && item._id ? item._id : item) === String(id));
 }
 
 function collegeClause(collegeId) {
@@ -152,12 +150,50 @@ function createMongooseRepository() {
       if (!unique.length) return [];
       return Course.find({ _id: { $in: unique } }).select('name project college').lean();
     },
-    async listCourses(projectId, collegeId) {
+    async listCourses(collegeId) {
       return Course.find({
-        project: projectId,
         isDeleted: { $ne: true },
         ...collegeClause(collegeId),
-      }).select('name project college').sort({ name: 1 }).lean();
+      }).select('name project college').sort({ name: 1 }).limit(300).lean();
+    },
+    async courseIdsForCollege(collegeId) {
+      const rows = await Course.find({
+        isDeleted: { $ne: true },
+        ...collegeClause(collegeId),
+      }).select('_id').lean();
+      return rows.map(row => row._id);
+    },
+    async hrIdsForCollege(collegeId) {
+      if (!collegeId || !isObjectId(collegeId)) return [];
+      const college = await College.findById(collegeId).select('_concernPerson').lean();
+      return ((college && college._concernPerson) || [])
+        .map(person => person && person._id)
+        .filter(Boolean);
+    },
+    async findJob(id) {
+      if (!isObjectId(id)) return null;
+      return Vacancy.findById(id).select('title displayCompanyName _company hr status').lean();
+    },
+    async findJobsByIds(ids) {
+      const unique = [...new Set(ids.map(idString).filter(isObjectId))];
+      if (!unique.length) return [];
+      return Vacancy.find({ _id: { $in: unique } })
+        .select('title displayCompanyName _company hr status').lean();
+    },
+    async listJobs(collegeId) {
+      const hrIds = await this.hrIdsForCollege(collegeId);
+      if (collegeId && !hrIds.length) return [];
+      const filter = { status: { $ne: false } };
+      if (hrIds.length) filter.hr = { $in: hrIds };
+      return Vacancy.find(filter)
+        .select('title displayCompanyName _company hr status')
+        .sort({ title: 1 })
+        .limit(300)
+        .lean();
+    },
+    async jobIdsForCollege(collegeId) {
+      const rows = await this.listJobs(collegeId);
+      return rows.map(row => row._id);
     },
     async findSource(id) {
       if (!isObjectId(id)) return null;
@@ -209,7 +245,14 @@ function createMongooseRepository() {
       return saved.toObject();
     },
     async update(id, patch) {
-      return MetaFormMapping.findByIdAndUpdate(id, { $set: patch }, { new: true }).lean();
+      const update = {};
+      if (patch && (patch.$set || patch.$unset)) {
+        if (patch.$set) update.$set = patch.$set;
+        if (patch.$unset) update.$unset = patch.$unset;
+      } else {
+        update.$set = patch;
+      }
+      return MetaFormMapping.findByIdAndUpdate(id, update, { new: true }).lean();
     },
     async list(filter, skip, limit) {
       const [total, rows] = await Promise.all([
@@ -251,6 +294,43 @@ function readCrmFields(body, { required }) {
   return result;
 }
 
+function hasValue(value) {
+  return value !== undefined && value !== null && value !== '';
+}
+
+function readTarget(body, { required }) {
+  if (hasValue(body.projectId)) {
+    throw mappingError(
+      'project_not_used',
+      'Choose a course or a job. A Meta applicant is not stored against a project.',
+      400,
+    );
+  }
+  const hasCourse = hasValue(body.courseId);
+  const hasJob = hasValue(body.jobId);
+  const mentioned = Object.prototype.hasOwnProperty.call(body, 'courseId')
+    || Object.prototype.hasOwnProperty.call(body, 'jobId');
+  if (!mentioned && !required) return null;
+  if (hasCourse && hasJob) {
+    throw mappingError('target_conflict', 'Choose a course or a job, not both.', 400);
+  }
+  if (!hasCourse && !hasJob) {
+    if (!required) return null;
+    throw mappingError('target_required', 'Choose a course or a job.', 400);
+  }
+  if (hasCourse) {
+    return { courseId: requireObjectId(body.courseId, 'courseId'), jobId: null };
+  }
+  return { jobId: requireObjectId(body.jobId, 'jobId'), courseId: null };
+}
+
+function jobLabel(job) {
+  if (!job) return '';
+  const title = typeof job.title === 'string' ? job.title.trim() : '';
+  if (title) return title;
+  return typeof job.displayCompanyName === 'string' ? job.displayCompanyName.trim() : '';
+}
+
 function parsePage(query) {
   const source = query || {};
   const page = source.page === undefined || source.page === '' ? 1 : Number(source.page);
@@ -270,10 +350,11 @@ function present(mapping, names) {
     pageId: mapping.pageId,
     formId: mapping.formId,
     formName: names.formName || '',
-    projectId: idString(mapping.projectId),
-    projectName: names.projectName || '',
+    targetType: mapping.jobId ? 'job' : 'course',
     courseId: idString(mapping.courseId),
     courseName: names.courseName || '',
+    jobId: idString(mapping.jobId),
+    jobName: names.jobName || '',
     leadSourceId: idString(mapping.leadSource),
     leadSource: names.leadSource || '',
     defaultStatusId: idString(mapping.defaultStatus),
@@ -322,20 +403,32 @@ function createMappingService(repository = createMongooseRepository()) {
   }
 
   async function loadSelection(input, collegeId) {
-    const project = await repository.findProject(input.projectId);
-    if (!project || !visible(project, collegeId)) {
-      throw mappingError('project_not_found', 'The selected project was not found.', 400);
+    const hasCourse = Boolean(input.courseId);
+    const hasJob = Boolean(input.jobId);
+    if (hasCourse && hasJob) {
+      throw mappingError('target_conflict', 'Choose a course or a job, not both.', 400);
     }
-    const course = await repository.findCourse(input.courseId);
-    if (!course || !visible(course, collegeId)) {
-      throw mappingError('course_not_found', 'The selected course was not found.', 400);
+    if (!hasCourse && !hasJob) {
+      throw mappingError('target_required', 'Choose a course or a job.', 400);
     }
-    if (idString(course.project) !== idString(project._id)) {
-      throw mappingError(
-        'course_project_mismatch',
-        'The selected course does not belong to the selected project.',
-        400,
-      );
+    let course = null;
+    let job = null;
+    if (hasCourse) {
+      course = await repository.findCourse(input.courseId);
+      if (!course || !visible(course, collegeId)) {
+        throw mappingError('course_not_found', 'The selected course was not found.', 400);
+      }
+    } else {
+      job = await repository.findJob(input.jobId);
+      if (!job || job.status === false) {
+        throw mappingError('job_not_found', 'The selected job was not found.', 400);
+      }
+      if (collegeId) {
+        const hrIds = (await repository.hrIdsForCollege(collegeId)).map(idString);
+        if (!hrIds.includes(idString(job.hr))) {
+          throw mappingError('job_not_found', 'The selected job was not found.', 400);
+        }
+      }
     }
     const source = await repository.findSource(input.leadSource);
     if (!source) {
@@ -358,37 +451,21 @@ function createMappingService(repository = createMongooseRepository()) {
         400,
       );
     }
-    const assignment = await repository.findAssignment(project._id, status._id);
-    const projectHasRules = await repository.projectHasAssignments(project._id);
-    if (projectHasRules && !assignment) {
-      throw mappingError(
-        'status_not_assigned',
-        'The selected status is not assigned to this project.',
-        400,
-      );
-    }
-    if (assignment && !includesId(assignment.substatuses, substatus._id)) {
-      throw mappingError(
-        'substatus_not_assigned',
-        'The selected substatus is not assigned to this project.',
-        400,
-      );
-    }
     return {
-      project, course, source, status, substatus,
+      course, job, source, status, substatus,
     };
   }
 
   async function namesFor(rows) {
-    const [projects, courses, sources, statuses, labels] = await Promise.all([
-      repository.findProjectsByIds(rows.map(row => row.projectId)),
+    const [courses, jobs, sources, statuses, labels] = await Promise.all([
       repository.findCoursesByIds(rows.map(row => row.courseId)),
+      repository.findJobsByIds(rows.map(row => row.jobId)),
       repository.findSourcesByIds(rows.map(row => row.leadSource)),
       repository.findStatusesByIds(rows.map(row => row.defaultStatus)),
       repository.findFormLabels(rows.map(row => ({ pageId: row.pageId, formId: row.formId }))),
     ]);
-    const projectMap = byId(projects);
     const courseMap = byId(courses);
+    const jobMap = byId(jobs);
     const sourceMap = byId(sources);
     const statusMap = byId(statuses);
     const labelMap = new Map(labels.map(label => [
@@ -399,8 +476,8 @@ function createMappingService(repository = createMongooseRepository()) {
       const status = statusMap.get(idString(row.defaultStatus));
       return present(row, {
         formName: labelMap.get(formKey(row.pageId, row.formId)) || '',
-        projectName: (projectMap.get(idString(row.projectId)) || {}).name || '',
         courseName: (courseMap.get(idString(row.courseId)) || {}).name || '',
+        jobName: jobLabel(jobMap.get(idString(row.jobId))),
         leadSource: (sourceMap.get(idString(row.leadSource)) || {}).name || '',
         defaultStatus: status ? status.title : '',
         defaultSubstatus: substatusTitle(status, row.defaultSubstatus),
@@ -411,8 +488,8 @@ function createMappingService(repository = createMongooseRepository()) {
   function namesFromSelection(form, selection) {
     return {
       formName: form.formName || '',
-      projectName: selection.project.name,
-      courseName: selection.course.name,
+      courseName: selection.course ? selection.course.name : '',
+      jobName: jobLabel(selection.job),
       leadSource: selection.source.name,
       defaultStatus: selection.status.title,
       defaultSubstatus: selection.substatus.title,
@@ -427,9 +504,19 @@ function createMappingService(repository = createMongooseRepository()) {
     if (!mapping) {
       throw mappingError('mapping_not_found', 'The form mapping was not found.', 404);
     }
-    if (collegeId) {
-      const project = await repository.findProject(mapping.projectId);
-      if (project && !visible(project, collegeId)) {
+    if (collegeId && mapping.collegeId && idString(mapping.collegeId) !== idString(collegeId)) {
+      throw mappingError('mapping_not_found', 'The form mapping was not found.', 404);
+    }
+    if (collegeId && !mapping.collegeId && mapping.courseId) {
+      const course = await repository.findCourse(mapping.courseId);
+      if (course && !visible(course, collegeId)) {
+        throw mappingError('mapping_not_found', 'The form mapping was not found.', 404);
+      }
+    }
+    if (collegeId && !mapping.collegeId && mapping.jobId) {
+      const job = await repository.findJob(mapping.jobId);
+      const hrIds = (await repository.hrIdsForCollege(collegeId)).map(idString);
+      if (job && !hrIds.includes(idString(job.hr))) {
         throw mappingError('mapping_not_found', 'The form mapping was not found.', 404);
       }
     }
@@ -463,13 +550,19 @@ function createMappingService(repository = createMongooseRepository()) {
       filter.isActive = flag === true || flag === 'true';
     }
     if (actor.collegeId) {
-      const allowed = (await repository.projectIdsForCollege(actor.collegeId)).map(idString);
-      if (filter.projectId && !allowed.includes(String(filter.projectId))) {
-        return {
-          success: true, page: parsed.page, limit: parsed.limit, total: 0, mappings: [],
-        };
-      }
-      if (!filter.projectId) filter.projectId = { $in: allowed };
+      const [courseIds, jobIds, legacyProjects] = await Promise.all([
+        repository.courseIdsForCollege(actor.collegeId),
+        repository.jobIdsForCollege(actor.collegeId),
+        repository.projectIdsForCollege(actor.collegeId),
+      ]);
+      filter.$and = [...(filter.$and || []), {
+        $or: [
+          { collegeId: actor.collegeId },
+          { courseId: { $in: courseIds } },
+          { jobId: { $in: jobIds } },
+          { projectId: { $in: legacyProjects } },
+        ],
+      }];
     }
     const result = await repository.list(filter, parsed.skip, parsed.limit);
     const mappings = await namesFor(result.rows);
@@ -525,7 +618,8 @@ function createMappingService(repository = createMongooseRepository()) {
     rejectForbidden(body);
     const discovered = await assertDiscoveredForm(body.pageId, body.formId);
     const fields = readCrmFields(body, { required: true });
-    const selection = await loadSelection(fields, actor.collegeId);
+    const target = readTarget(body, { required: true });
+    const selection = await loadSelection({ ...fields, ...target }, actor.collegeId);
     const existing = await repository.findByForm(discovered.pageId, discovered.formId);
     if (existing) {
       const message = existing.isActive === false
@@ -538,8 +632,9 @@ function createMappingService(repository = createMongooseRepository()) {
       saved = await repository.create({
         pageId: discovered.pageId,
         formId: discovered.formId,
-        projectId: fields.projectId,
-        courseId: fields.courseId,
+        collegeId: actor.collegeId || null,
+        courseId: target.courseId || undefined,
+        jobId: target.jobId || undefined,
         leadSource: fields.leadSource,
         defaultStatus: fields.defaultStatus,
         defaultSubstatus: fields.defaultSubstatus,
@@ -578,6 +673,7 @@ function createMappingService(repository = createMongooseRepository()) {
       throw mappingError('mapping_key_immutable', 'Form ID cannot be changed.', 400);
     }
     const fields = readCrmFields(body, { required: false });
+    const target = readTarget(body, { required: false });
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       throw mappingError('invalid_request', 'isActive must be true or false.', 400);
     }
@@ -586,14 +682,30 @@ function createMappingService(repository = createMongooseRepository()) {
       ...fields,
       isActive: body.isActive === undefined ? current.isActive !== false : body.isActive,
     };
-    const touchesCrm = CRM_FIELDS.some(field => Object.prototype.hasOwnProperty.call(body, field));
+    if (target) {
+      merged.courseId = target.courseId;
+      merged.jobId = target.jobId;
+    }
+    const touchesCrm = CRM_FIELDS.some(field => Object.prototype.hasOwnProperty.call(body, field)) || Boolean(target);
     let selection = null;
     if (merged.isActive || touchesCrm) {
       selection = await loadSelection(merged, actor.collegeId);
     }
-    const patch = { updatedBy: actor.userId || null, ...fields };
-    if (body.isActive !== undefined) patch.isActive = body.isActive;
-    const saved = await repository.update(current._id, patch);
+    const set = { updatedBy: actor.userId || null, ...fields };
+    const unset = {};
+    if (actor.collegeId) set.collegeId = actor.collegeId;
+    if (body.isActive !== undefined) set.isActive = body.isActive;
+    if (target && target.courseId) {
+      set.courseId = target.courseId;
+      unset.jobId = '';
+      unset.projectId = '';
+    }
+    if (target && target.jobId) {
+      set.jobId = target.jobId;
+      unset.courseId = '';
+      unset.projectId = '';
+    }
+    const saved = await repository.update(current._id, { $set: set, $unset: unset });
     const form = await repository.findMappableForm(saved.pageId, saved.formId);
     const view = selection
       ? present(saved, namesFromSelection(form || {}, selection))
@@ -605,53 +717,32 @@ function createMappingService(repository = createMongooseRepository()) {
     return updateMapping(id, { isActive: false }, actor);
   }
 
-  async function mappingOptions(query, actor = {}) {
-    const source = query || {};
-    const leadSources = (await repository.listLeadSources()).map(row => ({
-      id: idString(row._id),
-      name: row.name,
-    }));
-    if (!source.projectId) {
-      return {
-        success: true, leadSources, courses: [], statuses: [],
-      };
-    }
-    const projectId = requireObjectId(source.projectId, 'projectId');
-    const project = await repository.findProject(projectId);
-    if (!project || !visible(project, actor.collegeId)) {
-      throw mappingError('project_not_found', 'The selected project was not found.', 400);
-    }
-    const courses = (await repository.listCourses(project._id, actor.collegeId))
-      .filter(course => visible(course, actor.collegeId))
-      .map(course => ({ id: idString(course._id), name: course.name }));
-    const [assignments, statuses] = await Promise.all([
-      repository.listAssignments(project._id),
+  async function mappingOptions(_query, actor = {}) {
+    const [leadSourceRows, courseRows, jobRows, statusRows] = await Promise.all([
+      repository.listLeadSources(),
+      repository.listCourses(actor.collegeId),
+      repository.listJobs(actor.collegeId),
       repository.listStatuses(actor.collegeId),
     ]);
-    const visibleStatuses = statuses.filter(status => visible(status, actor.collegeId));
-    const assignmentMap = new Map(assignments.map(row => [idString(row.status), row]));
-    const statusRows = (assignments.length
-      ? visibleStatuses.filter(status => assignmentMap.has(idString(status._id)))
-      : visibleStatuses
-    ).map((status) => {
-      const allowed = assignmentMap.get(idString(status._id));
-      const subs = status.substatuses || [];
-      const usable = allowed
-        ? subs.filter(sub => includesId(allowed.substatuses, sub._id))
-        : subs;
-      return {
-        id: idString(status._id),
-        title: status.title,
-        substatuses: usable.map(sub => ({ id: idString(sub._id), title: sub.title })),
-      };
-    });
     return {
       success: true,
-      projectId: idString(project._id),
-      projectName: project.name,
-      leadSources,
-      courses,
-      statuses: statusRows,
+      leadSources: leadSourceRows.map(row => ({ id: idString(row._id), name: row.name })),
+      courses: courseRows
+        .filter(course => visible(course, actor.collegeId) && String(course.name || '').trim())
+        .map(course => ({ id: idString(course._id), name: String(course.name).trim() })),
+      jobs: jobRows
+        .filter(job => jobLabel(job))
+        .map(job => ({ id: idString(job._id), name: jobLabel(job) })),
+      statuses: statusRows
+        .filter(status => visible(status, actor.collegeId))
+        .map(status => ({
+          id: idString(status._id),
+          title: status.title,
+          substatuses: (status.substatuses || []).map(sub => ({
+            id: idString(sub._id),
+            title: sub.title,
+          })),
+        })),
     };
   }
 
@@ -688,10 +779,12 @@ function createMappingService(repository = createMongooseRepository()) {
           mappingId: idString(mapping._id),
           pageId: mapping.pageId,
           formId: mapping.formId,
-          projectId: idString(selection.project._id),
-          projectName: selection.project.name,
-          courseId: idString(selection.course._id),
-          courseName: selection.course.name,
+          collegeId: idString(mapping.collegeId),
+          targetType: selection.job ? 'job' : 'course',
+          courseId: selection.course ? idString(selection.course._id) : '',
+          courseName: selection.course ? selection.course.name : '',
+          jobId: selection.job ? idString(selection.job._id) : '',
+          jobName: jobLabel(selection.job),
           leadSourceId: idString(selection.source._id),
           leadSource: selection.source.name,
           statusId: idString(selection.status._id),
