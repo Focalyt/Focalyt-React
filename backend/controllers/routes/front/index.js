@@ -599,12 +599,73 @@ router.get("/event", async (req, res) => {
 
 
 
+function escapeHtml(value) {
+	return String(value ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+function imageExtension(value) {
+	const clean = String(value || "").split("?")[0].split("#")[0];
+	const match = clean.match(/\.([a-z0-9]+)$/i);
+	return match ? match[1].toLowerCase() : "";
+}
+
+function socialImageMimeType(url) {
+	const ext = imageExtension(url);
+	if (ext === "png") return "image/png";
+	if (ext === "gif") return "image/gif";
+	if (ext === "webp") return "image/webp";
+	if (ext === "bmp") return "image/bmp";
+	if (ext === "svg") return "image/svg+xml";
+	return "image/jpeg";
+}
+
+const PUBLIC_SOCIAL_PREVIEW_PATH = "/public_assets/images/newjoblisting/course_img.jpg";
+
+function toAbsoluteHttpsImageUrl(value, baseUrl) {
+	if (!value || typeof value !== "string") return "";
+	const trimmed = value.trim();
+	if (!trimmed) return "";
+	if (/^https:\/\//i.test(trimmed)) return trimmed;
+	if (/^http:\/\//i.test(trimmed)) return `https://${trimmed.slice(7)}`;
+	if (trimmed.startsWith("/Assets/") || /^Assets\//i.test(trimmed)) {
+		const pathPart = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+		return `${baseUrl}${pathPart}`;
+	}
+	const resolved = resolvePublicUrl(trimmed);
+	if (!resolved) return "";
+	if (/^https:\/\//i.test(resolved)) return resolved;
+	if (/^http:\/\//i.test(resolved)) return `https://${resolved.slice(7)}`;
+	return "";
+}
+
+function selectSocialPreviewImage(candidates, baseUrl) {
+	for (const raw of candidates) {
+		const ext = imageExtension(raw);
+		// Keep stored SVG paths unchanged. Do not invent a sibling JPG/PNG URL.
+		if (ext === "svg") continue;
+		if (ext !== "jpg" && ext !== "jpeg" && ext !== "png") continue;
+		const url = toAbsoluteHttpsImageUrl(raw, baseUrl);
+		if (!url) continue;
+		return { url, type: socialImageMimeType(url) };
+	}
+	return { url: `${baseUrl}${PUBLIC_SOCIAL_PREVIEW_PATH}`, type: "image/jpeg" };
+}
+
 router.get("/coursedetails/:id", async (req, res) => {
+	try {
 	const { id } = req.params
 	if (!id || !ObjectId.isValid(id)) {
 		return res.status(400).json({ message: "Invalid course id" });
 	}
 	let course = await Courses.findOne({ _id: id })
+	if (!course) {
+		return res.status(404).json({ message: "Course not found" });
+	}
 	const fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
 	console.log(fullUrl);
 
@@ -659,10 +720,74 @@ router.get("/coursedetails/:id", async (req, res) => {
 			// non-blocking; meta still works with truncated description
 		}
 	}
+
+	const userAgent = req.get("User-Agent") || "";
+
+	const isSocialCrawler =
+		/WhatsApp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|SkypeUriPreview/i.test(userAgent);
+
+	if (isSocialCrawler) {
+		const baseUrl = `${req.protocol}://${req.get('host')}`;
+		const courseUrl = `${baseUrl}/coursedetails/${id}`;
+		const courseTitle = `${course.name || "Course"} - Focalyt`;
+		const courseDescription =
+			coursePayload.shareDescription ||
+			[course.courseLevel, course.duration, course.trainingMode, course.state]
+				.filter(Boolean)
+				.join(" | ");
+
+		const imageCandidates = [];
+		if (course.thumbnail) imageCandidates.push(course.thumbnail);
+		if (Array.isArray(course.photos)) {
+			course.photos.forEach((photo) => {
+				if (photo) imageCandidates.push(photo);
+			});
+		}
+		const { url: courseImageUrl, type: courseImageType } = selectSocialPreviewImage(imageCandidates, baseUrl);
+
+		const safeTitle = escapeHtml(courseTitle);
+		const safeDescription = escapeHtml(courseDescription);
+		const safeUrl = escapeHtml(courseUrl);
+		const safeImage = escapeHtml(courseImageUrl);
+		const safeImageType = escapeHtml(courseImageType);
+
+		const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>${safeTitle}</title>
+	<meta name="description" content="${safeDescription}">
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="${safeUrl}">
+	<meta property="og:title" content="${safeTitle}">
+	<meta property="og:description" content="${safeDescription}">
+	<meta property="og:image" content="${safeImage}">
+	<meta property="og:image:secure_url" content="${safeImage}">
+	<meta property="og:image:type" content="${safeImageType}">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="${safeTitle}">
+	<meta name="twitter:description" content="${safeDescription}">
+	<meta name="twitter:image" content="${safeImage}">
+</head>
+<body>
+	<h1>${safeTitle}</h1>
+	<p>${safeDescription}</p>
+</body>
+</html>`;
+
+		res.setHeader("Content-Type", "text/html; charset=utf-8");
+		return res.send(htmlContent);
+	}
+
 	return res.json({
 		course: coursePayload || course,
 		storageScript: storageScript,
 	});
+	} catch (err) {
+		console.error("Error in /coursedetails/:id", err);
+		return res.status(500).json({ message: "Failed to load course details" });
+	}
 });
 router.get("/contact", (req, res) => {
 	rePath = res.render(`${req.vPath}/front/contact`, {
@@ -801,8 +926,8 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			// Return HTML with meta tags for social media crawlers and browsers
 			const baseUrl = `${req.protocol}://${req.get('host')}`;
 			const jobUrl = `${baseUrl}/jobdetailsmore/${jobId}`;
-			const companyName = job._company?.name || 'Focalyt';
-			const jobTitle = (job.title || job.name || 'Job Opening').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+			let companyName = job._company?.name || 'Focalyt';
+			let jobTitle = job.title || job.name || 'Job Opening';
 			// Create description with company name prominently
 			let jobDescription = '';
 			if (job.jobDescription) {
@@ -812,13 +937,16 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			} else {
 				jobDescription = `Apply for ${jobTitle} at ${companyName}`;
 			}
-			jobDescription = jobDescription.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 			if (jobDescription.length > 197) {
 				jobDescription = jobDescription.substring(0, 197) + '...';
 			}
 			
 			// Create title with company name for better preview
-			const previewTitle = `${jobTitle} - ${companyName}`;
+			let previewTitle = `${jobTitle} - ${companyName}`;
+			companyName = escapeHtml(companyName);
+			jobTitle = escapeHtml(jobTitle);
+			jobDescription = escapeHtml(jobDescription);
+			previewTitle = escapeHtml(previewTitle);
 			
 			// Get absolute image URL - MUST be absolute for social media
 			// Priority: jobVideoThumbnail > thumbnail > _company?.logo > default image
@@ -901,8 +1029,18 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			} else {
 				// Default image - use absolute URL
 				console.log("⚠️ jobVideoThumbnail, thumbnail, and company logo not found, using default image");
-				thumbnailUrl = `${baseUrl}/Assets/public_assets/images/newjoblisting/course_img.svg`;
-				console.log("   - Using default image: /Assets/public_assets/images/newjoblisting/course_img.svg");
+				thumbnailUrl = `${baseUrl}${PUBLIC_SOCIAL_PREVIEW_PATH}`;
+				console.log("   - Using default image: /public_assets/images/newjoblisting/course_img.jpg");
+			}
+
+			// SVG files are left unchanged in storage. Social apps need a JPG/PNG preview.
+			let thumbnailType = "image/jpeg";
+			if (imageExtension(thumbnailUrl) === "svg") {
+				console.log("   - SVG social preview uses public JPG fallback");
+				thumbnailUrl = `${baseUrl}${PUBLIC_SOCIAL_PREVIEW_PATH}`;
+				thumbnailType = "image/jpeg";
+			} else {
+				thumbnailType = socialImageMimeType(thumbnailUrl);
 			}
 
 			console.log("🖼️  Thumbnail URL for meta tags:", thumbnailUrl);
@@ -912,6 +1050,10 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			console.log("   - og:description:", jobDescription.substring(0, 50) + "...");
 			console.log("   - og:image:", thumbnailUrl);
 			console.log("   - og:url:", jobUrl);
+
+			const safeJobUrl = escapeHtml(jobUrl);
+			const safeThumbnailUrl = escapeHtml(thumbnailUrl);
+			const safeThumbnailType = escapeHtml(thumbnailType);
 
 			const htmlContent = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns#">
@@ -926,28 +1068,28 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 	
 	<!-- Open Graph / Facebook / WhatsApp -->
 	<meta property="og:type" content="website">
-	<meta property="og:url" content="${jobUrl}">
+	<meta property="og:url" content="${safeJobUrl}">
 	<meta property="og:title" content="${previewTitle}">
 	<meta property="og:description" content="${jobDescription}">
-	<meta property="og:image" content="${thumbnailUrl}">
-	<meta property="og:image:secure_url" content="${thumbnailUrl}">
+	<meta property="og:image" content="${safeThumbnailUrl}">
+	<meta property="og:image:secure_url" content="${safeThumbnailUrl}">
 	<meta property="og:image:width" content="1200">
 	<meta property="og:image:height" content="630">
-	<meta property="og:image:type" content="image/jpeg">
+	<meta property="og:image:type" content="${safeThumbnailType}">
 	<meta property="og:site_name" content="Focalyt">
 	<meta property="og:locale" content="en_US">
 	
 	<!-- Twitter Card -->
 	<meta name="twitter:card" content="summary_large_image">
-	<meta name="twitter:url" content="${jobUrl}">
+	<meta name="twitter:url" content="${safeJobUrl}">
 	<meta name="twitter:title" content="${previewTitle}">
 	<meta name="twitter:description" content="${jobDescription}">
-	<meta name="twitter:image" content="${thumbnailUrl}">
-	<meta name="twitter:image:src" content="${thumbnailUrl}">
+	<meta name="twitter:image" content="${safeThumbnailUrl}">
+	<meta name="twitter:image:src" content="${safeThumbnailUrl}">
 	
 	<!-- Additional Meta -->
 	<meta name="author" content="Focalyt">
-	<link rel="canonical" href="${jobUrl}">
+	<link rel="canonical" href="${safeJobUrl}">
 	
 	<!-- NO REDIRECT FOR CRAWLERS - They need to see the meta tags -->
 </head>
@@ -955,8 +1097,8 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 	<div style="padding: 20px; font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
 		<h1 style="color: #333; margin-bottom: 10px;">${jobTitle}</h1>
 		<p style="color: #666; line-height: 1.6; margin-bottom: 20px;">${jobDescription}</p>
-		<img src="${thumbnailUrl}" alt="${jobTitle}" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 20px;">
-		<p><a href="${jobUrl}" style="color: #FC2B5A; text-decoration: none; font-weight: 600;">View Job Details →</a></p>
+		<img src="${safeThumbnailUrl}" alt="${jobTitle}" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 20px;">
+		<p><a href="${safeJobUrl}" style="color: #FC2B5A; text-decoration: none; font-weight: 600;">View Job Details →</a></p>
 	</div>
 </body>
 </html>`;
