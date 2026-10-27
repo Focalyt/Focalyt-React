@@ -1,5 +1,7 @@
 import React from 'react';
 
+// Production crawlers (Meta) are served the static copy at public/privacy-policy.html.
+// Keep that file in sync when this page's text or layout changes.
 const PrivacyPolicy = () => {
   return (
     <div className="container-fluid">
