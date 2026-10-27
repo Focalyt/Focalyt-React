@@ -965,7 +965,7 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
     leads = leads.filter((lead) => ownerIds.includes(hrLeadOwnerId(lead)));
   } else if (counselorIds.length) {
     leads = leads.filter((lead) => counselorIds.some((id) => hrLeadPersonIds(lead).includes(id)));
-  } else if (parseYesNo(query.scopeToViewer) === true && viewer?._id) {
+  } else if (!q && parseYesNo(query.scopeToViewer) === true && viewer?._id) {
     const teamIds = await resolveHrViewerTeamIds(viewer);
     if (teamIds.length) {
       const teamSet = new Set(teamIds.map((id) => String(id)));

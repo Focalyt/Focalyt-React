@@ -5995,7 +5995,7 @@ export default function HomePage() {
       }
       return job._company.logo;
     }
-    return "/Assets/public_assets/images/newjoblisting/course_img.svg";
+    return "/Assets/public_assets/images/newjoblisting/course_img.jpg";
   };
 
   const handleShare = async (course, courseId, courseName) => {

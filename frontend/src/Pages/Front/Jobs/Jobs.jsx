@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
 import { buildJobApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
 
-const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.jpg";
 
 function formatJobExperience(job) {
   if ((job.experience === 0 && job.experienceMonths === 0) || (job.experience === 0 && !job.experienceMonths)) {
@@ -1548,7 +1548,7 @@ Provide analysis in clear format.`;
       return course._company.logo;
     }
     // Default fallback
-    return "/Assets/public_assets/images/newjoblisting/course_img.svg";
+    return "/Assets/public_assets/images/newjoblisting/course_img.jpg";
   };
 
   const handleShare = async (courseId, courseName, courseThumbnail) => {
