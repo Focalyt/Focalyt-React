@@ -22,7 +22,7 @@ const PrivacyPolicy = () => {
               <span className="fs-2 me-3">📖</span>
               <div>
                 <h5 className="alert-heading mb-2">Introduction</h5>
-                <p className="mb-0">Focalyt Portal is a comprehensive educational management platform that enables educational institutes to manage courses, leads, students, training programs, and communication through integrated WhatsApp Business API. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our educational management platform.</p>
+                <p className="mb-0">Focalyt Portal is a comprehensive educational management platform that enables educational institutes to manage courses, leads, students, training programs, and communication through integrated WhatsApp Business API. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our educational management platform. This Privacy Policy also applies to our Meta application named <strong>Focalyt CRM Lead Integration</strong>, which receives Facebook and Instagram Lead Ads submissions and stores them in Focalyt CRM for the educational institute that ran the advertisement.</p>
               </div>
             </div>
           </div>
@@ -459,14 +459,76 @@ const PrivacyPolicy = () => {
             </div>
           </div>
 
-       
+          {/* Focalyt CRM Lead Integration */}
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-primary text-white">
+              <h3 className="card-title mb-0">📱 8. Focalyt CRM Lead Integration (Facebook and Instagram Lead Ads)</h3>
+            </div>
+            <div className="card-body">
+              <p>Our Meta application <strong>Focalyt CRM Lead Integration</strong> connects Facebook and Instagram Lead Ads to Focalyt CRM. It is used only when an educational institute connects its Facebook Page in Focalyt and maps a Lead Ad form to a course or job in Focalyt CRM.</p>
+
+              <div className="row g-4 mb-4">
+                <div className="col-md-6">
+                  <div className="card border-primary h-100">
+                    <div className="card-header bg-primary text-white">
+                      <h6 className="mb-0">How we collect Lead Ads data</h6>
+                    </div>
+                    <div className="card-body">
+                      <p className="small">When you submit a Facebook or Instagram Lead Ad form for an advertisement that is connected through Focalyt CRM Lead Integration:</p>
+                      <ul className="small mb-0">
+                        <li className="mb-2">Meta notifies Focalyt that a lead was created and sends identifiers such as the Meta lead ID, Page ID, form ID, ad ID, and the time of submission.</li>
+                        <li className="mb-2">Focalyt CRM Lead Integration then retrieves that lead from Meta, including the answers you provided on the lead form, such as name, phone number, email address, WhatsApp number, and other questions present on that form.</li>
+                        <li className="mb-0">We collect this information only for Pages and forms that an institute has connected and mapped in Focalyt. We do not retrieve Lead Ads from Pages that are not connected to Focalyt CRM Lead Integration.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="card border-success h-100">
+                    <div className="card-header bg-success text-white">
+                      <h6 className="mb-0">How we process and store it in Focalyt CRM</h6>
+                    </div>
+                    <div className="card-body">
+                      <ul className="small mb-0">
+                        <li className="mb-2">The webhook identifiers are stored so the same Meta lead is processed once.</li>
+                        <li className="mb-2">Focalyt reads the institute’s form mapping (lead source, status, and the mapped course or job) and creates or matches a candidate record in Focalyt CRM.</li>
+                        <li className="mb-2">A name and a valid mobile number are required to save the CRM lead. Email, WhatsApp number, and gender are stored when the lead form provided them.</li>
+                        <li className="mb-2">The record is stored as a course or job inquiry for the mapped institute so authorized staff can follow up on that enquiry.</li>
+                        <li className="mb-0">If a candidate with the same mobile number already exists, Focalyt attaches the new enquiry to that existing record instead of creating a duplicate person.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row g-4">
+                <div className="col-md-6">
+                  <div className="p-3 border rounded h-100">
+                    <h6 className="text-primary">How this data is used</h6>
+                    <p className="small mb-0">Lead Ads data received through Focalyt CRM Lead Integration is used to record your enquiry in Focalyt CRM and to let the educational institute contact you about the course, training program, or job advertised on Facebook or Instagram. It is not sold to third parties and is not used to create advertising audiences outside that institute’s follow-up on your enquiry.</p>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="p-3 border rounded h-100">
+                    <h6 className="text-success">Who can access it</h6>
+                    <p className="small mb-0">The mapped institute’s authorized Focalyt CRM users can view the lead. Focalyt processes the data to operate Focalyt CRM Lead Integration. Meta continues to hold its own copy of the lead form submission under Meta’s policies. This integration does not automatically delete Meta’s copy of your data.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="alert alert-info border-0 mt-4 mb-0">
+                <h6 className="alert-heading">Your choices</h6>
+                <p className="mb-0">You may request deletion of personal data Focalyt collected through Meta Lead Ads and stored in Focalyt CRM by following the instructions at <a href="/data-deletion">https://focalyt.com/data-deletion</a>, or by emailing <a href="mailto:info@focalyt.com">info@focalyt.com</a>. Deletion requests are handled manually. Visiting this Privacy Policy does not delete any leads.</p>
+              </div>
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="text-center mb-5">
             <div className="card border-0 bg-light">
               <div className="card-body">
-                <p className="mb-2"><strong>Last Updated:</strong> 10th July 2025</p>
-                <p className="mb-2">This Privacy Policy governs your use of Focalyt Portal's comprehensive educational management platform including course management, lead management, student management, training management, and integrated WhatsApp Business communication services.</p>
+                <p className="mb-2"><strong>Last Updated:</strong> 27th October 2026</p>
+                <p className="mb-2">This Privacy Policy governs your use of Focalyt Portal's comprehensive educational management platform including course management, lead management, student management, training management, and integrated WhatsApp Business communication services. It also governs our Meta application Focalyt CRM Lead Integration.</p>
               </div>
             </div>
           </div>
