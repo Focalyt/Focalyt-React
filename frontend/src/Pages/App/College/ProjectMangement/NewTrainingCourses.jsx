@@ -56,6 +56,7 @@ const NewTrainingCourses = () => {
   const [savingProject, setSavingProject] = useState(false);
   const [projectMessage, setProjectMessage] = useState('');
   const [copyingId, setCopyingId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   // Course training team: eligible senior trainers and trainers stored on course.trainers
   const [referCourse, setReferCourse] = useState(null);
@@ -276,13 +277,35 @@ const NewTrainingCourses = () => {
         name: created.name || `${course.name || 'Course'} (Copy)`,
         vertical: course.vertical,
         project: course.project,
-        center: course.center,
+        center: created.center || [],
         status: created.status === false || created.status === 'inactive' ? 'inactive' : 'active',
       }, ...prev]);
     } catch (error) {
       window.alert(error?.response?.data?.message || 'Could not copy this course.');
     } finally {
       setCopyingId('');
+    }
+  };
+
+  const deleteCourse = async (course) => {
+    if (!course?._id) return;
+    const confirmed = window.confirm(`Delete "${course.name || 'this course'}"? It will be hidden from all centers.`);
+    if (!confirmed) return;
+    setDeletingId(course._id);
+    try {
+      const response = await axios.delete(
+        `${backendUrl}/college/courses/${course._id}`,
+        { headers: { 'x-auth': token } }
+      );
+      if (!response.data?.success) {
+        window.alert(response.data?.message || 'Could not delete this course.');
+        return;
+      }
+      setCourses((prev) => prev.filter((item) => item._id !== course._id));
+    } catch (error) {
+      window.alert(error?.response?.data?.message || 'Could not delete this course.');
+    } finally {
+      setDeletingId('');
     }
   };
 
@@ -474,6 +497,14 @@ const NewTrainingCourses = () => {
                         >
                           <i className={`bi ${copyingId === course._id ? 'bi-hourglass-split' : 'bi-files'}`}></i>
                         </button>
+                        {/* <button
+                          type="button"
+                          title="Delete"
+                          disabled={deletingId === course._id}
+                          onClick={() => deleteCourse(course)}
+                        >
+                          <i className={`bi ${deletingId === course._id ? 'bi-hourglass-split' : 'bi-trash'}`}></i>
+                        </button> */}
                       </div>
                     </td>
                   </tr>

@@ -1457,16 +1457,18 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const handleEdit = (batch) => {
     setEditingBatch(batch);
     setFormData({
-      code: batch.code,
-      name: batch.name,
-      course: batch.course,
-      center: batch.center,
-      maxStudents: batch.maxStudents.toString(),
-      startDate: batch.startDate,
-      endDate: batch.endDate,
+      name: batch.name || '',
+      description: batch.description || '',
+      startDate: batch.startDate || '',
+      endDate: batch.endDate || '',
+      zeroPeriodStartDate: batch.zeroPeriodStartDate || '',
+      zeroPeriodEndDate: batch.zeroPeriodEndDate || '',
       assessmentDate: batch.assessmentDate || null,
-      mode: batch.mode,
-      status: batch.status
+      maxStudents: batch.maxStudents ?? 0,
+      status: batch.status || 'active',
+      courseId: batch.courseId?._id || batch.courseId || selectedCourse?._id || '',
+      centerId: batch.centerId?._id || batch.centerId || selectedCenter?._id || '',
+      createdBy: userData?._id || '',
     });
     setShowEditForm(true);
   };
@@ -1477,7 +1479,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   };
 
   const confirmDelete = () => {
-    setBatches(prev => prev.filter(b => b.id !== batchToDelete.id));
+    const deleteId = String(batchToDelete?._id || batchToDelete?.id || '');
+    setBatches(prev => prev.filter(b => String(b._id || b.id) !== deleteId));
     setShowDeleteModal(false);
     setBatchToDelete(null);
   };
@@ -1524,12 +1527,12 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (formData.zeroPeriodStartDate && new Date(formData.zeroPeriodStartDate) < today) {
+    if (!editingBatch && formData.zeroPeriodStartDate && new Date(formData.zeroPeriodStartDate) < today) {
       alert('Zero Period start date cannot be in the past');
       return;
     }
 
-    if (formData.startDate && new Date(formData.startDate) < today) {
+    if (!editingBatch && formData.startDate && new Date(formData.startDate) < today) {
       alert('Batch start date cannot be in the past');
       return;
     }
@@ -1570,51 +1573,69 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       }
     }
 
-    if (editingBatch) {
-      // Edit existing batch
-      setBatches(prev => prev.map(b =>
-        b.id === editingBatch.id
-          ? {
-            ...b,
-            ...formData,
-            courseName: '',
-            centerName: 'Virtual Center',
-            maxStudents: parseInt(formData.maxStudents) || 0
-          }
-          : b
-      ));
-      setShowEditForm(false);
-    } else {
-      const response = await fetch(`${backendUrl}/college/add_batch`, {
-        method: 'POST',
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData),
-      });
+    try {
+      if (editingBatch) {
+        const batchId = editingBatch._id || editingBatch.id;
+        const response = await fetch(`${backendUrl}/college/update_batch/${batchId}`, {
+          method: 'PUT',
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData),
+        });
 
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || result.success === false) {
-        throw new Error(result.message || 'Failed to add batch');
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) {
+          alert(result.message || 'Failed to update batch');
+          return;
+        }
+        const refreshed = await axios.get(`${backendUrl}/college/get_batches`, {
+          params: {
+            courseId: selectedCourse?._id,
+            centerId: selectedCenter?._id,
+          },
+          headers: { 'x-auth': token },
+        });
+        if (refreshed.data.success) {
+          setBatches(refreshed.data.data);
+        }
+        window.alert(result.message || 'Batch updated successfully');
+        setShowEditForm(false);
+      } else {
+        const response = await fetch(`${backendUrl}/college/add_batch`, {
+          method: 'POST',
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) {
+          alert(result.message || 'Failed to add batch');
+          return;
+        }
+        const refreshed = await axios.get(`${backendUrl}/college/get_batches`, {
+          params: {
+            courseId: selectedCourse?._id,
+            centerId: selectedCenter?._id,
+          },
+          headers: { 'x-auth': token },
+        });
+        if (refreshed.data.success) {
+          setBatches(refreshed.data.data);
+        }
+        window.alert(result.message || 'Batch added successfully');
+        setShowAddForm(false);
       }
-      const refreshed = await axios.get(`${backendUrl}/college/get_batches`, {
-        params: {
-          courseId: selectedCourse?._id,
-          centerId: selectedCenter?._id,
-        },
-        headers: { 'x-auth': token },
-      });
-      if (refreshed.data.success) {
-        setBatches(refreshed.data.data);
-      }
-      window.alert(result.message || 'Batch added successfully');
+
       resetForm();
-      setShowAddForm(false);
+      setEditingBatch(null);
+    } catch (error) {
+      alert(error?.message || 'Failed to save batch');
     }
-
-    resetForm();
-    setEditingBatch(null);
   };
 
   const handleShare = (batch) => {
@@ -2289,9 +2310,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                             <button type="button" title="Edit" onClick={() => handleEdit(batch)}>
                               <i className="bi bi-pencil"></i>
                             </button>
-                            <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(batch)}>
+                            {/* <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(batch)}>
                               <i className="bi bi-trash"></i>
-                            </button>
+                            </button> */}
                           </div>
                         </td>
                       </tr>

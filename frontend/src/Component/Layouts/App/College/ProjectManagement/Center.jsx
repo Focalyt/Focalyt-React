@@ -734,9 +734,9 @@ const updatedPermission = async () => {
                                             <button className="btn btn-sm btn-light me-1" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(center); }}>
                                                 <i className="bi bi-pencil-square"></i>
                                             </button>
-                                            <button className="btn btn-sm btn-light text-danger" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(center); }}>
+                                            {/* <button className="btn btn-sm btn-light text-danger" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(center); }}>
                                                 <i className="bi bi-trash"></i>
-                                            </button>
+                                            </button> */}
                                         </div>
                                     </div>
 

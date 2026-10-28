@@ -398,10 +398,23 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    setCourses(prev => prev.filter(c => c.id !== courseToDelete.id));
-    setShowDeleteModal(false);
-    setCourseToDelete(null);
+  const confirmDelete = async () => {
+    if (!courseToDelete?._id) return;
+    try {
+      const response = await axios.delete(`${backendUrl}/college/courses/${courseToDelete._id}`, {
+        headers: { 'x-auth': token }
+      });
+      if (!response.data?.success) {
+        showAlert(response.data?.message || 'Failed to delete course', 'error');
+        return;
+      }
+      setCourses(prev => prev.filter(c => c._id !== courseToDelete._id));
+      setShowDeleteModal(false);
+      setCourseToDelete(null);
+      showAlert('Course deleted', 'success');
+    } catch (error) {
+      showAlert(error?.response?.data?.message || 'Failed to delete course', 'error');
+    }
   };
 
 
@@ -562,8 +575,8 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
               <button type="button" className="btn-close btn-close-white" onClick={() => setShowDeleteModal(false)}></button>
             </div>
             <div className="modal-body">
-              <p>Are you sure you want to delete the course <strong>{courseToDelete.name} ({courseToDelete.code})</strong>?</p>
-              <p className="text-muted">This action cannot be undone and will remove all associated data including student enrollments.</p>
+              <p>Are you sure you want to delete <strong>{courseToDelete.name}</strong>?</p>
+              <p className="text-muted mb-0">This will hide the course from all centers.</p>
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>
@@ -765,6 +778,16 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
                       >
                         <i className="bi bi-people"></i>
                       </button>
+                      {/* <button
+                        className="btn btn-sm btn-light me-1 border-0 bg-transparent text-danger"
+                        title="Delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(course);
+                        }}
+                      >
+                        <i className="bi bi-trash"></i>
+                      </button> */}
 
                     </div>
                   </div>
@@ -791,6 +814,8 @@ const Course = ({ selectedCenter = null, onBackToCenters = null, selectedProject
           )}
         </div>
       )}
+
+      <DeleteModal />
 
       {/* Trainer Selection Modal */}
       {isTrainerDropdownOpen && (

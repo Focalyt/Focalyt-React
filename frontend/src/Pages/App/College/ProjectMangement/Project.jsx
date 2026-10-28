@@ -596,9 +596,9 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null, stopAtCent
                       <button type="button" title="Edit" onClick={() => handleEdit(project)}>
                         <i className="bi bi-pencil"></i>
                       </button>
-                      <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(project)}>
+                      {/* <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(project)}>
                         <i className="bi bi-trash"></i>
-                      </button>
+                      </button> */}
                     </div>
                   )}
                 </td>

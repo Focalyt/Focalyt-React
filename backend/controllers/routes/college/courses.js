@@ -819,6 +819,10 @@ router
 			delete duplicateData._id;
 			delete duplicateData.createdAt;
 			delete duplicateData.updatedAt;
+			delete duplicateData.__v;
+			duplicateData.center = [];
+			duplicateData.centerId = undefined;
+			duplicateData.students = 0;
 
 			if (typeof duplicateData.name === 'string') {
 				const copySuffix = ' (Copy)';
@@ -834,6 +838,29 @@ router
 		} catch (err) {
 			console.error('Failed to duplicate coursecopy:', err);
 			return res.status(500).json({ success: false, message: 'Failed to duplicate course' });
+		}
+	});
+
+	router.delete('/:courseId', async (req, res) => {
+		try {
+			const { courseId } = req.params;
+			if (!mongoose.Types.ObjectId.isValid(courseId)) {
+				return res.status(400).json({ success: false, message: 'Invalid course' });
+			}
+
+			const course = await Courses.findById(courseId);
+			if (!course || course.isDeleted) {
+				return res.status(404).json({ success: false, message: 'Course not found' });
+			}
+
+			course.isDeleted = true;
+			course.status = false;
+			await course.save();
+
+			return res.json({ success: true, message: 'Course deleted successfully' });
+		} catch (err) {
+			console.error('Failed to delete course:', err);
+			return res.status(500).json({ success: false, message: 'Failed to delete course' });
 		}
 	});
 
@@ -1536,6 +1563,10 @@ router.post('/:courseId/duplicate', async (req, res) => {
 		delete duplicateData._id;
 		delete duplicateData.createdAt;
 		delete duplicateData.updatedAt;
+		delete duplicateData.__v;
+		duplicateData.center = [];
+		duplicateData.centerId = undefined;
+		duplicateData.students = 0;
 
 		if (typeof duplicateData.name === 'string') {
 			const copySuffix = ' Copy';
@@ -1546,7 +1577,6 @@ router.post('/:courseId/duplicate', async (req, res) => {
 			}
 		}
 
-		// Preserve arrays and string fields as-is
 		const newCourse = await Courses.create(duplicateData);
 
 		return res.status(201).json({ success: true, message: 'Course duplicated successfully', data: newCourse });

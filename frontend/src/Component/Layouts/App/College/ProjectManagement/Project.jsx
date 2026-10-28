@@ -622,9 +622,9 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null }) => {
                           <button className="btn btn-sm btn-light me-1 border-0 bg-transparent" title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>
                             <i className="bi bi-pencil-square"></i>
                           </button>
-                          <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(project); }}>
+                          {/* <button className="btn btn-sm btn-light text-danger border-0 bg-transparent" title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(project); }}>
                             <i className="bi bi-trash"></i>
-                          </button>
+                          </button> */}
                         </>)}
                     </div>
                   </div>

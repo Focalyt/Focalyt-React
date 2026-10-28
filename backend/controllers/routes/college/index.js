@@ -9104,8 +9104,8 @@ router.get('/all_courses_centerwise', async (req, res) => {
 		const { centerId, projectId } = req.query
 		let filter = {
 			center: centerId,
-			project: projectId
-
+			project: projectId,
+			isDeleted: { $ne: true },
 		}
 		if (!centerId || !projectId) {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
@@ -9197,16 +9197,22 @@ router.post('/add_batch', isCollege, async (req, res) => {
 		}
 
 		const course = await Courses.findById(courseId).select('center').lean();
+		if (!course) {
+			return res.status(404).json({ success: false, message: 'Course not found' });
+		}
+
 		const assignedCenterIds = [
 			...new Set(
-				(Array.isArray(course?.center) ? course.center : [])
+				(Array.isArray(course.center) ? course.center : [])
 					.map((id) => (id && id._id ? String(id._id) : String(id || '')))
 					.filter((id) => mongoose.Types.ObjectId.isValid(id))
 			),
 		];
-		const centerIds = assignedCenterIds.length ? assignedCenterIds : [String(centerId)];
+		if (assignedCenterIds.length && !assignedCenterIds.includes(String(centerId))) {
+			return res.status(400).json({ success: false, message: 'Selected center is not assigned to this course' });
+		}
 
-		const batchFields = {
+		const savedBatch = await Batch.create({
 			name,
 			startDate,
 			description,
@@ -9217,25 +9223,70 @@ router.post('/add_batch', isCollege, async (req, res) => {
 			maxStudents: maxStudents || 0,
 			status: status || 'active',
 			courseId,
+			centerId,
 			createdBy: user._id,
 			college: college._id,
-		};
-
-		const savedBatches = await Batch.insertMany(
-			centerIds.map((id) => ({ ...batchFields, centerId: id }))
-		);
+		});
 
 		res.status(201).json({
 			success: true,
-			message: savedBatches.length > 1
-				? `Batch created for ${savedBatches.length} centers`
-				: 'Batch created successfully',
-			data: savedBatches.length === 1 ? savedBatches[0] : savedBatches,
-			count: savedBatches.length,
+			message: 'Batch created successfully',
+			data: savedBatch,
 		});
 	} catch (error) {
 		console.error('Error creating batch:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.put('/update_batch/:id', isCollege, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const {
+			name,
+			startDate,
+			description,
+			endDate,
+			zeroPeriodStartDate,
+			zeroPeriodEndDate,
+			assessmentDate,
+			maxStudents,
+			status,
+		} = req.body;
+
+		if (!mongoose.Types.ObjectId.isValid(id)) {
+			return res.status(400).json({ success: false, message: 'Invalid batch' });
+		}
+
+		const batch = await Batch.findById(id);
+		if (!batch) {
+			return res.status(404).json({ success: false, message: 'Batch not found' });
+		}
+
+		if (!name || !startDate || !endDate || !zeroPeriodStartDate || !zeroPeriodEndDate) {
+			return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+		}
+
+		batch.name = name;
+		batch.description = description || '';
+		batch.startDate = startDate;
+		batch.endDate = endDate;
+		batch.zeroPeriodStartDate = zeroPeriodStartDate;
+		batch.zeroPeriodEndDate = zeroPeriodEndDate;
+		batch.assessmentDate = assessmentDate || null;
+		batch.maxStudents = maxStudents || 0;
+		if (status) batch.status = status;
+
+		await batch.save();
+
+		return res.json({
+			success: true,
+			message: 'Batch updated successfully',
+			data: batch,
+		});
+	} catch (error) {
+		console.error('Error updating batch:', error);
+		return res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
 
