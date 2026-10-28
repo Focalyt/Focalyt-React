@@ -56,6 +56,8 @@ const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
 const StatusB2b = require("../../../models/statusB2b");
 const Candidate = require("../../../models/candidateProfile");
+const B2bMilestone = require("../../../models/b2bMilestone");
+const B2bMilestoneAssignment = require("../../../models/b2bMilestoneAssignment");
 
 const { generatePassword, sendMail } = require("../../../../helpers");
 const { findLeadsBlockedForStatus } = require("../../../../helpers/b2bStatusAssignment");
@@ -741,7 +743,8 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				path: 'department',
 				select: 'name'
 			}
-		});
+		})
+		.populate('_milestone', 'title description');
 
 	// AI client (optional): used for supervision report narrative
 	const getAnthropicClient = () => {
@@ -3126,7 +3129,9 @@ router.get('/leads', isCollege, async (req, res) => {
 			referredByMe,
 			isDuplicateMobile,
 			isContactDuplicate,
-			noFollowupTab
+			noFollowupTab,
+			milestoneId,
+			reachedMilestone
 		} = req.query;
 
 		const referredByMeActive = isReferredByMeQuery(referredByMe);
@@ -3258,6 +3263,26 @@ router.get('/leads', isCollege, async (req, res) => {
 					? [{ $or: [{ followUpVisit: { $exists: false } }, { followUpVisit: null }] }]
 					: []),
 			...(isNoFollowupTabQuery(noFollowupTab) ? await getNoFollowupHistoryExclusion() : []),
+			...(function () {
+				if (milestoneId && mongoose.Types.ObjectId.isValid(String(milestoneId))) {
+					const milestoneObjectId = convertToObjectId(milestoneId);
+					return [{
+						$or: [
+							{ 'milestoneHistory.milestone': milestoneObjectId },
+							{ _milestone: milestoneObjectId },
+						],
+					}];
+				}
+				if (String(reachedMilestone).toLowerCase() === 'true') {
+					return [{
+						$or: [
+							{ 'milestoneHistory.0': { $exists: true } },
+							{ _milestone: { $ne: null } },
+						],
+					}];
+				}
+				return [];
+			})(),
 		]
 	};
 
@@ -4782,6 +4807,164 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			message: 'Failed to update lead status',
 			error: error.message
 		});
+	}
+});
+
+router.put('/leads/:id/milestone', isCollege, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const milestoneId = req.body._milestone;
+		const userId = req.user._id;
+		const collegeId = req.user?.college?._id;
+		if (!collegeId) {
+			return res.status(400).json({ status: false, message: 'College not found for this user' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(String(milestoneId || ''))) {
+			return res.status(400).json({ status: false, message: 'Invalid lead or milestone' });
+		}
+
+		const lead = await Lead.findById(id);
+		if (!lead) {
+			return res.status(404).json({ status: false, message: 'Lead not found' });
+		}
+
+		const isAdmin = req.user.permissions?.permission_type === 'Admin';
+		if (!isAdmin) {
+			const teamMembers = await getAllTeamMembers(req.user._id);
+			const isOwner = teamMembers.some((member) =>
+				(lead.leadAddedBy && lead.leadAddedBy.toString() === member.toString()) ||
+				(lead.leadOwner && lead.leadOwner.toString() === member.toString()) ||
+				(lead.leadCoOwner && lead.leadCoOwner.toString() === member.toString())
+			);
+			if (!isOwner) {
+				return res.status(403).json({
+					status: false,
+					message: 'You do not have permission to update this lead',
+				});
+			}
+		}
+
+		const milestone = await B2bMilestone.findOne({ _id: milestoneId, college: collegeId }).lean();
+		if (!milestone) {
+			return res.status(404).json({ status: false, message: 'Milestone not found' });
+		}
+
+		const projectId = lead.b2bProject;
+		if (!projectId) {
+			return res.status(400).json({ status: false, message: "This lead has no project, so it has no milestones" });
+		}
+		const assigned = await B2bMilestoneAssignment.findOne({
+			college: collegeId,
+			milestone: milestone._id,
+			project: projectId,
+		}).select('_id').lean();
+		if (!assigned) {
+			return res.status(400).json({ status: false, message: "This milestone is not aligned to the lead's project" });
+		}
+
+		const savedMilestone = {
+			_id: milestone._id,
+			title: milestone.title,
+			description: milestone.description || '',
+		};
+		const historyPayload = (rows) => (rows || []).map((row) => ({
+			milestone: row.milestone,
+			title: row.title || '',
+			reachedAt: row.reachedAt || null,
+		}));
+
+		const assignedRows = await B2bMilestoneAssignment.find({
+			college: collegeId,
+			project: projectId,
+		}).sort({ index: 1, createdAt: 1 }).select('milestone').lean();
+		const docs = await B2bMilestone.find({
+			_id: { $in: assignedRows.map((row) => row.milestone) },
+			college: collegeId,
+		}).select('_id title').lean();
+		const byId = new Map(docs.map((item) => [String(item._id), item]));
+		const ordered = assignedRows.map((row) => byId.get(String(row.milestone))).filter(Boolean);
+		const orderedIds = ordered.map((item) => String(item._id));
+
+		if (!Array.isArray(lead.milestoneHistory)) lead.milestoneHistory = [];
+		const reachedIds = new Set(lead.milestoneHistory.map((row) => String(row.milestone)));
+		if (lead._milestone && !reachedIds.has(String(lead._milestone))) {
+			const existing = await B2bMilestone.findById(lead._milestone).select('title').lean();
+			if (existing) {
+				lead.milestoneHistory.push({
+					milestone: existing._id,
+					title: existing.title || '',
+					reachedAt: lead.updatedAt || new Date(),
+					reachedBy: userId,
+				});
+				reachedIds.add(String(existing._id));
+			}
+		}
+
+		const currentId = lead.milestoneHistory.length
+			? String(lead.milestoneHistory[lead.milestoneHistory.length - 1].milestone)
+			: '';
+		const requestedId = String(milestone._id);
+
+		if (reachedIds.has(requestedId)) {
+			if (requestedId === currentId) {
+				lead._milestone = milestone._id;
+				await lead.save();
+				return res.json({
+					status: true,
+					message: 'Milestone already reached',
+					data: { _id: lead._id, _milestone: savedMilestone, milestoneHistory: historyPayload(lead.milestoneHistory) },
+				});
+			}
+			return res.status(400).json({
+				status: false,
+				message: `"${milestone.title}" is already reached and stays on this lead`,
+			});
+		}
+
+		const currentPos = currentId ? orderedIds.indexOf(currentId) : -1;
+		const nextId = !currentId
+			? (orderedIds[0] || '')
+			: (currentPos >= 0 ? (orderedIds[currentPos + 1] || '') : (orderedIds.find((itemId) => !reachedIds.has(itemId)) || ''));
+		if (!nextId) {
+			return res.status(400).json({ status: false, message: 'This lead is already on the last milestone' });
+		}
+		if (requestedId !== nextId) {
+			const nextMilestone = ordered.find((item) => String(item._id) === nextId);
+			return res.status(400).json({
+				status: false,
+				message: `Move only to the next milestone${nextMilestone?.title ? `: ${nextMilestone.title}` : ''}. Earlier milestones stay reached.`,
+			});
+		}
+
+		const previousTitle = lead.milestoneHistory.length
+			? (lead.milestoneHistory[lead.milestoneHistory.length - 1].title || '')
+			: '';
+		lead.milestoneHistory.push({
+			milestone: milestone._id,
+			title: milestone.title,
+			reachedAt: new Date(),
+			reachedBy: userId,
+		});
+		lead._milestone = milestone._id;
+		lead.updatedBy = userId;
+		lead.logs.push({
+			user: userId,
+			timestamp: new Date(),
+			action: previousTitle
+				? `Milestone moved from "${previousTitle}" to "${milestone.title}". "${previousTitle}" stays reached.`
+				: `Milestone set to "${milestone.title}"`,
+			remarks: '',
+		});
+		await lead.save();
+
+		return res.json({
+			status: true,
+			message: 'Milestone updated',
+			data: { _id: lead._id, _milestone: savedMilestone, milestoneHistory: historyPayload(lead.milestoneHistory) },
+		});
+	} catch (error) {
+		console.error('[B2B Lead Milestone Change] Error:', error);
+		return res.status(500).json({ status: false, message: error.message || 'Failed to update milestone' });
 	}
 });
 

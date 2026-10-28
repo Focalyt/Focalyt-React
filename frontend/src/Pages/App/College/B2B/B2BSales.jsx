@@ -1566,6 +1566,7 @@ const B2BSales = () => {
     fetchUsers(); // Fetch users for Lead Owner dropdown
     fetchStatusCounts(); // Fetch status counts
     fetchApprovalCounts(); // Fetch lead approval counts
+    fetchLeadMilestones();
   }, []);
 
 
@@ -1642,6 +1643,20 @@ const B2BSales = () => {
       }
     } catch (err) {
       console.error('Failed to fetch B2B dropdown options:', err);
+    }
+  };
+
+  const fetchLeadMilestones = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/milestoneB2b`, {
+        headers: { 'x-auth': token },
+      });
+      if (response.data.success) {
+        setLeadMilestones(response.data.data || []);
+        setReachedMilestoneLeadCount(Number(response.data.reachedLeadCount) || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching B2B milestones:', error);
     }
   };
 
@@ -1932,7 +1947,9 @@ const B2BSales = () => {
       end: null
     },
     status: [],
-    subStatus: []
+    subStatus: [],
+    milestoneId: '',
+    reachedMilestone: '',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [headerDatePreset, setHeaderDatePreset] = useState('');
@@ -1947,6 +1964,16 @@ const B2BSales = () => {
     return d;
   });
   const [showHeaderDateRangePicker, setShowHeaderDateRangePicker] = useState(false);
+  const [leadMilestones, setLeadMilestones] = useState([]);
+  const [reachedMilestoneLeadCount, setReachedMilestoneLeadCount] = useState(0);
+  const [activeMilestoneId, setActiveMilestoneId] = useState(null);
+  const [showLeadMilestoneModal, setShowLeadMilestoneModal] = useState(false);
+  const [leadMilestoneProfile, setLeadMilestoneProfile] = useState(null);
+  const [leadMilestoneRows, setLeadMilestoneRows] = useState([]);
+  const [leadMilestoneLoading, setLeadMilestoneLoading] = useState(false);
+  const [leadMilestoneSavingId, setLeadMilestoneSavingId] = useState(null);
+  const [leadMilestoneError, setLeadMilestoneError] = useState('');
+  const [leadMilestoneForm, setLeadMilestoneForm] = useState({ milestoneId: '' });
 
   const filtersRef = useRef(filters);
   const leadViewTabRef = useRef(leadViewTab);
@@ -2002,6 +2029,41 @@ const B2BSales = () => {
     }
     return types;
   }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, allB2bProjects, hasRestrictedDepartmentAccess, accessibleDepartmentIds]);
+
+  const idOf = (value) => {
+    if (!value) return '';
+    if (typeof value === 'object') return String(value._id || value.id || '');
+    return String(value);
+  };
+
+  const milestoneProjectId = String(filters.b2bProject || '');
+  const milestoneProjectChoices = useMemo(() => {
+    const assignedIds = new Set();
+    (leadMilestones || []).forEach((milestone) => {
+      (milestone.assignedProjects || []).forEach((projectId) => assignedIds.add(String(projectId)));
+    });
+    const choices = (cycleProjectOptions || []).filter((proj) => assignedIds.has(String(proj._id)));
+    if (milestoneProjectId && !choices.some((proj) => String(proj._id) === milestoneProjectId)) {
+      const current = (cycleProjectOptions || []).find((proj) => String(proj._id) === milestoneProjectId);
+      if (current) choices.unshift(current);
+    }
+    return choices;
+  }, [leadMilestones, cycleProjectOptions, milestoneProjectId]);
+  const milestonePerformanceChips = useMemo(() => {
+    if (!milestoneProjectId) return [];
+    const positionOf = (milestone) => {
+      const position = Number(milestone.projectPositions?.[milestoneProjectId]);
+      return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+    };
+    return (leadMilestones || [])
+      .filter((milestone) => (milestone.assignedProjects || []).map(String).includes(milestoneProjectId))
+      .sort((a, b) => positionOf(a) - positionOf(b))
+      .map((milestone) => ({
+        ...milestone,
+        count: Number(milestone.leadCount) || 0,
+      }));
+  }, [leadMilestones, milestoneProjectId]);
+  const hasActiveMilestoneFilter = Boolean(filters.milestoneId || filters.reachedMilestone === 'true');
 
   const fetchMyReferLeadsCount = async () => {
     try {
@@ -2123,8 +2185,18 @@ const B2BSales = () => {
     setLeadViewTab(tab);
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
+    setActiveMilestoneId(null);
     setCurrentPage(1);
-    const overrides = getLeadFetchOverrides({ approvalStatus: null }, tab);
+    const next = syncFiltersRef({
+      ...filtersRef.current,
+      milestoneId: '',
+      reachedMilestone: '',
+    });
+    setFilters(next);
+    const overrides = getLeadFetchOverrides({
+      ...next,
+      approvalStatus: null,
+    }, tab);
     fetchLeads(null, 1, overrides);
     if (tab === 'all') {
       fetchStatusCounts();
@@ -2532,12 +2604,15 @@ const B2BSales = () => {
     followUpCallBucket: '',
     followUpVisitBucket: '',
     documentsStatus: [],
+    milestoneId: '',
+    reachedMilestone: '',
   });
 
   // Handle status card click (Performance: HOT, WARM, etc.)
   const handleStatusCardClick = (statusId) => {
     setSelectedStatusFilter(statusId);
     setSelectedApprovalStatus(null);
+    setActiveMilestoneId(null);
     const next = getDashSubFiltersCleared();
     syncFiltersRef(next);
     setFilters(next);
@@ -2574,6 +2649,8 @@ const B2BSales = () => {
       || f.nextActionDateRange?.end
       || (Array.isArray(f.status) && f.status.length)
       || (Array.isArray(f.subStatus) && f.subStatus.length)
+      || f.milestoneId
+      || f.reachedMilestone === 'true'
       || selectedStatusFilter
       || selectedApprovalStatus
       || leadViewTab === 'myRefer'
@@ -2644,8 +2721,11 @@ const B2BSales = () => {
       modifiedDateRange: { start: null, end: null },
       nextActionDateRange: { start: null, end: null },
       status: [],
-      subStatus: []
+      subStatus: [],
+      milestoneId: '',
+      reachedMilestone: '',
     };
+    setActiveMilestoneId(null);
     syncFiltersRef(cleared);
     setFilters(cleared);
     setCurrentPage(1);
@@ -2658,6 +2738,7 @@ const B2BSales = () => {
   const clearFollowupDashFilters = () => {
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
+    setActiveMilestoneId(null);
     const next = getDashSubFiltersCleared();
     syncFiltersRef(next);
     setFilters(next);
@@ -2695,6 +2776,8 @@ const B2BSales = () => {
     followUpCallBucket: '',
     followUpVisitBucket: '',
     documentsStatus: [],
+    milestoneId: '',
+    reachedMilestone: '',
   });
 
   const appendLeadFilterParams = (params, eff, options = {}) => {
@@ -2740,6 +2823,10 @@ const B2BSales = () => {
     if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
       params.documentsStatusIn = toCsv(eff.documentsStatus);
     }
+    if (eff.milestoneId) params.milestoneId = eff.milestoneId;
+    if (eff.reachedMilestone === true || eff.reachedMilestone === 'true') {
+      params.reachedMilestone = true;
+    }
     if (!options.skipApprovalStatus) {
       const approval = eff.approvalStatus ?? selectedApprovalStatusRef.current;
       if (approval) params.approvalStatus = approval;
@@ -2758,6 +2845,7 @@ const B2BSales = () => {
     if (!togglingOff) {
       setSelectedStatusFilter(null);
       setSelectedApprovalStatus(null);
+      setActiveMilestoneId(null);
     }
     syncFiltersRef(next);
     setFilters(next);
@@ -2771,15 +2859,39 @@ const B2BSales = () => {
     return filters[filterKey] === bucket;
   };
 
+  const handleMilestoneChipClick = (milestone) => {
+    setActiveMilestoneId(milestone?._id || null);
+    setSelectedStatusFilter(null);
+    setSelectedApprovalStatus(null);
+    setCurrentPage(1);
+    const next = getDashSubFiltersCleared();
+    if (milestone?._id) {
+      next.milestoneId = milestone._id;
+      next.reachedMilestone = '';
+    } else {
+      next.milestoneId = '';
+      next.reachedMilestone = 'true';
+    }
+    syncFiltersRef(next);
+    setFilters(next);
+    fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
+  };
+
   const handleCycleFilterChange = (key, value) => {
     const next = { ...filters };
     if (key === 'b2bDepartment') {
       next.b2bDepartment = value;
       next.b2bProject = '';
       next.typeOfB2B = [];
+      next.milestoneId = '';
+      next.reachedMilestone = '';
+      setActiveMilestoneId(null);
     } else if (key === 'b2bProject') {
       next.b2bProject = value;
       next.typeOfB2B = [];
+      next.milestoneId = '';
+      next.reachedMilestone = '';
+      setActiveMilestoneId(null);
     } else if (key === 'typeOfB2B') {
       next.typeOfB2B = value ? [value] : [];
     } else if (key === 'leadOwner') {
@@ -3176,8 +3288,11 @@ const B2BSales = () => {
         end: null
       },
       status: [],
-      subStatus: []
+      subStatus: [],
+      milestoneId: '',
+      reachedMilestone: '',
     };
+    setActiveMilestoneId(null);
     syncFiltersRef(cleared);
     setFilters(cleared);
     setCurrentPage(1);
@@ -3452,6 +3567,7 @@ const B2BSales = () => {
   const handleApprovalCardClick = (nextStatus) => {
     setSelectedApprovalStatus(nextStatus);
     setSelectedStatusFilter(null);
+    setActiveMilestoneId(null);
     const next = getDashSubFiltersCleared();
     syncFiltersRef(next);
     setFilters(next);
@@ -3653,6 +3769,162 @@ const B2BSales = () => {
     if (!lead) return false;
     if (canEditLeadsB2B) return true;
     return canUpdateLead(lead);
+  };
+
+  const closeLeadMilestones = () => {
+    if (leadMilestoneSavingId) return;
+    setShowLeadMilestoneModal(false);
+    setLeadMilestoneProfile(null);
+    setLeadMilestoneRows([]);
+    setLeadMilestoneError('');
+    setLeadMilestoneForm({ milestoneId: '' });
+  };
+
+  const getProfileMilestoneId = (profile) => idOf(profile?._milestone);
+
+  const getMilestoneTrail = (profile) => {
+    const history = Array.isArray(profile?.milestoneHistory) ? profile.milestoneHistory : [];
+    return history
+      .map((step) => ({
+        id: idOf(step?.milestone || step?._id),
+        title: step?.title || '',
+      }))
+      .filter((step) => step.title || step.id);
+  };
+
+  const getNextMilestone = (profile, rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const reachedIds = new Set(getMilestoneTrail(profile).map((step) => step.id).filter(Boolean));
+    const currentId = getProfileMilestoneId(profile) || [...reachedIds].pop() || '';
+    if (!currentId) return list[0] || null;
+    const currentPos = list.findIndex((item) => String(item._id) === String(currentId));
+    if (currentPos >= 0) return list[currentPos + 1] || null;
+    return list.find((item) => !reachedIds.has(String(item._id))) || null;
+  };
+
+  const getCurrentMilestone = (profile) => {
+    const trail = getMilestoneTrail(profile);
+    const stored = profile?._milestone;
+    const storedTitle = stored && typeof stored === 'object' ? (stored.title || '') : '';
+    const latest = trail[trail.length - 1] || null;
+    return {
+      id: idOf(stored) || latest?.id || '',
+      title: storedTitle || latest?.title || '',
+      previous: trail.length >= 2 ? trail[trail.length - 2] : null,
+      trail,
+    };
+  };
+
+  const applySavedLeadMilestone = (profile, saved, milestoneHistory) => {
+    const nextProfile = { ...profile, _milestone: saved, milestoneHistory };
+    setLeads((prev) => (Array.isArray(prev) ? prev.map((item) => (
+      String(item._id) === String(profile._id) ? { ...item, _milestone: saved, milestoneHistory } : item
+    )) : prev));
+    setCrossSaleCache((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((rootId) => {
+        next[rootId] = (next[rootId] || []).map((item) => (
+          String(item._id) === String(profile._id) ? { ...item, _milestone: saved, milestoneHistory } : item
+        ));
+      });
+      return next;
+    });
+    setLeadMilestoneProfile(nextProfile);
+    const following = getNextMilestone(nextProfile, leadMilestoneRows);
+    setLeadMilestoneForm({ milestoneId: following?._id || '' });
+  };
+
+  const submitLeadMilestoneForm = async (profile) => {
+    if (!profile?._id || leadMilestoneSavingId) return;
+    if (!canUpdateLead(profile)) {
+      setLeadMilestoneError("You don't have permission to update this lead");
+      return;
+    }
+    const milestone = leadMilestoneRows.find((item) => String(item._id) === String(leadMilestoneForm.milestoneId));
+    if (!milestone) {
+      setLeadMilestoneError('Select the next milestone');
+      return;
+    }
+    const next = getNextMilestone(profile, leadMilestoneRows);
+    if (!next) {
+      setLeadMilestoneError('This lead is already on the last milestone');
+      return;
+    }
+    if (String(next._id) !== String(milestone._id)) {
+      setLeadMilestoneError(`Move only to the next milestone: ${next.title}. Earlier milestones stay reached.`);
+      return;
+    }
+    setLeadMilestoneError('');
+    setLeadMilestoneSavingId(milestone._id);
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/b2b/leads/${profile._id}/milestone`,
+        { _milestone: milestone._id },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!response.data?.status) {
+        setLeadMilestoneError(response.data?.message || 'Failed to save milestone');
+        return;
+      }
+      const saved = response.data.data?._milestone || {
+        _id: milestone._id,
+        title: milestone.title,
+        description: milestone.description || '',
+      };
+      applySavedLeadMilestone(profile, saved, response.data.data?.milestoneHistory || []);
+      fetchLeadMilestones();
+    } catch (error) {
+      console.error('Error saving B2B lead milestone:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to save milestone');
+    } finally {
+      setLeadMilestoneSavingId(null);
+    }
+  };
+
+  const openLeadMilestones = async (profile) => {
+    if (!profile?._id) return;
+    if (!canUpdateLead(profile)) {
+      alert("You don't have permission to update this lead.");
+      return;
+    }
+    setLeadMilestoneProfile(profile);
+    setLeadMilestoneForm({
+      milestoneId: getProfileMilestoneId(profile),
+    });
+    setShowLeadMilestoneModal(true);
+    setLeadMilestoneLoading(true);
+    setLeadMilestoneError('');
+    setLeadMilestoneRows([]);
+    try {
+      const response = await axios.get(`${backendUrl}/college/milestoneB2b`, {
+        headers: { 'x-auth': token },
+      });
+      if (!response.data?.success) {
+        setLeadMilestoneError(response.data?.message || 'Failed to fetch milestones');
+        return;
+      }
+      const rows = Array.isArray(response.data.data) ? response.data.data : [];
+      setLeadMilestones(rows);
+      setReachedMilestoneLeadCount(Number(response.data.reachedLeadCount) || 0);
+      const projectId = String(profile?.b2bProject?._id || profile?.b2bProject || '');
+      const projectPosition = (item) => {
+        const position = Number(item.projectPositions?.[projectId]);
+        return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+      };
+      const matched = projectId
+        ? rows
+          .filter((item) => (item.assignedProjects || []).map(String).includes(projectId))
+          .sort((a, b) => projectPosition(a) - projectPosition(b))
+        : [];
+      setLeadMilestoneRows(matched);
+      const following = getNextMilestone(profile, matched);
+      setLeadMilestoneForm({ milestoneId: following?._id || '' });
+    } catch (error) {
+      console.error('Error fetching B2B milestones:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to fetch milestones');
+    } finally {
+      setLeadMilestoneLoading(false);
+    }
   };
 
   // Update lead status
@@ -9146,14 +9418,95 @@ const renderWhatsAppPanel = () => {
                       </div>
                     </div>
 
-                    {hasActiveFollowupFilter && (
+                    <div className="b2b-dash-section mt-3">
+                      <label className="b2b-dash-section__label" htmlFor="b2bMilestoneProject">Project</label>
+                      <div className="b2b-milestone-row d-flex flex-nowrap gap-2 align-items-center pt-1">
+                        <select
+                          id="b2bMilestoneProject"
+                          className="b2b-milestone-project"
+                          aria-label="Project"
+                          value={milestoneProjectId}
+                          onChange={(event) => handleCycleFilterChange('b2bProject', event.target.value)}
+                        >
+                          <option value="">Select project</option>
+                          {milestoneProjectChoices.map((option) => (
+                            <option key={option._id} value={option._id}>{option.name}</option>
+                          ))}
+                        </select>
+                        {!milestoneProjectId && (
+                          <span className="b2b-milestone-project-hint">Choose a project to see its milestones</span>
+                        )}
+                        {milestoneProjectId && (
+                          <div className="b2b-milestone-chips b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center">
+                            <button
+                              type="button"
+                              className="b2b-perf-chip"
+                              title={`Leads that have reached a milestone (${reachedMilestoneLeadCount})`}
+                              style={{
+                                padding: '6px 14px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                borderRadius: '999px',
+                                cursor: 'pointer',
+                                color: filters.reachedMilestone === 'true' && !activeMilestoneId ? '#fff' : 'rgb(250, 85, 121)',
+                                backgroundColor: filters.reachedMilestone === 'true' && !activeMilestoneId ? 'rgb(250, 85, 121)' : '#fff',
+                                border: filters.reachedMilestone === 'true' && !activeMilestoneId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                              }}
+                              onClick={() => handleMilestoneChipClick(null)}
+                            >
+                              All
+                            </button>
+                            {milestonePerformanceChips.length === 0 && (
+                              <span className="text-muted" style={{ fontSize: 12, fontWeight: 600 }}>
+                                No milestones on this project
+                              </span>
+                            )}
+                            {milestonePerformanceChips.map((milestone, index) => {
+                              const isSelected = String(activeMilestoneId) === String(milestone._id);
+                              return (
+                                <button
+                                  key={milestone._id || index}
+                                  type="button"
+                                  className="b2b-perf-chip"
+                                  style={{
+                                    padding: '6px 14px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    borderRadius: '999px',
+                                    cursor: 'pointer',
+                                    color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
+                                    backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
+                                    border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                                  }}
+                                  onClick={() => handleMilestoneChipClick(milestone)}
+                                >
+                                  {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {(hasActiveFollowupFilter || hasActiveMilestoneFilter) && (
                       <div className="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
-                        <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
-                          <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
-                          {filters.followUpCallBucket
-                            ? `Call: ${filters.followUpCallBucket}`
-                            : `Visit: ${filters.followUpVisitBucket}`}
-                        </span>
+                        {hasActiveFollowupFilter && (
+                          <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
+                            <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
+                            {filters.followUpCallBucket
+                              ? `Call: ${filters.followUpCallBucket}`
+                              : `Visit: ${filters.followUpVisitBucket}`}
+                          </span>
+                        )}
+                        {hasActiveMilestoneFilter && (
+                          <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
+                            <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
+                            Milestone: {activeMilestoneId
+                              ? (leadMilestones.find((item) => String(item._id) === String(activeMilestoneId))?.title || 'Selected')
+                              : 'All'}
+                          </span>
+                        )}
                         <button
                           type="button"
                           className="btn btn-sm btn-outline-danger"
@@ -9271,6 +9624,47 @@ const renderWhatsAppPanel = () => {
                           font-weight: 600;
                           color: #333;
                           line-height: 1.2;
+                        }
+                        .b2b-crm-dashboard .b2b-milestone-row {
+                          flex-wrap: nowrap;
+                          min-width: 0;
+                        }
+                        .b2b-crm-dashboard .b2b-milestone-project {
+                          width: 118px;
+                          min-width: 118px;
+                          max-width: 118px;
+                          height: 32px;
+                          padding: 0 26px 0 10px;
+                          border-radius: 999px;
+                          border: 1.5px solid rgb(250, 85, 121);
+                          color: rgb(250, 85, 121);
+                          font-weight: 600;
+                          font-size: 12px;
+                          line-height: 30px;
+                          background-color: #fff;
+                          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fa5579' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
+                          background-repeat: no-repeat;
+                          background-position: right 8px center;
+                          background-size: 10px 7px;
+                          appearance: none;
+                          outline: none;
+                          cursor: pointer;
+                          flex: 0 0 118px;
+                        }
+                        .b2b-crm-dashboard .b2b-milestone-project:focus {
+                          box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.16);
+                        }
+                        .b2b-crm-dashboard .b2b-milestone-project-hint {
+                          color: #9ca3af;
+                          font-size: 12px;
+                          font-weight: 500;
+                          white-space: nowrap;
+                        }
+                        .b2b-crm-dashboard .b2b-milestone-chips {
+                          flex: 1 1 auto;
+                          min-width: 0;
+                          flex-wrap: nowrap;
+                          overflow-x: auto;
                         }
                         .b2b-crm-dashboard .b2b-dash-stat-card {
                           border-radius: 8px;
@@ -9807,6 +10201,19 @@ const renderWhatsAppPanel = () => {
                                       {getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                     </span>
                                   </div>
+                                  <div
+                                    className="lhm__status-row"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openLeadMilestones(lead);
+                                    }}
+                                  >
+                                    <span className="lhm__status-label">Milestone</span>
+                                    <span className="lhm__status-val">
+                                      {getCurrentMilestone(lead).title || 'Set milestone'}
+                                    </span>
+                                  </div>
                                 </div>
 
                               </div>
@@ -10241,6 +10648,23 @@ const renderWhatsAppPanel = () => {
                                       value={getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                       readOnly
                                       style={{ fontSize: '8px' }}
+                                    />
+                                  </div>
+                                  <div className="lead-header-v2__perf-row">
+                                    <span className="lead-header-v2__perf-label">Milestone</span>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm m-0 lead-header-v2__perf-input"
+                                      value={getCurrentMilestone(lead).title || 'Set milestone'}
+                                      readOnly
+                                      title={getCurrentMilestone(lead).previous?.title
+                                        ? `${getCurrentMilestone(lead).title} · from ${getCurrentMilestone(lead).previous.title}`
+                                        : (getCurrentMilestone(lead).title || 'Set milestone')}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openLeadMilestones(lead);
+                                      }}
                                     />
                                   </div>
                                   {/* mobile expand/options — keep hidden on desktop */}
@@ -15679,7 +16103,194 @@ position: absolute;
     max-height: calc(90vh - 140px);
     -webkit-overflow-scrolling: touch;
   }
+  .lead-milestone-path{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .lead-milestone-path__step{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .lead-milestone-path__arrow{
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .lead-milestone-path__card{
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 88px;
+    max-width: 160px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+  .lead-milestone-path__card--from{
+    background: #fff7ed;
+    border-color: #fdba74;
+  }
+  .lead-milestone-path__card--now{
+    background: #eef2ff;
+    border-color: #818cf8;
+  }
+  .lead-milestone-path__label{
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+  .lead-milestone-path__card--now .lead-milestone-path__label{
+    color: #4338ca;
+  }
+  .lead-milestone-path__card--from .lead-milestone-path__label{
+    color: #c2410c;
+  }
+  .lead-milestone-path__title{
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 `}</style>
+
+      {showLeadMilestoneModal && leadMilestoneProfile && (
+        <div
+          className="modal fade show d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="leadMilestoneModalLabel"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeLeadMilestones();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5 text-capitalize" id="leadMilestoneModalLabel">
+                  Milestones — {leadMilestoneProfile.businessName || leadMilestoneProfile.concernPersonName || 'Lead'}
+                </h1>
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="Close"
+                  onClick={closeLeadMilestones}
+                />
+              </div>
+              <div className="modal-body">
+                {(() => {
+                  const current = getCurrentMilestone(leadMilestoneProfile);
+                  if (!current.trail.length && !current.title) return null;
+                  const steps = current.trail.length
+                    ? current.trail
+                    : [{ id: current.id, title: current.title }];
+                  return (
+                    <div className="lead-milestone-path mb-3">
+                      {steps.map((step, index) => {
+                        const isNow = index === steps.length - 1;
+                        const isFrom = steps.length >= 2 && index === steps.length - 2;
+                        const stepLabel = isNow ? 'Now' : isFrom ? 'Came from' : 'Earlier';
+                        return (
+                          <div className="lead-milestone-path__step" key={`${step.id || step.title}-${index}`}>
+                            {index > 0 ? <span className="lead-milestone-path__arrow" aria-hidden="true">→</span> : null}
+                            <div className={`lead-milestone-path__card${isNow ? ' lead-milestone-path__card--now' : ''}${isFrom ? ' lead-milestone-path__card--from' : ''}`}>
+                              <span className="lead-milestone-path__label">{stepLabel}</span>
+                              <span className="lead-milestone-path__title">{step.title || 'Milestone'}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    submitLeadMilestoneForm(leadMilestoneProfile);
+                  }}
+                >
+                  <div className="mb-1">
+                    <label htmlFor="leadMilestoneSelect" className="form-label small fw-medium text-dark">
+                      Milestone<span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className="form-select border-0 bgcolor"
+                      id="leadMilestoneSelect"
+                      value={leadMilestoneForm.milestoneId}
+                      disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId)}
+                      style={{
+                        height: '42px',
+                        paddingTop: '8px',
+                        paddingInline: '10px',
+                        width: '100%',
+                        backgroundColor: '#f1f2f6',
+                      }}
+                      onChange={(event) => {
+                        setLeadMilestoneError('');
+                        setLeadMilestoneForm((prev) => ({ ...prev, milestoneId: event.target.value }));
+                      }}
+                    >
+                      <option value="">
+                        {leadMilestoneLoading
+                          ? 'Loading milestones...'
+                          : getNextMilestone(leadMilestoneProfile, leadMilestoneRows)
+                            ? 'Select next milestone'
+                            : 'Last milestone reached'}
+                      </option>
+                      {leadMilestoneRows.map((milestone) => {
+                        const reachedIds = new Set(getMilestoneTrail(leadMilestoneProfile).map((step) => step.id));
+                        const next = getNextMilestone(leadMilestoneProfile, leadMilestoneRows);
+                        const reached = reachedIds.has(String(milestone._id));
+                        const isNext = next && String(next._id) === String(milestone._id);
+                        const suffix = reached ? ' — reached' : isNext ? '' : ' — later';
+                        return (
+                          <option key={milestone._id} value={milestone._id} disabled={!isNext}>
+                            {milestone.title}{suffix}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  {leadMilestoneError ? (
+                    <div className="text-danger small mt-2">{leadMilestoneError}</div>
+                  ) : null}
+                  {!leadMilestoneLoading && leadMilestoneRows.length === 0 ? (
+                    <div className="text-muted small mt-2">No milestones are aligned to this project.</div>
+                  ) : null}
+                  <div className="d-flex justify-content-end gap-2 mt-4">
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                      onClick={closeLeadMilestones}
+                    >
+                      CLOSE
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn text-white"
+                      disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId) || !getNextMilestone(leadMilestoneProfile, leadMilestoneRows)}
+                      style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+                    >
+                      {leadMilestoneSavingId ? 'SAVING...' : 'SUBMIT'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cross-sale: add lead to another B2B project */}
       {showCrossSaleModal && crossSaleSourceLead && (
