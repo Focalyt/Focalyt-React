@@ -109,6 +109,13 @@ router.get('/bookings', wrap(async (req, res) => {
   send(res, data, 'Bookings loaded');
 }));
 
+router.get('/my-bookings', wrap(async (req, res) => {
+  const data = await service.listMyBookings({
+    ...context(req), from: req.query.from, to: req.query.to,
+  });
+  send(res, data, 'Your timetable loaded');
+}));
+
 router.post('/bookings', wrap(async (req, res) => {
   const data = await service.createBooking({ ...context(req), body: req.body || {} });
   res.status(201).json({ status: true, success: true, message: 'Session booked', data });

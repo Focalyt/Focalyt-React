@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
+import TrainerTimetable from './TrainerTimetable';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -3258,6 +3259,7 @@ const SessionCard = ({
     ['fa-book-open', 'Topic covered', activeSession.topicCovered || activeSession.title, 'blue'],
     ['fa-chalkboard', 'Training method', activeSession.trainingMethod || 'Interactive Learning', 'blue'],
     ['fa-calendar-alt', 'Session date', activeSession.date || formatSessionDate(activeSession.sessionDate), 'blue'],
+    ['fa-clock', 'Class time', formatSessionTimeRange(activeSession), 'blue'],
     ['fa-graduation-cap', 'Course / trade', activeSession.courseTrade || basicDetails.courseTrade, 'pink'],
     ['fa-hashtag', 'Batch code', activeSession.batchCode || basicDetails.batchCode, 'pink'],
     ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
@@ -3786,7 +3788,21 @@ const TrainerModule = () => {
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-  const [reportDate, setReportDate] = useState(new Date());
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const classDetailsRef = useRef(null);
+  const handleScheduleLoaded = useCallback((rows) => {
+    setSelectedBooking((previous) => previous ? rows.find((row) => row._id === previous._id) || null : null);
+  }, []);
+  const handleTimetableClass = (booking) => {
+    setSelectedBooking(booking);
+    setSelectedSessionId(booking.sessionId);
+    setQuickSearch('');
+    setFilters((previous) => ({ ...previous, batch: booking.batchId, course: '', center: '' }));
+    reloadAssignedSessions();
+  };
+  useEffect(() => {
+    if (selectedBooking) classDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedBooking?._id]);
   const [filters, setFilters] = useState({
     department: '',
     project: '',
@@ -3856,7 +3872,7 @@ const TrainerModule = () => {
       batchOptions,
       trainerName: trainerProfile.name,
     });
-    const seed = sessions[0];
+    const seed = (selectedBooking && sessions.find((item) => String(item.assignmentId) === selectedBooking.assignmentId)) || sessions[0];
     if (!seed) return fromFilters;
     return {
       ...fromFilters,
@@ -3871,7 +3887,7 @@ const TrainerModule = () => {
       department: fromFilters.department || seed.department || seed.vertical || '',
       project: fromFilters.project || seed.project || '',
     };
-  }, [filters, sessions, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, trainerProfile.name]);
+  }, [filters, sessions, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, trainerProfile.name, selectedBooking]);
 
   const persistSessions = useCallback((nextSessions, batchId = filters.batch) => {
     if (!batchId) return;
@@ -4488,6 +4504,7 @@ const TrainerModule = () => {
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
     return displaySessions.filter((session) => {
+      if (selectedBooking && String(session.assignmentId) !== selectedBooking.assignmentId) return false;
       if (filters.batch && session.batch && String(session.batch) !== String(filters.batch)) return false;
       if (filters.course && session.course && String(session.course) !== String(filters.course)) return false;
       if (filters.center && session.center && String(session.center) !== String(filters.center)) return false;
@@ -4499,8 +4516,15 @@ const TrainerModule = () => {
         || session.date?.toLowerCase().includes(query)
         || session.batchCode?.toLowerCase().includes(query)
       );
-    });
-  }, [displaySessions, quickSearch, filters.batch, filters.course, filters.center]);
+    }).map((session) => selectedBooking ? {
+      ...session,
+      startTime: selectedBooking.startTime,
+      endTime: selectedBooking.endTime,
+      sessionDate: selectedBooking.dateKey,
+      date: new Date(`${selectedBooking.dateKey}T12:00:00`).toLocaleDateString('en-IN'),
+      batchCode: selectedBooking.batchName,
+    } : session);
+  }, [displaySessions, quickSearch, filters.batch, filters.course, filters.center, selectedBooking]);
 
   useEffect(() => {
     if (!filteredSessions.length) {
@@ -5048,10 +5072,6 @@ const TrainerModule = () => {
             <span className="dbr-breadcrumb--active">Daily Report Card</span>
           </nav>
         </div>
-        <div className="dbr-header-date">
-          <i className="fas fa-calendar-alt" />
-          <DatePicker value={reportDate} onChange={setReportDate} format="dd/MM/yyyy" clearIcon={null} />
-        </div>
       </header>
 
       <div className="dbr-main-tabs">
@@ -5069,7 +5089,19 @@ const TrainerModule = () => {
 
           {mainTab === 'session' && (
             <>
-              <div className="dbr-session-bar">
+              <TrainerTimetable
+                backendUrl={backendUrl}
+                token={token}
+                onSelect={handleTimetableClass}
+                onScheduleLoaded={handleScheduleLoaded}
+              />
+              {selectedBooking && (
+                <div className="dbr-session-bar">
+                  <strong>{selectedBooking.dateKey} · {selectedBooking.startTime}–{selectedBooking.endTime} · {selectedBooking.batchName} · {selectedBooking.title}</strong>
+                  <button type="button" className="dbr-btn" onClick={() => setSelectedBooking(null)}>Show all assigned sessions</button>
+                </div>
+              )}
+              <div className="dbr-session-bar" ref={classDetailsRef}>
                 <div className="dbr-session-summary">
                   <span className="dbr-session-summary__lbl">Selected path</span>
                   <span className="dbr-session-summary__count">
