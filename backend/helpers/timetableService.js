@@ -663,6 +663,49 @@ const listBatchSessions = async ({ college, user, batchId, track }) => {
     }));
 };
 
+// Read the authenticated trainer's bookings directly, never the shared plan's
+// mirrored date/time (the same plan can be taught in several batches).
+const listMyBookings = async ({ college, user, from, to }) => {
+  if (!college?._id || !user?._id) fail('Sign in to view your timetable', 403);
+  const start = assertDateKey(from);
+  const end = assertDateKey(to);
+  const span = (new Date(end) - new Date(start)) / 86400000;
+  if (span < 0 || span > 31) fail('Choose a date range of up to 31 days');
+  const batches = await Batch.find({ college: college._id }).select('_id name').lean();
+  const batchNames = new Map(batches.map((batch) => [String(batch._id), batch.name || '']));
+  const assignments = await BatchSessionAssignment.find({
+    trainer: user._id,
+    batch: { $in: batches.map((batch) => batch._id) },
+  }).populate({ path: 'session', match: { college: college._id, isDeleted: false } }).lean();
+  const valid = assignments.filter((row) => row.session);
+  const byId = new Map(valid.map((row) => [String(row._id), row]));
+  const days = await TimetableDay.find({
+    college: college._id,
+    batch: { $in: batches.map((batch) => batch._id) },
+    dateKey: { $gte: start, $lte: end },
+  }).select('_id dateKey batch track slots').lean();
+  const daysById = new Map(days.map((day) => [String(day._id), day]));
+  const rows = await TimetableBooking.find({
+    status: 'active',
+    timetableDay: { $in: days.map((day) => day._id) },
+    batchSessionAssignment: { $in: valid.map((row) => row._id) },
+  }).sort({ startTime: 1 }).lean();
+  return rows.map((row) => {
+    const assignment = byId.get(String(row.batchSessionAssignment));
+    const day = daysById.get(String(row.timetableDay));
+    const session = assignment.session;
+    return {
+      _id: String(row._id), assignmentId: String(assignment._id),
+      sessionId: String(session._id), title: session.title || '',
+      topic: session.topicCovered || session.title || '',
+      batchId: String(assignment.batch), batchName: batchNames.get(String(assignment.batch)),
+      dateKey: day.dateKey, startTime: row.startTime, endTime: row.endTime,
+      track: day.track,
+      period: day.slots.filter((slot) => row.slotKeys.includes(slot.key)).map((slot) => slot.label).join(' + '),
+    };
+  }).sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.startTime.localeCompare(b.startTime));
+};
+
 module.exports = {
   TimetableError,
   listTemplates,
@@ -675,6 +718,7 @@ module.exports = {
   rebuildDay,
   listDays,
   listBookings,
+  listMyBookings,
   createBooking,
   updateBookingSlots,
   clearBooking,

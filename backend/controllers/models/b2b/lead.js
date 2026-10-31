@@ -157,6 +157,17 @@ const B2BLeadSchema = new mongoose.Schema({
   subStatus: { 
     type: ObjectId
   },
+  _milestone: {
+    type: ObjectId,
+    ref: 'B2bMilestone',
+  },
+  // Reached milestones stay here. Moving forward appends the next step and does not drop earlier ones.
+  milestoneHistory: [{
+    milestone: { type: ObjectId, ref: 'B2bMilestone', required: true },
+    title: { type: String, trim: true, default: '' },
+    reachedAt: { type: Date, default: Date.now },
+    reachedBy: { type: ObjectId, ref: 'User' },
+  }],
   followUp: { type: ObjectId, ref: 'FollowUp' },
   followUpCall: { type: ObjectId, ref: 'FollowUp' },
   followUpVisit: { type: ObjectId, ref: 'FollowUp' },
@@ -167,6 +178,8 @@ const B2BLeadSchema = new mongoose.Schema({
 
 B2BLeadSchema.index({ mobile: 1 });
 B2BLeadSchema.index({ whatsapp: 1 });
+B2BLeadSchema.index({ _milestone: 1 });
+B2BLeadSchema.index({ 'milestoneHistory.milestone': 1 });
 
 B2BLeadSchema.statics.normalizeApproval = normalizeB2BApproval;
 B2BLeadSchema.statics.approvalNeedsRepair = approvalNeedsRepair;

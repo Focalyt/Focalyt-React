@@ -1,10 +1,11 @@
 const express = require("express");
 const mongoose = require('mongoose');
 const router = express.Router();
-const { isCollege } = require("../../../../helpers");
+const { isCollege, getAllTeamMembers } = require("../../../../helpers");
 
 const B2bMilestone = require('../../../models/b2bMilestone');
 const B2bMilestoneAssignment = require('../../../models/b2bMilestoneAssignment');
+const Lead = require('../../../models/b2b/lead');
 const { resolveProjectSelection: resolveB2bProjectSelection, getStatusProjectScope } = require('../../../../helpers/b2bStatusAssignment');
 const {
   getMilestoneAssignmentState,
@@ -16,6 +17,16 @@ const {
 } = require('../../../../helpers/b2bMilestoneAssignment');
 
 const isValidId = (value) => mongoose.Types.ObjectId.isValid(String(value || ''));
+
+const ownerIdsForMilestoneCounts = async (user) => {
+  const isAdmin = user?.permissions?.permission_type === 'Admin';
+  if (isAdmin) return [];
+  const ids = await getAllTeamMembers(user._id);
+  const list = Array.isArray(ids) && ids.length ? ids : (user?._id ? [user._id] : []);
+  return list
+    .filter((id) => isValidId(id))
+    .map((id) => new mongoose.Types.ObjectId(String(id)));
+};
 
 // B2B departments and projects are not tied to a college
 const resolveProjectSelection = (collegeId, departments, projects) => resolveB2bProjectSelection(departments, projects);
@@ -42,6 +53,50 @@ router.get('/', isCollege, async (req, res) => {
 
     const state = await getMilestoneAssignmentState(collegeId, milestones.map((item) => item._id));
     milestones = milestones.filter((item) => state.get(String(item._id))?.projects?.size);
+    const ownerIds = await ownerIdsForMilestoneCounts(req.user);
+    const counted = await Lead.aggregate([
+      {
+        $match: {
+          ...(ownerIds.length ? {
+            $or: [
+              { leadAddedBy: { $in: ownerIds } },
+              { leadOwner: { $in: ownerIds } },
+              { leadCoOwner: { $in: ownerIds } },
+            ],
+          } : {}),
+        },
+      },
+      {
+        $project: {
+          milestones: {
+            $setUnion: [
+              { $ifNull: ['$milestoneHistory.milestone', []] },
+              {
+                $cond: [
+                  { $ifNull: ['$_milestone', false] },
+                  ['$_milestone'],
+                  [],
+                ],
+              },
+            ],
+          },
+        },
+      },
+      { $match: { 'milestones.0': { $exists: true } } },
+      {
+        $facet: {
+          byMilestone: [
+            { $unwind: '$milestones' },
+            { $group: { _id: '$milestones', count: { $sum: 1 } } },
+          ],
+          leads: [{ $count: 'count' }],
+        },
+      },
+    ]);
+    const countByMilestone = new Map(
+      ((counted[0] && counted[0].byMilestone) || []).map((row) => [String(row._id), row.count])
+    );
+    const reachedLeadCount = counted[0]?.leads?.[0]?.count || 0;
     const data = milestones.map((item) => {
       const assignment = state.get(String(item._id));
       const projectPositions = {};
@@ -59,6 +114,7 @@ router.get('/', isCollege, async (req, res) => {
         title: item.title,
         description: item.description,
         index: item.index,
+        leadCount: countByMilestone.get(String(item._id)) || 0,
         assignedDepartments: assignment ? [...assignment.departments] : [],
         assignedProjects: assignment ? [...assignment.projects] : [],
         projectPositions,
@@ -68,7 +124,12 @@ router.get('/', isCollege, async (req, res) => {
       };
     });
 
-    return res.status(200).json({ success: true, message: 'Milestones fetched successfully', data });
+    return res.status(200).json({
+      success: true,
+      message: 'Milestones fetched successfully',
+      reachedLeadCount,
+      data,
+    });
   } catch (err) {
     console.error('Error fetching milestones:', err.message);
     return res.status(500).json({ success: false, message: 'Server Error' });

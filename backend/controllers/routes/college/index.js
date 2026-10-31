@@ -9104,8 +9104,8 @@ router.get('/all_courses_centerwise', async (req, res) => {
 		const { centerId, projectId } = req.query
 		let filter = {
 			center: centerId,
-			project: projectId
-
+			project: projectId,
+			isDeleted: { $ne: true },
 		}
 		if (!centerId || !projectId) {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
@@ -9197,16 +9197,22 @@ router.post('/add_batch', isCollege, async (req, res) => {
 		}
 
 		const course = await Courses.findById(courseId).select('center').lean();
+		if (!course) {
+			return res.status(404).json({ success: false, message: 'Course not found' });
+		}
+
 		const assignedCenterIds = [
 			...new Set(
-				(Array.isArray(course?.center) ? course.center : [])
+				(Array.isArray(course.center) ? course.center : [])
 					.map((id) => (id && id._id ? String(id._id) : String(id || '')))
 					.filter((id) => mongoose.Types.ObjectId.isValid(id))
 			),
 		];
-		const centerIds = assignedCenterIds.length ? assignedCenterIds : [String(centerId)];
+		if (assignedCenterIds.length && !assignedCenterIds.includes(String(centerId))) {
+			return res.status(400).json({ success: false, message: 'Selected center is not assigned to this course' });
+		}
 
-		const batchFields = {
+		const savedBatch = await Batch.create({
 			name,
 			startDate,
 			description,
@@ -9217,25 +9223,70 @@ router.post('/add_batch', isCollege, async (req, res) => {
 			maxStudents: maxStudents || 0,
 			status: status || 'active',
 			courseId,
+			centerId,
 			createdBy: user._id,
 			college: college._id,
-		};
-
-		const savedBatches = await Batch.insertMany(
-			centerIds.map((id) => ({ ...batchFields, centerId: id }))
-		);
+		});
 
 		res.status(201).json({
 			success: true,
-			message: savedBatches.length > 1
-				? `Batch created for ${savedBatches.length} centers`
-				: 'Batch created successfully',
-			data: savedBatches.length === 1 ? savedBatches[0] : savedBatches,
-			count: savedBatches.length,
+			message: 'Batch created successfully',
+			data: savedBatch,
 		});
 	} catch (error) {
 		console.error('Error creating batch:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.put('/update_batch/:id', isCollege, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const {
+			name,
+			startDate,
+			description,
+			endDate,
+			zeroPeriodStartDate,
+			zeroPeriodEndDate,
+			assessmentDate,
+			maxStudents,
+			status,
+		} = req.body;
+
+		if (!mongoose.Types.ObjectId.isValid(id)) {
+			return res.status(400).json({ success: false, message: 'Invalid batch' });
+		}
+
+		const batch = await Batch.findById(id);
+		if (!batch) {
+			return res.status(404).json({ success: false, message: 'Batch not found' });
+		}
+
+		if (!name || !startDate || !endDate || !zeroPeriodStartDate || !zeroPeriodEndDate) {
+			return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+		}
+
+		batch.name = name;
+		batch.description = description || '';
+		batch.startDate = startDate;
+		batch.endDate = endDate;
+		batch.zeroPeriodStartDate = zeroPeriodStartDate;
+		batch.zeroPeriodEndDate = zeroPeriodEndDate;
+		batch.assessmentDate = assessmentDate || null;
+		batch.maxStudents = maxStudents || 0;
+		if (status) batch.status = status;
+
+		await batch.save();
+
+		return res.json({
+			success: true,
+			message: 'Batch updated successfully',
+			data: batch,
+		});
+	} catch (error) {
+		console.error('Error updating batch:', error);
+		return res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
 
@@ -11864,6 +11915,128 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 	}
 });
 
+router.put("/upload_placement_docs/:id", isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		let { id } = req.params;
+		let { doc } = req.body;
+		let docsId = doc;
+
+		if (!docsId) {
+			return res.status(400).json({ status: false, error: "docs id not found." });
+		}
+
+		if (typeof docsId === 'string' && mongoose.Types.ObjectId.isValid(docsId)) {
+			docsId = new mongoose.Types.ObjectId(docsId);
+		}
+
+		if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
+			id = new mongoose.Types.ObjectId(id);
+		}
+
+		const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
+			path: '_course',
+			select: 'docsRequired placementDocs name'
+		}).populate({
+			path: '_candidate',
+			select: 'name mobile'
+		});
+
+		if (!appliedCourse) {
+			return res.status(400).json({ status: false, error: "You have not applied for this course." });
+		}
+
+		const placementDoc = (appliedCourse._course?.placementDocs || []).find(
+			(item) => item && item._id.toString() === docsId.toString() && item.status !== false
+		);
+		if (!placementDoc) {
+			return res.status(400).json({ status: false, message: "Placement document not found for this course." });
+		}
+
+		const docName = placementDoc.Name || placementDoc.name || 'Placement Document';
+		const files = req.files?.file;
+		if (!files) {
+			return res.status(400).send({ status: false, message: "No files uploaded" });
+		}
+
+		const filesArray = Array.isArray(files) ? files : [files];
+		const uploadedFiles = [];
+		const uploadPromises = [];
+
+		filesArray.forEach((item) => {
+			const { name, mimetype } = item;
+			const ext = name?.split('.').pop().toLowerCase();
+
+			if (!allowedExtensions.includes(ext)) {
+				throw new Error(`File type not supported: ${ext}`);
+			}
+
+			let fileType = "document";
+			if (allowedImageExtensions.includes(ext)) {
+				fileType = "image";
+			} else if (allowedVideoExtensions.includes(ext)) {
+				fileType = "video";
+			}
+
+			const key = buildCourseDocumentKey({
+				candidateName: appliedCourse._candidate?.name,
+				candidateMobile: appliedCourse._candidate?.mobile,
+				courseName: appliedCourse._course?.name,
+				docName,
+				ext,
+			});
+
+			const params = {
+				Bucket: bucketName,
+				Key: key,
+				Body: item.data,
+				ContentType: mimetype,
+			};
+
+			uploadPromises.push(
+				objectStorage.upload(params).promise().then(() => {
+					uploadedFiles.push({
+						fileURL: key,
+						fileType,
+					});
+				})
+			);
+		});
+
+		await Promise.all(uploadPromises);
+		const fileUrl = uploadedFiles[0].fileURL;
+
+		if (!Array.isArray(appliedCourse.placementUploadedDocs)) {
+			appliedCourse.placementUploadedDocs = [];
+		}
+
+		appliedCourse.placementUploadedDocs.push({
+			docsId: new mongoose.Types.ObjectId(docsId),
+			fileUrl: fileUrl,
+			status: "Pending",
+			uploadedAt: new Date()
+		});
+
+		appliedCourse.logs.push({
+			user: user._id,
+			timestamp: new Date(),
+			action: 'Placement Document Uploaded',
+			remarks: `${docName} uploaded for verification`
+		});
+
+		await appliedCourse.save();
+
+		return res.status(200).json({
+			status: true,
+			message: "Placement document uploaded successfully",
+			data: appliedCourse
+		});
+	} catch (err) {
+		console.log(err);
+		return res.status(500).send({ status: false, message: err.message });
+	}
+});
+
 router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
@@ -12656,7 +12829,45 @@ router.route("/verify-document/:profileId/:uploadId").put(isCollege, async (req,
 			return res.status(404).json({ success: false, message: "Profile not found" });
 		}
 
-		const docId = profile.uploadedDocs.find(doc => doc._id.toString() === validUploadId.toString()).docsId;
+		const placementUpload = (profile.placementUploadedDocs || []).find(
+			(doc) => doc._id.toString() === validUploadId.toString()
+		);
+		if (placementUpload) {
+			if (!['Verified', 'Rejected', 'Pending'].includes(status)) {
+				return res.status(400).json({ success: false, message: "Invalid document status" });
+			}
+			placementUpload.status = status;
+			if (status === 'Rejected') {
+				placementUpload.reason = rejectionReason;
+			}
+			if (status === 'Verified' || status === 'Rejected') {
+				placementUpload.verifiedBy = req.user._id;
+				placementUpload.verifiedDate = new Date();
+			}
+			const placementDocName = (profile._course?.placementDocs || []).find(
+				(item) => item && placementUpload.docsId && item._id.toString() === placementUpload.docsId.toString()
+			)?.Name || 'Placement document';
+			profile.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: status === 'Verified' ? 'Placement Document Verified' : 'Placement Document Rejected',
+				remarks: `${placementDocName} marked ${status}`
+			});
+			await profile.save();
+			return res.json({
+				success: true,
+				message: "Document status updated successfully",
+				allMandatoryDocsVerified: false,
+				documentVerifiedWhatsAppSent: false,
+				documentRejectedWhatsAppSent: false,
+			});
+		}
+
+		const matchedUpload = (profile.uploadedDocs || []).find(doc => doc._id.toString() === validUploadId.toString());
+		if (!matchedUpload) {
+			return res.status(404).json({ success: false, message: "Document upload not found" });
+		}
+		const docId = matchedUpload.docsId;
 
 		const allMandatoryVerifiedBefore = mandatoryDocsFullyVerified(profile._course, profile.uploadedDocs);
 

@@ -654,9 +654,9 @@ const updatedPermission = async () => {
                                         <button type="button" title="Edit" onClick={() => handleEdit(center)}>
                                             <i className="bi bi-pencil"></i>
                                         </button>
-                                        <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(center)}>
+                                        {/* <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(center)}>
                                             <i className="bi bi-trash"></i>
-                                        </button>
+                                        </button> */}
                                     </div>
                                 </td>
                             </tr>
