@@ -699,7 +699,6 @@ function EditJob({ readOnly = false }) {
     if (form.ageMin && form.ageMax && Number(form.ageMin) > Number(form.ageMax))
       newErrors.ageGroup = 'Enter a valid age group';
     if (!form.jobType) newErrors.jobType = 'Please select job type';
-    if (!form.shiftTimingFrom || !form.shiftTimingTo) newErrors.shiftTiming = 'Please enter shift timing';
     if (!form.compensation) newErrors.compensation = 'Please select compensation';
     if (!form.pay) newErrors.pay = 'Please select pay type';
     if (!form.work) newErrors.work = 'Please select work type';
@@ -1337,8 +1336,8 @@ function EditJob({ readOnly = false }) {
                       </div>
                     </div>
 
-                    <div className={`col-xl-3 mb-1 ${errors.shiftTiming ? 'error' : ''}`} id="shift-field">
-                      <label>Shift Timing</label><span className="mandatory"> *</span>
+                    <div className="col-xl-3 mb-1" id="shift-field">
+                      <label>Shift Timing</label>
                       <div className="row">
                         <div className="col-6">
                           <label>From</label>
