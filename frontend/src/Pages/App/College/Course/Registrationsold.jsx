@@ -7888,11 +7888,15 @@ console.log('API Response:', response.data);
       .map((step) => ({
         id: idOf(step?.milestone || step?._id),
         title: step?.title || '',
+        droppedOut: step?.droppedOut === true,
       }))
       .filter((step) => step.title || step.id);
   };
 
+  const isMilestoneDroppedOut = (profile) => getMilestoneTrail(profile).some((step) => step.droppedOut);
+
   const getNextMilestone = (profile, rows) => {
+    if (isMilestoneDroppedOut(profile)) return null;
     const list = Array.isArray(rows) ? rows : [];
     const reachedIds = new Set(getMilestoneTrail(profile).map((step) => step.id).filter(Boolean));
     const currentId = getProfileMilestoneId(profile) || [...reachedIds].pop() || '';
@@ -7911,6 +7915,7 @@ console.log('API Response:', response.data);
       id: idOf(stored) || latest?.id || '',
       title: storedTitle || latest?.title || '',
       previous: trail.length >= 2 ? trail[trail.length - 2] : null,
+      droppedOut: trail.some((step) => step.droppedOut),
       trail,
     };
   };
@@ -7936,6 +7941,11 @@ console.log('API Response:', response.data);
 
   const submitLeadMilestoneForm = async (profile) => {
     if (!profile?._id || leadMilestoneSavingId) return;
+    if (isMilestoneDroppedOut(profile)) {
+      const dropped = getMilestoneTrail(profile).find((step) => step.droppedOut);
+      setLeadMilestoneError(`This lead dropped out from "${dropped?.title || 'a milestone'}". The next milestone cannot be updated.`);
+      return;
+    }
     const milestone = leadMilestoneRows.find((item) => String(item._id) === String(leadMilestoneForm.milestoneId));
     if (!milestone) {
       setLeadMilestoneError('Select the next milestone');
@@ -7972,6 +7982,37 @@ console.log('API Response:', response.data);
     } catch (error) {
       console.error('Error saving lead milestone:', error);
       setLeadMilestoneError(error.response?.data?.message || 'Failed to save milestone');
+    } finally {
+      setLeadMilestoneSavingId(null);
+    }
+  };
+
+  const markLeadMilestoneDropout = async (profile, milestoneId, milestoneTitle) => {
+    if (!profile?._id || !milestoneId || leadMilestoneSavingId) return;
+    const confirmed = window.confirm(
+      `Mark dropout on "${milestoneTitle || 'this milestone'}"? The next milestone cannot be updated.`
+    );
+    if (!confirmed) return;
+    setLeadMilestoneError('');
+    setLeadMilestoneSavingId(milestoneId);
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/lead/milestone_dropout/${profile._id}`,
+        { milestoneId },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!response.data?.success) {
+        setLeadMilestoneError(response.data?.message || 'Failed to mark dropout');
+        return;
+      }
+      applySavedLeadMilestone(
+        profile,
+        response.data.data?._milestone || profile._milestone,
+        response.data.data?.milestoneHistory || []
+      );
+    } catch (error) {
+      console.error('Error marking milestone dropout:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to mark dropout');
     } finally {
       setLeadMilestoneSavingId(null);
     }
@@ -8018,8 +8059,10 @@ console.log('API Response:', response.data);
     }
   };
 
+  const isWonLeadStatus = (profile) => String(profile?._leadStatus?.title || '').trim().toLowerCase() === 'won';
+
   const renderLeadMilestoneButton = (profile, extraClassName = '') => {
-    if (!profile?.admissionDone) return null;
+    if (!isWonLeadStatus(profile)) return null;
     const current = getCurrentMilestone(profile);
     const label = current.title || 'Milestone';
     const fromTitle = current.previous?.title || '';
@@ -8027,7 +8070,7 @@ console.log('API Response:', response.data);
       <button
         type="button"
         className={`lead-card-kyc-dash__btn lead-card-kyc-dash__btn--milestone${extraClassName ? ` ${extraClassName}` : ''}`}
-        title={fromTitle ? `${label} · came from ${fromTitle}` : label}
+        title={current.droppedOut ? `${label} · Dropout` : (fromTitle ? `${label} · came from ${fromTitle}` : label)}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -8035,7 +8078,8 @@ console.log('API Response:', response.data);
         }}
       >
         <span className="lead-milestone-btn__now">{label}</span>
-        {fromTitle ? <span className="lead-milestone-btn__from">from {fromTitle}</span> : null}
+        {current.droppedOut ? <span className="lead-milestone-btn__from">Dropout</span> : null}
+        {!current.droppedOut && fromTitle ? <span className="lead-milestone-btn__from">from {fromTitle}</span> : null}
       </button>
     );
   };
@@ -18811,27 +18855,45 @@ useEffect(() => {
                   <div className="modal-body">
                     {(() => {
                       const current = getCurrentMilestone(leadMilestoneProfile);
+                      const droppedSteps = current.trail.filter((step) => step.droppedOut);
                       if (!current.trail.length && !current.title) return null;
                       const steps = current.trail.length
                         ? current.trail
-                        : [{ id: current.id, title: current.title }];
+                        : [{ id: current.id, title: current.title, droppedOut: current.droppedOut }];
                       return (
-                        <div className="lead-milestone-path mb-3">
-                          {steps.map((step, index) => {
-                            const isNow = index === steps.length - 1;
-                            const isFrom = steps.length >= 2 && index === steps.length - 2;
-                            const stepLabel = isNow ? 'Now' : isFrom ? 'Came from' : 'Earlier';
-                            return (
-                              <div className="lead-milestone-path__step" key={`${step.id || step.title}-${index}`}>
-                                {index > 0 ? <span className="lead-milestone-path__arrow" aria-hidden="true">→</span> : null}
-                                <div className={`lead-milestone-path__card${isNow ? ' lead-milestone-path__card--now' : ''}${isFrom ? ' lead-milestone-path__card--from' : ''}`}>
-                                  <span className="lead-milestone-path__label">{stepLabel}</span>
-                                  <span className="lead-milestone-path__title">{step.title || 'Milestone'}</span>
+                        <>
+                          <div className="lead-milestone-path mb-3">
+                            {steps.map((step, index) => {
+                              const isNow = index === steps.length - 1;
+                              const isFrom = !step.droppedOut && steps.length >= 2 && index === steps.length - 2;
+                              const stepLabel = step.droppedOut ? 'Dropout' : isNow ? 'Now' : isFrom ? 'Came from' : 'Earlier';
+                              return (
+                                <div className="lead-milestone-path__step" key={`${step.id || step.title}-${index}`}>
+                                  {index > 0 ? <span className="lead-milestone-path__arrow" aria-hidden="true">→</span> : null}
+                                  <div className={`lead-milestone-path__card${isNow ? ' lead-milestone-path__card--now' : ''}${isFrom ? ' lead-milestone-path__card--from' : ''}${step.droppedOut ? ' lead-milestone-path__card--dropout' : ''}`}>
+                                    <span className="lead-milestone-path__label">{stepLabel}</span>
+                                    <span className="lead-milestone-path__title">{step.title || 'Milestone'}</span>
+                                    {step.id && !step.droppedOut ? (
+                                      <button
+                                        type="button"
+                                        className="lead-milestone-path__dropout"
+                                        disabled={Boolean(leadMilestoneSavingId)}
+                                        onClick={() => markLeadMilestoneDropout(leadMilestoneProfile, step.id, step.title)}
+                                      >
+                                        {String(leadMilestoneSavingId) === String(step.id) ? 'Saving...' : 'Dropout'}
+                                      </button>
+                                    ) : null}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                          {droppedSteps.length ? (
+                            <div className="text-danger small mb-3">
+                              Dropped out from <strong>{droppedSteps.map((step) => step.title).join(', ')}</strong>. The next milestone cannot be updated.
+                            </div>
+                          ) : null}
+                        </>
                       );
                     })()}
                     <form
@@ -18848,7 +18910,7 @@ useEffect(() => {
                           className="form-select border-0 bgcolor"
                           id="leadMilestoneSelect"
                           value={leadMilestoneForm.milestoneId}
-                          disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId)}
+                          disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId) || isMilestoneDroppedOut(leadMilestoneProfile)}
                           style={{
                             height: '42px',
                             paddingTop: '8px',
@@ -18864,7 +18926,9 @@ useEffect(() => {
                           <option value="">
                             {leadMilestoneLoading
                               ? 'Loading milestones...'
-                              : getNextMilestone(leadMilestoneProfile, leadMilestoneRows)
+                              : isMilestoneDroppedOut(leadMilestoneProfile)
+                                ? 'Dropped out'
+                                : getNextMilestone(leadMilestoneProfile, leadMilestoneRows)
                                 ? 'Select next milestone'
                                 : 'Last milestone reached'}
                           </option>
@@ -33599,6 +33663,11 @@ max-width: 600px;
           border-color: #818cf8;
         }
 
+        .lead-milestone-path__card--dropout{
+          background: #fef2f2;
+          border-color: #f87171;
+        }
+
         .lead-milestone-path__label{
           font-size: 10px;
           font-weight: 700;
@@ -33609,6 +33678,10 @@ max-width: 600px;
 
         .lead-milestone-path__card--now .lead-milestone-path__label{
           color: #4338ca;
+        }
+
+        .lead-milestone-path__card--dropout .lead-milestone-path__label{
+          color: #b91c1c;
         }
 
         .lead-milestone-path__card--from .lead-milestone-path__label{
@@ -33622,6 +33695,24 @@ max-width: 600px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .lead-milestone-path__dropout{
+          margin-top: 4px;
+          border: 0;
+          border-radius: 999px;
+          background: #dc2626;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          line-height: 1;
+          padding: 4px 8px;
+          cursor: pointer;
+        }
+
+        .lead-milestone-path__dropout:disabled{
+          opacity: 0.7;
+          cursor: default;
         }
 
         .lead-milestone-path__meta,

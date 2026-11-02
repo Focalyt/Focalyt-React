@@ -3802,6 +3802,11 @@ const B2BSales = () => {
     return list.find((item) => !reachedIds.has(String(item._id))) || null;
   };
 
+  const isWonLeadStatus = (lead) => {
+    const title = lead?.status?.title || lead?.status?.name || '';
+    return String(title).trim().toLowerCase() === 'won';
+  };
+
   const getCurrentMilestone = (profile) => {
     const trail = getMilestoneTrail(profile);
     const stored = profile?._milestone;
@@ -3882,7 +3887,7 @@ const B2BSales = () => {
   };
 
   const openLeadMilestones = async (profile) => {
-    if (!profile?._id) return;
+    if (!profile?._id || !isWonLeadStatus(profile)) return;
     if (!canUpdateLead(profile)) {
       alert("You don't have permission to update this lead.");
       return;
@@ -9995,6 +10000,21 @@ const renderWhatsAppPanel = () => {
                               <i className="fas fa-plus" aria-hidden="true" />
                               <span className="d-none d-md-inline"> Cross Sale</span>
                             </button>
+                            {isWonLeadStatus(lead) && (
+                              <button
+                                type="button"
+                                className="lead-project-tabs__milestone"
+                                title={getCurrentMilestone(lead).previous?.title
+                                  ? `${getCurrentMilestone(lead).title} · from ${getCurrentMilestone(lead).previous.title}`
+                                  : (getCurrentMilestone(lead).title || 'Set milestone')}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openLeadMilestones(lead);
+                                }}
+                              >
+                                {getCurrentMilestone(lead).title || 'Milestone'}
+                              </button>
+                            )}
                           </div>
                         )}
                         {/* Card Header */}
@@ -10201,6 +10221,7 @@ const renderWhatsAppPanel = () => {
                                       {getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                     </span>
                                   </div>
+                                  {isWonLeadStatus(lead) && (
                                   <div
                                     className="lhm__status-row"
                                     onClick={(e) => {
@@ -10214,6 +10235,7 @@ const renderWhatsAppPanel = () => {
                                       {getCurrentMilestone(lead).title || 'Set milestone'}
                                     </span>
                                   </div>
+                                  )}
                                 </div>
 
                               </div>
@@ -10648,23 +10670,6 @@ const renderWhatsAppPanel = () => {
                                       value={getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                       readOnly
                                       style={{ fontSize: '8px' }}
-                                    />
-                                  </div>
-                                  <div className="lead-header-v2__perf-row">
-                                    <span className="lead-header-v2__perf-label">Milestone</span>
-                                    <input
-                                      type="text"
-                                      className="form-control form-control-sm m-0 lead-header-v2__perf-input"
-                                      value={getCurrentMilestone(lead).title || 'Set milestone'}
-                                      readOnly
-                                      title={getCurrentMilestone(lead).previous?.title
-                                        ? `${getCurrentMilestone(lead).title} · from ${getCurrentMilestone(lead).previous.title}`
-                                        : (getCurrentMilestone(lead).title || 'Set milestone')}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        openLeadMilestones(lead);
-                                      }}
                                     />
                                   </div>
                                   {/* mobile expand/options — keep hidden on desktop */}
@@ -16086,6 +16091,21 @@ position: absolute;
   }
   .lead-project-tabs__add:hover {
     background: rgba(250, 85, 121, 0.08);
+  }
+  .lead-project-tabs__milestone {
+    border: 0;
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: #fff;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
   }
 
   .cross-sale-modal {
