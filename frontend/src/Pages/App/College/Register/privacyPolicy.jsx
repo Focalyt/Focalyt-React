@@ -9,10 +9,10 @@ const PrivacyPolicy = () => {
       <div className="row justify-content-center">
         <div className="col-lg-10 col-xl-8">
           <div className="card border-0 shadow-lg mb-5">
-            <div className="card-header bg-gradient text-white text-center py-4" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
-              <h1 className="display-4 mb-3">🔒 Privacy Policy</h1>
-              <h4 className="fw-light">Focalyt Portal - Educational Management Platform</h4>
-              <p className="mb-0 opacity-75">Protecting Educational Data & Student Privacy</p>
+            <div className="card-header bg-white text-dark text-center py-4">
+              <h1 className="display-4 mb-3 text-dark">🔒 Privacy Policy</h1>
+              <h4 className="fw-light text-dark">Focalyt Portal - Educational Management Platform</h4>
+              <p className="mb-0 text-dark">Protecting Educational Data & Student Privacy</p>
             </div>
           </div>
 
