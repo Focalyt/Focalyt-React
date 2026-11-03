@@ -60,6 +60,7 @@ const DailyTrainerReport = ({
   const [editingId, setEditingId] = useState('');
   const [readOnly, setReadOnly] = useState(false);
   const [search, setSearch] = useState('');
+  const [screen, setScreen] = useState('add');
   const [form, setForm] = useState(emptyForm);
   const [removedIds, setRemovedIds] = useState([]);
   const [savedContext, setSavedContext] = useState(null);
@@ -84,6 +85,7 @@ const DailyTrainerReport = ({
         location: session.centerName || existing?.location || '',
         jobRole: session.courseTrade || session.courseName || existing?.jobRole || '',
         courseId: session.course ? String(session.course) : (existing?.courseId || ''),
+        centerId: session.center ? String(session.center) : (existing?.centerId || ''),
         batchSize: Number(session.studentCount || session.totalCandidates || existing?.batchSize || 0),
       };
       choices.set(id, next);
@@ -99,8 +101,14 @@ const DailyTrainerReport = ({
       : null;
     if (savedTemplate) return savedTemplate;
     if (selectedBatch?.courseId) {
+      const covers = (ids, single, value) => {
+        const list = ids?.length ? ids : (single ? [single] : []);
+        return !list.length || !value || list.includes(String(value));
+      };
       const match = templates.find((template) => {
-        if (template.enabled === false || template.courseId !== selectedBatch.courseId) return false;
+        if (template.enabled === false) return false;
+        if (!covers(template.courseIds, template.courseId, selectedBatch.courseId)) return false;
+        if (!covers(template.centerIds, template.centerId, selectedBatch.centerId)) return false;
         if (template.batchIds?.length && !template.batchIds.includes(selectedBatch.id)) return false;
         if (template.trainerIds?.length && !template.trainerIds.includes(String(userId || ''))) return false;
         return true;
@@ -319,6 +327,7 @@ const DailyTrainerReport = ({
       notify(editingId ? 'Daily report updated' : 'Daily report saved');
       await loadReports();
       openNew();
+      setScreen('view');
     } catch (error) {
       const existingId = error.response?.data?.data?.id;
       if (error.response?.status === 409 && existingId) {
@@ -374,6 +383,21 @@ const DailyTrainerReport = ({
       return { ...prev, [field.key]: current.concat(picked.slice(0, room)) };
     });
   };
+
+  const viewFields = useMemo(() => {
+    const fields = new Map();
+    templates.forEach((template) => {
+      (template.fields || []).forEach((field) => fields.set(field.key, field));
+    });
+    reports.forEach((report) => {
+      (report.answers || []).forEach((answer) => {
+        if (!fields.has(answer.key)) {
+          fields.set(answer.key, { key: answer.key, label: answer.label || answer.key, type: answer.type || 'text' });
+        }
+      });
+    });
+    return [...fields.values()];
+  }, [reports, templates]);
 
   const assignedTemplate = templates.find((template) => (
     template.enabled !== false
@@ -445,7 +469,10 @@ const DailyTrainerReport = ({
   return (
     <section className="dtr-wrap">
       <style>{`
-        .dtr-wrap { display: flex; flex-direction: column; gap: 14px; }
+        .dtr-wrap { display: flex; flex-direction: column; gap: 12px; }
+        .dtr-tabs { display: flex; width: fit-content; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+        .dtr-tabs button { border: 0; background: #fff; color: #64748b; padding: 10px 22px; font-weight: 700; cursor: pointer; }
+        .dtr-tabs button.active { background: #fa5579; color: #fff; }
         .dtr-bar, .dtr-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
         .dtr-bar { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px; flex-wrap: wrap; }
         .dtr-bar h2 { margin: 0; font-size: 16px; color: #0f172a; }
@@ -491,11 +518,15 @@ const DailyTrainerReport = ({
         }
       `}</style>
 
+      <div className="dtr-tabs">
+        <button type="button" className={screen === 'add' ? 'active' : ''} onClick={() => setScreen('add')}>Add report</button>
+        <button type="button" className={screen === 'view' ? 'active' : ''} onClick={() => setScreen('view')}>View report</button>
+      </div>
       <div className="dtr-card">
         <div className="dtr-bar">
           <div>
-            <h2>Daily Trainer Report</h2>
-            <p>Fill the first row, then save. Saved reports stay in the rows below.</p>
+            <h2>{screen === 'add' ? 'Add daily report' : 'View reports'}</h2>
+            <p>{screen === 'add' ? 'Fill the row, then save.' : `${visibleReports.length} saved report${visibleReports.length === 1 ? '' : 's'}`}</p>
           </div>
           <div className="dtr-actions">
             <input
@@ -504,17 +535,21 @@ const DailyTrainerReport = ({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
-            {!readOnly && (
-              <button type="button" className="dtr-btn dtr-btn--primary" onClick={saveReport} disabled={saving}>
-                {saving ? 'Saving...' : 'Save row'}
-              </button>
+            {screen === 'add' && (
+              <>
+                <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
+                {!readOnly && (
+                  <button type="button" className="dtr-btn dtr-btn--primary" onClick={saveReport} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save row'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
         {loading ? (
           <div className="dtr-empty">Loading reports...</div>
-        ) : (
+        ) : screen === 'add' ? (
           <div className="dtr-table-wrap">
             <table className="dtr-table">
               <thead>
@@ -544,13 +579,6 @@ const DailyTrainerReport = ({
                   </td>
                   {tableFields.map((field) => <td key={field.key}>{renderCell(field)}</td>)}
                 </tr>
-                {visibleReports.filter((report) => report.id !== editingId).map((report) => (
-                  <tr key={report.id} className="dtr-saved" onClick={() => openReport(report)}>
-                    <td>{formatReportDate(report.reportDate)}</td>
-                    <td>{report.batchCode || '-'}</td>
-                    {tableFields.map((field) => <td key={field.key}>{answerText(report, field)}</td>)}
-                  </tr>
-                ))}
               </tbody>
             </table>
             {form.batchId && !formTemplate && (
@@ -558,6 +586,39 @@ const DailyTrainerReport = ({
             )}
             {!tableFields.length && (
               <p className="dtr-empty">No DTR columns yet. The coordinator sets the fields, batches and trainers in Settings → DTR.</p>
+            )}
+          </div>
+        ) : (
+          <div className="dtr-table-wrap">
+            {visibleReports.length === 0 ? (
+              <div className="dtr-empty">No daily reports yet.</div>
+            ) : (
+              <table className="dtr-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Trainer</th>
+                    <th>Department</th>
+                    <th>Project</th>
+                    <th>Course</th>
+                    <th>Batch</th>
+                    {viewFields.map((field) => <th key={field.key}>{field.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleReports.map((report) => (
+                    <tr key={report.id} className="dtr-saved" onClick={() => { openReport(report); setScreen('add'); }}>
+                      <td>{formatReportDate(report.reportDate)}</td>
+                      <td>{report.trainerName || '-'}</td>
+                      <td>{report.verticalName || '-'}</td>
+                      <td>{report.projectName || '-'}</td>
+                      <td>{report.courseName || report.jobRole || '-'}</td>
+                      <td>{report.batchCode || '-'}</td>
+                      {viewFields.map((field) => <td key={field.key}>{answerText(report, field)}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         )}

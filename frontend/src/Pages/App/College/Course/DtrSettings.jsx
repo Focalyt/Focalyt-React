@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 
@@ -45,13 +45,23 @@ const blankDraft = () => ({
   id: '',
   name: '',
   enabled: true,
-  departmentId: '',
-  projectId: '',
-  courseId: '',
+  departmentIds: [],
+  projectIds: [],
+  centerIds: [],
+  courseIds: [],
   batchIds: [],
   trainerIds: [],
   fields: [emptyField()],
 });
+
+const idOf = (value) => {
+  const id = String(value?._id || value || '');
+  return id && id !== 'undefined' && id !== 'null' ? id : '';
+};
+
+const idsOf = (value) => (Array.isArray(value) ? value : [value]).map(idOf).filter(Boolean);
+
+const savedIds = (many, one) => (Array.isArray(many) && many.length ? many.map(String) : (one ? [String(one)] : []));
 
 const DtrSettings = () => {
   const user = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -59,19 +69,18 @@ const DtrSettings = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [departments, setDepartments] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [centers, setCenters] = useState([]);
   const [courses, setCourses] = useState([]);
+  const [allBatches, setAllBatches] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [draft, setDraft] = useState(blankDraft);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [optionInputs, setOptionInputs] = useState({});
-  const [courseBatches, setCourseBatches] = useState([]);
-  const [batchesLoading, setBatchesLoading] = useState(false);
-  const [batchesOpen, setBatchesOpen] = useState(false);
-  const [trainersOpen, setTrainersOpen] = useState(false);
-  const batchMenuRef = useRef(null);
-  const trainerMenuRef = useRef(null);
+  const [openMenu, setOpenMenu] = useState('');
+  const [menuQuery, setMenuQuery] = useState('');
+  const scopeRef = useRef(null);
 
   const headers = { 'x-auth': token };
 
@@ -79,22 +88,53 @@ const DtrSettings = () => {
     let cancelled = false;
     const load = async () => {
       try {
-        const [verticalRes, projectRes, courseRes, templateRes] = await Promise.all([
+        const [verticalRes, projectRes, centerRes, courseRes, batchRes, templateRes] = await Promise.all([
           axios.get(`${backendUrl}/college/getVerticals`, { headers }),
           axios.get(`${backendUrl}/college/list_all_projects`, { headers }),
+          axios.get(`${backendUrl}/college/list_all_centers`, { headers }),
           axios.get(`${backendUrl}/college/all_courses`, { headers }),
+          axios.get(`${backendUrl}/college/get_batches`, { headers }),
           axios.get(`${backendUrl}/college/trainer/daily-report-settings`, { headers }),
         ]);
         if (cancelled) return;
-        setDepartments((verticalRes.data?.data || []).map((item) => ({ id: String(item._id), name: item.name })));
-        setProjects((projectRes.data?.data || []).map((item) => ({ id: String(item._id), name: item.name })));
-        setCourses((courseRes.data?.data || []).map((item) => ({
-          id: String(item._id),
+        setDepartments((verticalRes.data?.data || []).map((item) => ({ id: idOf(item._id), name: item.name })));
+        setProjects((projectRes.data?.data || []).map((item) => ({
+          id: idOf(item._id),
           name: item.name,
-          projectId: String(item.project?._id || item.project || ''),
-          projectName: item.project?.name || item.projectName || '',
-          departmentId: String(item.vertical?._id || item.vertical || ''),
+          departmentId: idOf(item.vertical),
         })));
+        setCenters((centerRes.data?.data || []).map((item) => ({
+          id: idOf(item._id),
+          name: item.name,
+          projectIds: idsOf(item.projects),
+        })));
+        setCourses((courseRes.data?.data || []).map((item) => ({
+          id: idOf(item._id),
+          name: item.name,
+          projectId: idOf(item.project?._id || item.project),
+          projectName: item.project?.name || item.projectName || '',
+          departmentId: idOf(item.vertical?._id || item.vertical),
+          centerIds: [...new Set(idsOf(item.center).concat(idOf(item.centerId)).filter(Boolean))],
+        })));
+        setAllBatches((batchRes.data?.data || []).map((item) => {
+          const trainers = [];
+          const addTrainer = (trainer, fallbackName) => {
+            const id = idOf(trainer?._id || trainer);
+            if (!id || trainers.some((person) => person.id === id)) return;
+            trainers.push({ id, name: trainer?.name || fallbackName || 'Trainer' });
+          };
+          (item.trainers || []).forEach((trainer) => addTrainer(trainer));
+          if (item.seniorTrainer || item.seniorTrainerId) {
+            addTrainer(item.seniorTrainer || item.seniorTrainerId, item.seniorTrainerName);
+          }
+          return {
+            id: idOf(item._id),
+            name: item.name || 'Batch',
+            courseId: idOf(item.courseId),
+            centerId: idOf(item.centerId),
+            trainers,
+          };
+        }));
         setTemplates(templateRes.data?.data?.templates || []);
       } catch (error) {
         if (!cancelled) setMessage(error.response?.data?.message || 'Unable to load DTR settings');
@@ -106,106 +146,113 @@ const DtrSettings = () => {
     return () => { cancelled = true; };
   }, [backendUrl, token]);
 
-  const visibleProjects = useMemo(() => {
-    if (!draft.departmentId) return projects;
-    const ids = new Set(courses.filter((course) => course.departmentId === draft.departmentId).map((course) => course.projectId));
-    const matched = projects.filter((project) => ids.has(project.id));
-    return matched.length ? matched : projects;
-  }, [courses, draft.departmentId, projects]);
+  const projectsFor = (departmentIds) => projects.filter((project) => departmentIds.includes(project.departmentId));
+  const centersFor = (projectIds) => centers.filter((center) => center.projectIds.some((id) => projectIds.includes(id)));
+  const coursesFor = (departmentIds, projectIds, centerIds) => courses.filter((course) => {
+    if (departmentIds.length && course.departmentId && !departmentIds.includes(course.departmentId)) return false;
+    if (projectIds.length && course.projectId && !projectIds.includes(course.projectId)) return false;
+    if (centerIds.length && course.centerIds.length && !course.centerIds.some((id) => centerIds.includes(id))) return false;
+    return true;
+  });
+  const batchesFor = (courseIds, centerIds) => allBatches.filter((batch) => (
+    courseIds.includes(batch.courseId) && (!centerIds.length || centerIds.includes(batch.centerId))
+  ));
+
+  const visibleProjects = projectsFor(draft.departmentIds);
+  const visibleCenters = centersFor(draft.projectIds);
+  const visibleCourses = coursesFor(draft.departmentIds, draft.projectIds, draft.centerIds);
+  const visibleBatches = batchesFor(draft.courseIds, draft.centerIds);
 
   useEffect(() => {
-    if (!draft.courseId || !token) {
-      setCourseBatches([]);
-      return undefined;
-    }
-    let cancelled = false;
-    setBatchesLoading(true);
-    axios.get(`${backendUrl}/college/get_batches`, {
-      headers,
-      params: { courseId: draft.courseId },
-    }).then((response) => {
-      if (cancelled) return;
-      setCourseBatches((response.data?.data || []).map((item) => {
-        const trainers = [];
-        const addTrainer = (trainer, fallbackName) => {
-          const id = String(trainer?._id || trainer || '');
-          if (!id || id === 'undefined') return;
-          if (trainers.some((person) => person.id === id)) return;
-          trainers.push({ id, name: trainer?.name || fallbackName || 'Trainer' });
-        };
-        (item.trainers || []).forEach((trainer) => addTrainer(trainer));
-        if (item.seniorTrainer || item.seniorTrainerId) {
-          addTrainer(item.seniorTrainer || item.seniorTrainerId, item.seniorTrainerName);
-        }
-        return { id: String(item._id), name: item.name || 'Batch', trainers };
-      }));
-    }).catch(() => {
-      if (!cancelled) setCourseBatches([]);
-    }).finally(() => {
-      if (!cancelled) setBatchesLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [backendUrl, draft.courseId, token]);
-
-  useEffect(() => {
-    if (!batchesOpen && !trainersOpen) return undefined;
+    if (!openMenu) return undefined;
     const close = (event) => {
-      if (batchesOpen && !batchMenuRef.current?.contains(event.target)) setBatchesOpen(false);
-      if (trainersOpen && !trainerMenuRef.current?.contains(event.target)) setTrainersOpen(false);
+      if (!scopeRef.current?.contains(event.target)) setOpenMenu('');
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, [batchesOpen, trainersOpen]);
+  }, [openMenu]);
 
   const trainersFor = (batchIds) => {
     const selected = new Set(batchIds);
     const people = new Map();
-    courseBatches.forEach((batch) => {
+    allBatches.forEach((batch) => {
       if (!selected.has(batch.id)) return;
       (batch.trainers || []).forEach((trainer) => people.set(trainer.id, trainer.name));
     });
     return [...people.entries()].map(([id, name]) => ({ id, name }));
   };
   const trainerChoices = trainersFor(draft.batchIds);
-  const selectedTrainerNames = trainerChoices
-    .filter((trainer) => draft.trainerIds.includes(trainer.id))
-    .map((trainer) => trainer.name);
-  const trainerLabel = !draft.batchIds.length
-    ? 'Select batches first'
-    : !trainerChoices.length
-      ? 'No trainer on these batches'
-      : selectedTrainerNames.length
-        ? selectedTrainerNames.join(', ')
-        : 'Select trainers';
+  const pickLabel = (readyText, emptyText, options, selectedIds, placeholder) => {
+    if (readyText) return readyText;
+    if (!options.length) return emptyText;
+    const names = options.filter((item) => selectedIds.includes(item.id)).map((item) => item.name);
+    return names.length ? names.join(', ') : placeholder;
+  };
+  const departmentLabel = pickLabel('', 'No departments', departments, draft.departmentIds, 'Select departments');
+  const projectLabel = pickLabel(!draft.departmentIds.length && 'Select departments first', 'No projects', visibleProjects, draft.projectIds, 'Select projects');
+  const centerLabel = pickLabel(!draft.projectIds.length && 'Select projects first', 'No centers', visibleCenters, draft.centerIds, 'Select centers');
+  const courseLabel = pickLabel(!draft.centerIds.length && 'Select centers first', 'No courses', visibleCourses, draft.courseIds, 'Select courses');
+  const batchLabel = pickLabel(!draft.courseIds.length && 'Select courses first', 'No batches', visibleBatches, draft.batchIds, 'Select batches');
+  const trainerLabel = pickLabel(!draft.batchIds.length && 'Select batches first', 'No trainer on these batches', trainerChoices, draft.trainerIds, 'Select trainers');
 
-  const selectedBatchNames = courseBatches
-    .filter((batch) => draft.batchIds.includes(batch.id))
-    .map((batch) => batch.name);
-  const batchLabel = !draft.courseId
-    ? 'Select course first'
-    : batchesLoading
-      ? 'Loading batches...'
-      : !courseBatches.length
-        ? 'No batches'
-        : selectedBatchNames.length
-          ? selectedBatchNames.join(', ')
-          : 'Select batches';
+  const keepIds = (ids, options) => ids.filter((id) => options.some((item) => item.id === id));
 
-  const visibleCourses = useMemo(() => courses.filter((course) => {
-    if (draft.departmentId && course.departmentId && course.departmentId !== draft.departmentId) return false;
-    if (draft.projectId && course.projectId && course.projectId !== draft.projectId) return false;
-    return true;
-  }), [courses, draft.departmentId, draft.projectId]);
+  const chooseDepartments = (departmentIds) => {
+    const nextProjects = projectsFor(departmentIds);
+    const projectIds = keepIds(draft.projectIds, nextProjects);
+    const nextCenters = centersFor(projectIds);
+    const centerIds = keepIds(draft.centerIds, nextCenters);
+    const nextCourses = coursesFor(departmentIds, projectIds, centerIds);
+    const courseIds = keepIds(draft.courseIds, nextCourses);
+    const nextBatches = batchesFor(courseIds, centerIds);
+    const batchIds = keepIds(draft.batchIds, nextBatches);
+    const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
+    setDraft({ ...draft, departmentIds, projectIds, centerIds, courseIds, batchIds, trainerIds });
+  };
+
+  const chooseProjects = (projectIds) => {
+    const nextCenters = centersFor(projectIds);
+    const centerIds = keepIds(draft.centerIds, nextCenters);
+    const nextCourses = coursesFor(draft.departmentIds, projectIds, centerIds);
+    const courseIds = keepIds(draft.courseIds, nextCourses);
+    const nextBatches = batchesFor(courseIds, centerIds);
+    const batchIds = keepIds(draft.batchIds, nextBatches);
+    const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
+    setDraft({ ...draft, projectIds, centerIds, courseIds, batchIds, trainerIds });
+  };
+
+  const chooseCenters = (centerIds) => {
+    const nextCourses = coursesFor(draft.departmentIds, draft.projectIds, centerIds);
+    const courseIds = keepIds(draft.courseIds, nextCourses);
+    const nextBatches = batchesFor(courseIds, centerIds);
+    const batchIds = keepIds(draft.batchIds, nextBatches);
+    const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
+    setDraft({ ...draft, centerIds, courseIds, batchIds, trainerIds });
+  };
+
+  const chooseCourses = (courseIds) => {
+    const nextBatches = batchesFor(courseIds, draft.centerIds);
+    const batchIds = keepIds(draft.batchIds, nextBatches);
+    const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
+    setDraft({ ...draft, courseIds, batchIds, trainerIds });
+  };
+
+  const chooseBatches = (batchIds) => {
+    const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
+    setDraft({ ...draft, batchIds, trainerIds });
+  };
 
   const openTemplate = (template) => {
     setMessage('');
+    setOpenMenu('');
     setDraft({
       id: template.id,
       name: template.name || '',
       enabled: template.enabled !== false,
-      departmentId: template.departmentId || '',
-      projectId: template.projectId || '',
-      courseId: template.courseId || '',
+      departmentIds: savedIds(template.departmentIds, template.departmentId),
+      projectIds: savedIds(template.projectIds, template.projectId),
+      centerIds: savedIds(template.centerIds, template.centerId),
+      courseIds: savedIds(template.courseIds, template.courseId),
       batchIds: template.batchIds || [],
       trainerIds: template.trainerIds || [],
       fields: (template.fields || []).map((field) => ({
@@ -223,16 +270,6 @@ const DtrSettings = () => {
     }));
   };
 
-  const chooseBatches = (batchIds) => {
-    const allowed = new Set(trainersFor(batchIds).map((trainer) => trainer.id));
-    setTrainersOpen(false);
-    setDraft({
-      ...draft,
-      batchIds,
-      trainerIds: draft.trainerIds.filter((id) => allowed.has(id)),
-    });
-  };
-
   const addOption = (field) => {
     const text = String(optionInputs[field.key] || '').trim();
     if (!text) return;
@@ -246,11 +283,21 @@ const DtrSettings = () => {
   };
 
   const save = async () => {
-    const course = courses.find((item) => item.id === draft.courseId);
-    const department = departments.find((item) => item.id === draft.departmentId);
-    const project = projects.find((item) => item.id === draft.projectId);
-    if (!draft.courseId) {
-      setMessage('Select the course this DTR belongs to.');
+    const selectedCourses = courses.filter((item) => draft.courseIds.includes(item.id));
+    if (!draft.departmentIds.length) {
+      setMessage('Select at least one department.');
+      return;
+    }
+    if (!draft.projectIds.length) {
+      setMessage('Select at least one project.');
+      return;
+    }
+    if (!draft.centerIds.length) {
+      setMessage('Select at least one center.');
+      return;
+    }
+    if (!draft.courseIds.length) {
+      setMessage('Select at least one course.');
       return;
     }
     if (!draft.batchIds.length) {
@@ -264,13 +311,12 @@ const DtrSettings = () => {
     setSaving(true);
     setMessage('');
     const payload = {
-      name: draft.name || `${course?.name || 'Course'} DTR`,
+      name: draft.name || `${selectedCourses[0]?.name || 'Course'} DTR`,
       enabled: draft.enabled,
-      departmentId: draft.departmentId,
-      departmentName: department?.name || '',
-      projectId: draft.projectId,
-      projectName: project?.name || course?.projectName || '',
-      courseId: draft.courseId,
+      departmentIds: draft.departmentIds,
+      projectIds: draft.projectIds,
+      centerIds: draft.centerIds,
+      courseIds: draft.courseIds,
       batchIds: draft.batchIds,
       trainerIds: draft.trainerIds,
       fields: draft.fields.map((field) => ({
@@ -301,7 +347,7 @@ const DtrSettings = () => {
         return [saved, ...rest];
       });
       openTemplate(saved);
-      setMessage(`DTR saved for ${saved.courseName}. Trainers of this course will see these fields.`);
+      setMessage('DTR saved. The selected trainers can fill it on Daily Report.');
     } catch (error) {
       const existing = error.response?.data?.data;
       if (error.response?.status === 409 && existing?.id) openTemplate(existing);
@@ -328,7 +374,9 @@ const DtrSettings = () => {
         .dtr-multi-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff; font-weight: 500; color: #0f172a; cursor: pointer; }
         .dtr-multi-btn span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dtr-multi-btn:disabled { color: #94a3b8; cursor: default; }
-        .dtr-multi-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 220px; overflow: auto; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08); padding: 6px; }
+        .dtr-multi-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 260px; overflow: auto; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08); padding: 6px; }
+        .dtr-multi-search { position: sticky; top: 0; background: #fff; padding-bottom: 6px; z-index: 1; }
+        .dtr-multi-search input { width: 100%; }
         .dtr-set label.dtr-batch-item { flex-direction: row; align-items: center; gap: 8px; height: auto; font-weight: 600; padding: 6px; border-radius: 6px; cursor: pointer; }
         .dtr-set label.dtr-batch-item:hover { background: #f8fafc; }
         .dtr-set label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #334155; }
@@ -348,124 +396,101 @@ const DtrSettings = () => {
         @media (max-width: 980px) { .dtr-set, .dtr-set-grid, .dtr-file-extra { grid-template-columns: 1fr; } }
       `}</style>
       <aside className="dtr-set-card dtr-set-list">
-        <h2>DTR by course</h2>
-        <p>Each course gets its own report.</p>
-        <button type="button" className="dtr-set-btn" onClick={() => { setDraft(blankDraft()); setMessage(''); }}>New DTR</button>
+        <h2>DTR list</h2>
+        <p>One report can cover many departments, projects, centers, courses and batches.</p>
+        <button type="button" className="dtr-set-btn" onClick={() => { setDraft(blankDraft()); setOpenMenu(''); setMessage(''); }}>New DTR</button>
         {templates.map((template) => (
           <button key={template.id} type="button" onClick={() => openTemplate(template)}>
-            <strong>{template.courseName || template.name}</strong>
-            <small>{[template.departmentName, template.projectName, (template.trainerNames || []).join(', ')].filter(Boolean).join(' · ') || 'No department'}</small>
+            <strong>{template.name || template.courseName}</strong>
+            <small>{[template.departmentName, template.projectName, template.centerName, template.courseName].filter(Boolean).join(' · ') || 'No scope yet'}</small>
           </button>
         ))}
-        {!loading && templates.length === 0 && <p>No course DTR yet.</p>}
+        {!loading && templates.length === 0 && <p>No DTR yet.</p>}
       </aside>
       <section className="dtr-set-card">
         {loading ? <p>Loading...</p> : (
           <>
             <h2>{draft.id ? 'Edit DTR' : 'Create DTR'}</h2>
-            <p>Choose the department, project, course and batches. Then add the fields the trainer will fill.</p>
-            <div className="dtr-set-grid">
+            <p>Same order as the portal: department, project, center, course, then batch. You can select more than one in each.</p>
+            <div className="dtr-set-grid" ref={scopeRef}>
               <label>Report name
                 <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="RPL daily report" />
               </label>
-              <label className="dtr-check"> 
+              <label className="dtr-check">
                 <input type="checkbox" checked={draft.enabled} onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />
                 Trainers can fill this DTR
               </label>
-              <label>Department
-                <select value={draft.departmentId} onChange={(event) => setDraft({ ...draft, departmentId: event.target.value, projectId: '', courseId: '', batchIds: [], trainerIds: [] })}>
-                  <option value="">Select department</option>
-                  {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label>Project
-                <select value={draft.projectId} onChange={(event) => setDraft({ ...draft, projectId: event.target.value, courseId: '', batchIds: [], trainerIds: [] })}>
-                  <option value="">Select project</option>
-                  {visibleProjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <label>Course
-                <select value={draft.courseId} onChange={(event) => { setBatchesOpen(false); setTrainersOpen(false); setDraft({ ...draft, courseId: event.target.value, batchIds: [], trainerIds: [] }); }}>
-                  <option value="">Select course</option>
-                  {visibleCourses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <div className="dtr-multi" ref={batchMenuRef}>Batches
-                <button
-                  type="button"
-                  className="dtr-multi-btn"
-                  disabled={!draft.courseId || batchesLoading || !courseBatches.length}
-                  onClick={() => setBatchesOpen((open) => !open)}
-                >
-                  <span>{batchLabel}</span>
-                  <span aria-hidden="true">▾</span>
-                </button>
-                {batchesOpen && (
-                  <div className="dtr-multi-menu">
-                    <label className="dtr-batch-item">
-                      <input
-                        type="checkbox"
-                        checked={courseBatches.length > 0 && draft.batchIds.length === courseBatches.length}
-                        onChange={() => chooseBatches(draft.batchIds.length === courseBatches.length ? [] : courseBatches.map((item) => item.id))}
-                      />
-                      Select all
-                    </label>
-                    {courseBatches.map((batch) => (
-                      <label className="dtr-batch-item" key={batch.id}>
+              {[
+                ['department', 'Department', departmentLabel, departments, draft.departmentIds, chooseDepartments, false],
+                ['project', 'Project', projectLabel, visibleProjects, draft.projectIds, chooseProjects, !draft.departmentIds.length],
+                ['center', 'Center', centerLabel, visibleCenters, draft.centerIds, chooseCenters, !draft.projectIds.length],
+                ['course', 'Course', courseLabel, visibleCourses, draft.courseIds, chooseCourses, !draft.centerIds.length],
+                ['batch', 'Batches', batchLabel, visibleBatches, draft.batchIds, chooseBatches, !draft.courseIds.length],
+                ['trainer', 'Trainers', trainerLabel, trainerChoices, draft.trainerIds, (trainerIds) => setDraft({ ...draft, trainerIds }), !draft.batchIds.length],
+              ].map(([key, label, summary, options, selectedIds, onChange, disabled]) => (
+                <div className="dtr-multi" key={key}>
+                  {label}
+                  <button
+                    type="button"
+                    className="dtr-multi-btn"
+                    disabled={disabled || !options.length}
+                    onClick={() => {
+                      setMenuQuery('');
+                      setOpenMenu(openMenu === key ? '' : key);
+                    }}
+                  >
+                    <span>{summary}</span>
+                    <span aria-hidden="true">▾</span>
+                  </button>
+                  {openMenu === key && (
+                    <div className="dtr-multi-menu">
+                      <div className="dtr-multi-search">
                         <input
-                          type="checkbox"
-                          checked={draft.batchIds.includes(batch.id)}
-                          onChange={() => chooseBatches(draft.batchIds.includes(batch.id)
-                            ? draft.batchIds.filter((id) => id !== batch.id)
-                            : draft.batchIds.concat(batch.id))}
+                          value={menuQuery}
+                          placeholder={`Search ${String(label).toLowerCase()}`}
+                          onChange={(event) => setMenuQuery(event.target.value)}
+                          onMouseDown={(event) => event.stopPropagation()}
                         />
-                        {batch.name}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="dtr-multi" ref={trainerMenuRef}>Trainers
-                <button
-                  type="button"
-                  className="dtr-multi-btn"
-                  disabled={!draft.batchIds.length || !trainerChoices.length}
-                  onClick={() => setTrainersOpen((open) => !open)}
-                >
-                  <span>{trainerLabel}</span>
-                  <span aria-hidden="true">▾</span>
-                </button>
-                {trainersOpen && (
-                  <div className="dtr-multi-menu">
-                    <label className="dtr-batch-item">
-                      <input
-                        type="checkbox"
-                        checked={trainerChoices.length > 0 && draft.trainerIds.length === trainerChoices.length}
-                        onChange={() => setDraft({
-                          ...draft,
-                          trainerIds: draft.trainerIds.length === trainerChoices.length ? [] : trainerChoices.map((item) => item.id),
-                        })}
-                      />
-                      Select all
-                    </label>
-                    {trainerChoices.map((trainer) => (
-                      <label className="dtr-batch-item" key={trainer.id}>
-                        <input
-                          type="checkbox"
-                          checked={draft.trainerIds.includes(trainer.id)}
-                          onChange={() => setDraft({
-                            ...draft,
-                            trainerIds: draft.trainerIds.includes(trainer.id)
-                              ? draft.trainerIds.filter((id) => id !== trainer.id)
-                              : draft.trainerIds.concat(trainer.id),
-                          })}
-                        />
-                        {trainer.name}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      </div>
+                      {(() => {
+                        const query = menuQuery.trim().toLowerCase();
+                        const shown = query
+                          ? options.filter((item) => String(item.name || '').toLowerCase().includes(query))
+                          : options;
+                        const shownIds = shown.map((item) => item.id);
+                        const allShownSelected = shownIds.length > 0 && shownIds.every((id) => selectedIds.includes(id));
+                        return (
+                          <>
+                            <label className="dtr-batch-item">
+                              <input
+                                type="checkbox"
+                                checked={allShownSelected}
+                                onChange={() => onChange(allShownSelected
+                                  ? selectedIds.filter((id) => !shownIds.includes(id))
+                                  : [...new Set(selectedIds.concat(shownIds))])}
+                              />
+                              Select all
+                            </label>
+                            {shown.map((item) => (
+                              <label className="dtr-batch-item" key={item.id}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.includes(item.id)}
+                                  onChange={() => onChange(selectedIds.includes(item.id)
+                                    ? selectedIds.filter((id) => id !== item.id)
+                                    : selectedIds.concat(item.id))}
+                                />
+                                {item.name}
+                              </label>
+                            ))}
+                            {!shown.length && <p>No match</p>}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
               <h3 style={{ margin: 0 }}>Fields</h3>
@@ -556,7 +581,7 @@ const DtrSettings = () => {
             ))}
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14 }}>
               <button type="button" className="dtr-set-btn" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save DTR'}</button>
-              <Link to="/institute/training">Open trainer report</Link>
+              <Link to="/institute/daily-report">Open daily report</Link>
             </div>
             {message && <p className="dtr-note">{message}</p>}
           </>

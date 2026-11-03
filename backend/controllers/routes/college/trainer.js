@@ -1569,7 +1569,11 @@ const mapDtrSettings = (doc) => {
 };
 
 const loadDtrSettings = async (collegeId) => {
-	const doc = await DailyReportSetting.findOne({ college: collegeId }).lean();
+	const doc = await DailyReportSetting.findOne({
+		college: collegeId,
+		course: null,
+		$or: [{ courses: { $exists: false } }, { courses: { $size: 0 } }],
+	}).lean();
 	if (!doc) {
 		return {
 			enabled: true,
@@ -1772,9 +1776,14 @@ const loadReportBatchContext = async (req, batchId) => {
 	}
 
 	const [courseDoc, centerDoc] = await Promise.all([
-		batchDoc.courseId ? Courses.findById(batchDoc.courseId).select('name projectName project') : null,
+		batchDoc.courseId ? Courses.findById(batchDoc.courseId).select('name projectName project vertical') : null,
 		batchDoc.centerId ? Center.findById(batchDoc.centerId).select('name') : null,
 	]);
+	let verticalName = '';
+	if (courseDoc?.vertical) {
+		const vertical = await Vertical.findById(courseDoc.vertical).select('name').lean();
+		verticalName = vertical?.name || '';
+	}
 
 	return {
 		batch: batchDoc._id,
@@ -1783,6 +1792,7 @@ const loadReportBatchContext = async (req, batchId) => {
 		jobRole: courseDoc?.name || '',
 		project: courseDoc?.project || null,
 		projectName: courseDoc?.projectName || '',
+		verticalName,
 		center: centerDoc?._id || batchDoc.centerId || null,
 		centerName: centerDoc?.name || '',
 	};
@@ -1851,22 +1861,54 @@ const mapTemplateField = (field) => ({
 	maxFiles: Math.min(10, Math.max(1, Number(field.maxFiles) || 1)),
 });
 
-const mapTemplate = (doc) => ({
-	id: String(doc._id),
-	name: doc.name || 'Daily trainer report',
-	enabled: doc.enabled !== false,
-	departmentId: doc.vertical ? String(doc.vertical) : '',
-	departmentName: doc.verticalName || '',
-	projectId: doc.project ? String(doc.project) : '',
-	projectName: doc.projectName || '',
-	courseId: doc.course ? String(doc.course) : '',
-	courseName: doc.courseName || '',
-	batchIds: (doc.batches || []).map((id) => String(id)),
-	batchNames: Array.isArray(doc.batchNames) ? doc.batchNames : [],
-	trainerIds: (doc.trainers || []).map((id) => String(id)),
-	trainerNames: Array.isArray(doc.trainerNames) ? doc.trainerNames : [],
-	fields: (doc.fields || []).map(mapTemplateField),
-});
+const idStrings = (list, single) => {
+	const many = (Array.isArray(list) ? list : []).map((id) => String(id || '')).filter((id) => id && id !== 'null');
+	if (many.length) return many;
+	return single ? [String(single)] : [];
+};
+
+const nameList = (list, single) => {
+	const many = (Array.isArray(list) ? list : []).map((name) => String(name || '').trim()).filter(Boolean);
+	if (many.length) return many;
+	return single ? [String(single)] : [];
+};
+
+const mapTemplate = (doc) => {
+	const departmentIds = idStrings(doc.verticals, doc.vertical);
+	const departmentNames = nameList(doc.verticalNames, doc.verticalName);
+	const projectIds = idStrings(doc.projects, doc.project);
+	const projectNames = nameList(doc.projectNames, doc.projectName);
+	const centerIds = idStrings(doc.centers, doc.center);
+	const centerNames = nameList(doc.centerNames, doc.centerName);
+	const courseIds = idStrings(doc.courses, doc.course);
+	const courseNames = nameList(doc.courseNames, doc.courseName);
+	return {
+		id: String(doc._id),
+		name: doc.name || 'Daily trainer report',
+		enabled: doc.enabled !== false,
+		departmentIds,
+		departmentNames,
+		departmentId: departmentIds[0] || '',
+		departmentName: departmentNames.join(', '),
+		projectIds,
+		projectNames,
+		projectId: projectIds[0] || '',
+		projectName: projectNames.join(', '),
+		centerIds,
+		centerNames,
+		centerId: centerIds[0] || '',
+		centerName: centerNames.join(', '),
+		courseIds,
+		courseNames,
+		courseId: courseIds[0] || '',
+		courseName: courseNames.join(', '),
+		batchIds: (doc.batches || []).map((id) => String(id)),
+		batchNames: Array.isArray(doc.batchNames) ? doc.batchNames : [],
+		trainerIds: (doc.trainers || []).map((id) => String(id)),
+		trainerNames: Array.isArray(doc.trainerNames) ? doc.trainerNames : [],
+		fields: (doc.fields || []).map(mapTemplateField),
+	};
+};
 
 const normalizeTemplateFields = (fields) => {
 	if (!Array.isArray(fields) || !fields.length) {
@@ -1905,53 +1947,123 @@ const normalizeTemplateFields = (fields) => {
 	});
 };
 
-const loadTemplateScope = async (body) => {
-	if (!mongoose.Types.ObjectId.isValid(body.courseId)) {
-		throw reportHttpError(400, 'Select a course');
-	}
-	const courseDoc = await Courses.findById(body.courseId).select('name project projectName vertical');
-	if (!courseDoc) throw reportHttpError(404, 'Course not found');
-	let verticalName = '';
-	let projectName = courseDoc.projectName || '';
-	if (courseDoc.vertical) {
-		const vertical = await Vertical.findById(courseDoc.vertical).select('name');
-		verticalName = vertical?.name || '';
-	}
-	if (courseDoc.project) {
-		const project = await Project.findById(courseDoc.project).select('name');
-		projectName = project?.name || projectName;
-	}
+const uniqueObjectIds = (value) => [...new Set(
+	(Array.isArray(value) ? value : [value])
+		.map((id) => String(id || ''))
+		.filter((id) => mongoose.Types.ObjectId.isValid(id))
+)];
+
+const belongsToCollege = (doc, collegeId) => !doc?.college || String(doc.college) === String(collegeId);
+
+const orderedDocs = (ids, docs, missingMessage) => {
+	const byId = new Map(docs.map((doc) => [String(doc._id), doc]));
+	if (ids.some((id) => !byId.has(id))) throw reportHttpError(400, missingMessage);
+	return ids.map((id) => byId.get(id));
+};
+
+const loadTemplateScope = async (collegeId, body) => {
+	const departmentIds = uniqueObjectIds(body.departmentIds?.length ? body.departmentIds : body.departmentId);
+	const projectIds = uniqueObjectIds(body.projectIds?.length ? body.projectIds : body.projectId);
+	const centerIds = uniqueObjectIds(body.centerIds?.length ? body.centerIds : body.centerId);
+	const courseIds = uniqueObjectIds(body.courseIds?.length ? body.courseIds : body.courseId);
+	if (!departmentIds.length) throw reportHttpError(400, 'Select at least one department');
+	if (!projectIds.length) throw reportHttpError(400, 'Select at least one project');
+	if (!centerIds.length) throw reportHttpError(400, 'Select at least one center');
+	if (!courseIds.length) throw reportHttpError(400, 'Select at least one course');
+
+	const [verticalDocs, projectDocs, centerDocs, courseDocs] = await Promise.all([
+		Vertical.find({ _id: { $in: departmentIds } }).select('name college').lean(),
+		Project.find({ _id: { $in: projectIds } }).select('name college vertical').lean(),
+		Center.find({ _id: { $in: centerIds } }).select('name college projects').lean(),
+		Courses.find({ _id: { $in: courseIds } }).select('name college vertical project center centerId').lean(),
+	]);
+
+	const verticals = orderedDocs(
+		departmentIds,
+		verticalDocs.filter((doc) => belongsToCollege(doc, collegeId)),
+		'Select departments from this college'
+	);
+	const projects = orderedDocs(
+		projectIds,
+		projectDocs.filter((doc) => belongsToCollege(doc, collegeId) && departmentIds.includes(String(doc.vertical || ''))),
+		'Select projects from the chosen departments'
+	);
+	const centers = orderedDocs(
+		centerIds,
+		centerDocs.filter((doc) => belongsToCollege(doc, collegeId) && (doc.projects || []).some((id) => projectIds.includes(String(id)))),
+		'Select centers from the chosen projects'
+	);
+	const courses = orderedDocs(
+		courseIds,
+		courseDocs.filter((doc) => {
+			if (!belongsToCollege(doc, collegeId)) return false;
+			if (doc.vertical && !departmentIds.includes(String(doc.vertical))) return false;
+			if (doc.project && !projectIds.includes(String(doc.project))) return false;
+			const linkedCenters = [...(doc.center || []), doc.centerId]
+				.map((id) => String(id || ''))
+				.filter((id) => mongoose.Types.ObjectId.isValid(id));
+			return !linkedCenters.length || linkedCenters.some((id) => centerIds.includes(id));
+		}),
+		'Select courses from the chosen centers'
+	);
+
+	const verticalNames = verticals.map((doc) => doc.name || 'Department');
+	const projectNames = projects.map((doc) => doc.name || 'Project');
+	const centerNames = centers.map((doc) => doc.name || 'Center');
+	const courseNames = courses.map((doc) => doc.name || 'Course');
 	return {
-		vertical: body.departmentId && mongoose.Types.ObjectId.isValid(body.departmentId) ? body.departmentId : (courseDoc.vertical || null),
-		verticalName: String(body.departmentName || verticalName || ''),
-		project: body.projectId && mongoose.Types.ObjectId.isValid(body.projectId) ? body.projectId : (courseDoc.project || null),
-		projectName: String(body.projectName || projectName || ''),
-		course: courseDoc._id,
-		courseName: courseDoc.name || '',
+		verticals: verticals.map((doc) => doc._id),
+		verticalNames,
+		vertical: verticals[0]._id,
+		verticalName: verticalNames.join(', '),
+		projects: projects.map((doc) => doc._id),
+		projectNames,
+		project: projects[0]._id,
+		projectName: projectNames.join(', '),
+		centers: centers.map((doc) => doc._id),
+		centerNames,
+		center: centers[0]._id,
+		centerName: centerNames.join(', '),
+		courses: courses.map((doc) => doc._id),
+		courseNames,
+		course: courses[0]._id,
+		courseName: courseNames.join(', '),
 	};
 };
 
-const loadTemplateBatches = async (collegeId, courseId, batchIds) => {
-	const ids = [...new Set((Array.isArray(batchIds) ? batchIds : []).map(String).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+const loadTemplateBatches = async (collegeId, courseIds, centerIds, batchIds) => {
+	const ids = uniqueObjectIds(batchIds);
 	if (!ids.length) throw reportHttpError(400, 'Select at least one batch');
 	const docs = await Batch.find({
 		_id: { $in: ids },
-		courseId,
+		courseId: { $in: courseIds },
+		centerId: { $in: centerIds },
 		college: collegeId,
 	}).select('name').lean();
-	if (docs.length !== ids.length) throw reportHttpError(400, 'Select batches from this course');
-	const byId = new Map(docs.map((doc) => [String(doc._id), doc]));
+	const ordered = orderedDocs(ids, docs, 'Select batches from the chosen courses and centers');
 	return {
-		batches: ids.map((id) => byId.get(id)._id),
-		batchNames: ids.map((id) => byId.get(id).name || 'Batch'),
+		batches: ordered.map((doc) => doc._id),
+		batchNames: ordered.map((doc) => doc.name || 'Batch'),
 	};
 };
 
-const templateIncludesBatch = (template, batchId) => {
-	const ids = template?.batches || [];
-	if (!ids.length) return true;
-	return ids.some((id) => String(id) === String(batchId));
+const templateIdList = (list, single) => {
+	const ids = (Array.isArray(list) ? list : []).map((id) => String(id || '')).filter(Boolean);
+	if (ids.length) return ids;
+	return single ? [String(single)] : [];
 };
+
+const templateIncludesId = (list, single, value) => {
+	const ids = templateIdList(list, single);
+	if (!ids.length || !value) return true;
+	return ids.some((id) => id === String(value));
+};
+
+const templateIncludesBatch = (template, batchId) => templateIncludesId(template?.batches, null, batchId);
+
+const templateIncludesCourse = (template, courseId) => templateIncludesId(template?.courses, template?.course, courseId);
+
+const templateIncludesCenter = (template, centerId) => templateIncludesId(template?.centers, template?.center, centerId);
 
 const loadTemplateTrainers = async (batchIds, trainerIds) => {
 	const ids = [...new Set((Array.isArray(trainerIds) ? trainerIds : []).map(String).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
@@ -2073,18 +2185,10 @@ router.post('/daily-report-settings', authorizeTrainingAccess, async (req, res) 
 		if (!canSetDtr(req.user)) {
 			return res.status(403).json({ status: false, message: 'Only an academic coordinator can change DTR settings' });
 		}
-		const scope = await loadTemplateScope(req.body || {});
-		const batchScope = await loadTemplateBatches(req.college._id, scope.course, req.body?.batchIds);
+		const scope = await loadTemplateScope(req.college._id, req.body || {});
+		const batchScope = await loadTemplateBatches(req.college._id, scope.courses, scope.centers, req.body?.batchIds);
 		const trainerScope = await loadTemplateTrainers(batchScope.batches, req.body?.trainerIds);
 		const fields = normalizeTemplateFields(req.body?.fields);
-		const existing = await DailyReportSetting.findOne({ college: req.college._id, course: scope.course });
-		if (existing) {
-			return res.status(409).json({
-				status: false,
-				message: 'A DTR already exists for this course. Open it and add fields there.',
-				data: mapTemplate(existing),
-			});
-		}
 		const saved = await DailyReportSetting.create({
 			college: req.college._id,
 			name: String(req.body?.name || `${scope.courseName} DTR`).trim(),
@@ -2111,26 +2215,16 @@ router.put('/daily-report-settings/:id', authorizeTrainingAccess, async (req, re
 		}
 		const template = await DailyReportSetting.findOne({ _id: req.params.id, college: req.college._id });
 		if (!template) return res.status(404).json({ status: false, message: 'DTR not found' });
-		const scope = await loadTemplateScope(req.body || {});
-		const batchScope = await loadTemplateBatches(req.college._id, scope.course, req.body?.batchIds);
+		const scope = await loadTemplateScope(req.college._id, req.body || {});
+		const batchScope = await loadTemplateBatches(req.college._id, scope.courses, scope.centers, req.body?.batchIds);
 		const trainerScope = await loadTemplateTrainers(batchScope.batches, req.body?.trainerIds);
-		const clash = await DailyReportSetting.findOne({
-			_id: { $ne: template._id },
-			college: req.college._id,
-			course: scope.course,
-		}).select('_id');
-		if (clash) {
-			return res.status(409).json({ status: false, message: 'A DTR already exists for this course' });
-		}
 		template.name = String(req.body?.name || template.name).trim();
 		template.enabled = req.body?.enabled !== false;
 		Object.assign(template, scope, batchScope, trainerScope);
 		template.fields = normalizeTemplateFields(req.body?.fields);
-		template.markModified('fields');
-		template.markModified('batches');
-		template.markModified('batchNames');
-		template.markModified('trainers');
-		template.markModified('trainerNames');
+		['fields', 'verticals', 'verticalNames', 'projects', 'projectNames', 'centers', 'centerNames', 'courses', 'courseNames', 'batches', 'batchNames', 'trainers', 'trainerNames'].forEach((key) => {
+			template.markModified(key);
+		});
 		await template.save();
 		return res.status(200).json({ status: true, message: 'DTR saved', data: mapTemplate(template) });
 	} catch (error) {
@@ -2219,8 +2313,11 @@ router.post('/daily-reports', authorizeTrainingAccess, async (req, res) => {
 				return res.status(400).json({ status: false, message: 'Report date is required' });
 			}
 			const context = await loadReportBatchContext(req, req.body.batchId);
-			if (String(context.course || '') !== String(template.course)) {
-				return res.status(400).json({ status: false, message: 'This batch is not in the course for this DTR' });
+			if (!templateIncludesCourse(template, context.course)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the courses for this DTR' });
+			}
+			if (!templateIncludesCenter(template, context.center)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the centers for this DTR' });
 			}
 			if (!templateIncludesBatch(template, context.batch)) {
 				return res.status(400).json({ status: false, message: 'This batch is not included in the DTR' });
@@ -2248,11 +2345,11 @@ router.post('/daily-reports', authorizeTrainingAccess, async (req, res) => {
 				template: template._id,
 				reportDateKey,
 				reportDate: new Date(`${reportDateKey}T00:00:00.000Z`),
-				courseName: template.courseName || context.jobRole,
-				verticalName: template.verticalName || '',
+				courseName: context.jobRole || (template.courseNames || [])[0] || template.courseName || '',
+				verticalName: context.verticalName || (template.verticalNames || [])[0] || template.verticalName || '',
 				answers,
 				...context,
-				projectName: template.projectName || context.projectName,
+				projectName: context.projectName || (template.projectNames || [])[0] || template.projectName || '',
 			});
 			applyPortalSnapshot(report, template, answers);
 			await report.save();
@@ -2335,8 +2432,11 @@ router.put('/daily-reports/:id', authorizeTrainingAccess, async (req, res) => {
 				return res.status(400).json({ status: false, message: 'Report date is required' });
 			}
 			const context = await loadReportBatchContext(req, req.body.batchId);
-			if (String(context.course || '') !== String(template.course)) {
-				return res.status(400).json({ status: false, message: 'This batch is not in the course for this DTR' });
+			if (!templateIncludesCourse(template, context.course)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the courses for this DTR' });
+			}
+			if (!templateIncludesCenter(template, context.center)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the centers for this DTR' });
 			}
 			if (!templateIncludesBatch(template, context.batch)) {
 				return res.status(400).json({ status: false, message: 'This batch is not included in the DTR' });
@@ -2362,9 +2462,9 @@ router.put('/daily-reports/:id', authorizeTrainingAccess, async (req, res) => {
 				template: template._id,
 				reportDateKey,
 				reportDate: new Date(`${reportDateKey}T00:00:00.000Z`),
-				courseName: template.courseName || context.jobRole,
-				verticalName: template.verticalName || '',
-				projectName: template.projectName || context.projectName,
+				courseName: context.jobRole || (template.courseNames || [])[0] || template.courseName || '',
+				verticalName: context.verticalName || (template.verticalNames || [])[0] || template.verticalName || '',
+				projectName: context.projectName || (template.projectNames || [])[0] || template.projectName || '',
 				trainerName: req.user.name || report.trainerName,
 			});
 			applyPortalSnapshot(report, template, report.answers);

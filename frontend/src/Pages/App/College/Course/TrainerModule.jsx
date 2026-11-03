@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import TrainerTimetable from './TrainerTimetable';
-import DailyTrainerReport from './DailyTrainerReport';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -159,7 +158,6 @@ const FILTER_OPTIONS = {
 const MAIN_TABS = [
   { id: 'session', label: 'Sessions', icon: 'fa-chalkboard-teacher' },
   { id: 'student', label: 'Students', icon: 'fa-user-graduate' },
-  { id: 'report', label: 'Daily Report', icon: 'fa-clipboard-list' },
 ];
 
 
@@ -5204,17 +5202,6 @@ const TrainerModule = () => {
             </>
           )}
 
-          {mainTab === 'report' && (
-            <DailyTrainerReport
-              backendUrl={backendUrl}
-              token={token}
-              trainerName={trainerProfile.name}
-              userId={userData._id || userData.id}
-              sessions={sessions}
-              notify={notify}
-            />
-          )}
-
           {mainTab === 'student' && (
         <div className="dbr-student-view">
           {studentsLoading ? (
@@ -5433,7 +5420,7 @@ const PORTAL_CSS = `
   .dbr-filter-select { width: 100%; border: none; background: transparent; font-size: 13px; font-weight: 700; outline: none; cursor: pointer; color: #0f172a; }
 
   /* Main tabs */
-  .dbr-main-tabs { display: flex; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 12px; max-width: 560px; }
+  .dbr-main-tabs { display: flex; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 12px; max-width: 360px; }
   .dbr-main-tab { flex: 1; padding: 10px 16px; border: none; background: #fff; font-size: 13px; font-weight: 700; color: ${BLUE}; cursor: pointer; transition: 0.15s; }
   .dbr-main-tab:not(:last-child) { border-right: 1px solid #e2e8f0; }
   .dbr-main-tab--active { background: ${PINK}; color: #fff; }
