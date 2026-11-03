@@ -1528,6 +1528,14 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">{t('access_management')}</span>
                     </Link>
                   </li>
+                  {(permissions?.permission_type === 'Admin' || permissions?.custom_permissions?.can_be_academic_coordinator) && (
+                  <li className={`nav-item ${location.pathname === '/institute/dtr-settings' ? 'active' : ''}`}>
+                    <Link to="/institute/dtr-settings" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faClipboardList} />
+                      <span className="menu-title">DTR</span>
+                    </Link>
+                  </li>
+                  )}
                   {permissions?.permission_type === 'Admin' && (
                     <li className={`nav-item ${location.pathname === '/institute/meta-lead-ads' ? 'active' : ''}`}>
                       <Link to="/institute/meta-lead-ads" onClick={() => handleSidebarClose()}>
