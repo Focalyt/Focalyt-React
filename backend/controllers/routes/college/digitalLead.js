@@ -1525,6 +1525,9 @@ function extractVoicexPhone(payload) {
     return digits.length >= 10 ? digits.slice(-10) : '';
 }
 
+const SHORT_CALL_STATUS_TITLE = 'Short Call';
+const SHORT_CALL_MAX_SECONDS = 40;
+
 function mapDispositionToStatusTitle(disposition, callStatus) {
     const text = String(disposition || '').trim();
     if (text) {
@@ -1533,6 +1536,49 @@ function mapDispositionToStatusTitle(disposition, callStatus) {
     }
     if (String(callStatus || '').toUpperCase() === 'DONTCALL') return 'JUNK';
     return null;
+}
+
+function isNoResultDisposition(disposition) {
+    const text = String(disposition || '').trim().toLowerCase();
+    return !text || ['-', 'na', 'n/a', 'n.a.', 'none', 'null'].includes(text);
+}
+
+function parseSpokenDurationSeconds(text) {
+    const value = String(text || '').trim();
+    if (!value || value === '-') return null;
+    const minutes = value.match(/(\d+)\s*minute/i);
+    const seconds = value.match(/(\d+)\s*second/i);
+    if (!minutes && !seconds) return null;
+    return (minutes ? Number(minutes[1]) * 60 : 0) + (seconds ? Number(seconds[1]) : 0);
+}
+
+function callDurationSeconds(payload) {
+    const history = payload?.callHistory || {};
+    const raw = Number(history.callDuration ?? history.totalCallTime);
+    if (Number.isFinite(raw) && raw > 0) {
+        // VoiceX sends milliseconds: 105000 is 105 seconds, 12000 is 12 seconds.
+        return raw >= 1000 ? raw / 1000 : raw;
+    }
+    const crm = payload?.customer_crm_data || {};
+    return parseSpokenDurationSeconds(crm.DurationOfCall || payload?.DurationOfCall);
+}
+
+function isAnsweredByPerson(payload) {
+    const voicemail = String(payload?.customer_crm_data?.voicemail_status || '').trim().toLowerCase();
+    if (voicemail === 'yes') return false;
+    const callStatus = String(payload?.callHistory?.callStatus || payload?.callStatus || '').trim().toUpperCase();
+    if (['ANSWER', 'ANSWERED'].includes(callStatus)) return true;
+    if (['NOANSWER', 'NO_ANSWER', 'BUSY', 'FAILED', 'CANCEL', 'CANCELLED', 'DONTCALL'].includes(callStatus)) {
+        return false;
+    }
+    return callDurationSeconds(payload) > 0;
+}
+
+function isShortAnsweredCall(payload, disposition) {
+    if (!isNoResultDisposition(disposition)) return false;
+    if (!isAnsweredByPerson(payload)) return false;
+    const seconds = callDurationSeconds(payload);
+    return seconds != null && seconds > 0 && seconds <= SHORT_CALL_MAX_SECONDS;
 }
 
 async function findAppliedCourseFromWebhook(payload) {
@@ -1644,6 +1690,9 @@ router.post("/voicex-webhook", async (req, res) => {
                 let mappedTitle = null;
                 if (shouldMapStatus) {
                     mappedTitle = mapDispositionToStatusTitle(disposition, callStatus);
+                    if (!mappedTitle && isShortAnsweredCall(payload, disposition)) {
+                        mappedTitle = SHORT_CALL_STATUS_TITLE;
+                    }
                     if (mappedTitle) {
                         const newStatus = await resolveStatusForCourse(doc, mappedTitle);
                         if (newStatus) {

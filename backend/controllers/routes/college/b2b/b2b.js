@@ -4828,6 +4828,14 @@ router.put('/leads/:id/milestone', isCollege, async (req, res) => {
 			return res.status(404).json({ status: false, message: 'Lead not found' });
 		}
 
+		const statusDoc = lead.status
+			? await StatusB2b.findById(lead.status).select('title name').lean()
+			: null;
+		const statusTitle = String(statusDoc?.title || statusDoc?.name || '').trim().toLowerCase();
+		if (statusTitle !== 'won') {
+			return res.status(400).json({ status: false, message: 'Milestone can be set when the lead status is Won' });
+		}
+
 		const isAdmin = req.user.permissions?.permission_type === 'Admin';
 		if (!isAdmin) {
 			const teamMembers = await getAllTeamMembers(req.user._id);

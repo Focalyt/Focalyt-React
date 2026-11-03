@@ -7,7 +7,8 @@ const PAGE_SIZE = 20;
 const FILTERS = [
   { id: 'ai-called', label: 'AI called', countKey: 'aiCalled' },
   { id: 'changed', label: 'Status changed', countKey: 'changed' },
-  { id: 'same', label: 'Status same', countKey: 'same' },
+  { id: 'same', label: 'Status matched', countKey: 'same' },
+  { id: 'nearly', label: 'Nearly match', countKey: 'nearly' },
   { id: 'all', label: 'All leads', countKey: null },
 ];
 
@@ -20,10 +21,18 @@ const DATE_PRESETS = [
 ];
 
 /* ---------- helpers (logic unchanged) ---------- */
+const NEARLY_MATCH_STATUSES = new Set(['hot', 'warm', 'won']);
+
 const normalizeStatus = (value) => {
   const title = String(value || '').trim();
   if (!title || /^no status$/i.test(title)) return 'Untouch';
   return title;
+};
+
+const isNearlyMatched = (aiStatus, humanStatus) => {
+  const ai = String(aiStatus || '').trim().toLowerCase();
+  const human = String(humanStatus || '').trim().toLowerCase();
+  return ai !== human && NEARLY_MATCH_STATUSES.has(ai) && NEARLY_MATCH_STATUSES.has(human);
 };
 
 const normalizeRemarks = (value) => {
@@ -191,7 +200,7 @@ const Lead = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [compareCounts, setCompareCounts] = useState({ aiCalled: 0, changed: 0, same: 0 });
+  const [compareCounts, setCompareCounts] = useState({ aiCalled: 0, changed: 0, same: 0, nearly: 0 });
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('ai-called');
@@ -225,6 +234,7 @@ const Lead = () => {
       if (activeFilter !== 'all') params.aiCalled = 'true';
       if (activeFilter === 'changed') params.statusDiff = 'true';
       if (activeFilter === 'same') params.statusDiff = 'false';
+      if (activeFilter === 'nearly') params.statusNear = 'true';
       if (fromDate) {
         const iso = new Date(`${fromDate}T00:00:00`).toISOString();
         if (activeFilter === 'all') params.createdFromDate = iso;
@@ -253,11 +263,12 @@ const Lead = () => {
         aiCalled: Number(response.data.compare?.aiCalled || 0),
         changed: Number(response.data.compare?.changed || 0),
         same: Number(response.data.compare?.same || 0),
+        nearly: Number(response.data.compare?.nearly || 0),
       });
     } catch (err) {
       setLeads([]);
       setTotalCount(0);
-      setCompareCounts({ aiCalled: 0, changed: 0, same: 0 });
+      setCompareCounts({ aiCalled: 0, changed: 0, same: 0, nearly: 0 });
       setError(err.response?.data?.message || err.message || 'Failed to load leads');
     } finally {
       setLoading(false);
@@ -334,6 +345,8 @@ const Lead = () => {
       aiCallAt: lead?.aiVoice?.lastWebhookAt || '',
       createdAt: lead?.createdAt || '',
       changed,
+      statusMatched: typeof lead?.statusMatched === 'boolean' ? lead.statusMatched : !changed,
+      nearlyMatched: typeof lead?.nearlyMatched === 'boolean' ? lead.nearlyMatched : isNearlyMatched(aiStatus, humanStatus),
     };
   }), [leads]);
 
@@ -548,6 +561,7 @@ const Lead = () => {
               <col className="ah-col-status" />
               <col className="ah-col-remark" />
               <col className="ah-col-compare" />
+              <col className="ah-col-compare" />
             </colgroup>
             <thead>
               <tr>
@@ -561,7 +575,8 @@ const Lead = () => {
                 <th>AI remarks</th>
                 <th>Human status</th>
                 <th>Human remarks</th>
-                <th>Compare</th>
+                <th>Status matched</th>
+                <th>Nearly match</th>
               </tr>
             </thead>
             <tbody>
@@ -569,7 +584,7 @@ const Lead = () => {
                 const when = formatDateTime(row.aiCallAt || row.createdAt);
                 const whenKind = row.aiCallAt ? 'AI call' : 'Created';
                 return (
-                <tr key={row.id} className={row.changed ? 'is-changed' : 'is-same'}>
+                <tr key={row.id} className={row.statusMatched ? 'is-same' : row.nearlyMatched ? 'is-near' : 'is-changed'}>
                   <td>
                     <div className="ah-person" title={tip(row.name)}>
                       <span className="ah-avatar" aria-hidden="true">{initials(row.name)}</span>
@@ -598,10 +613,18 @@ const Lead = () => {
                   <td><RemarkButton label="Human remarks" text={row.humanRemarks} name={row.name} /></td>
                   <td>
                     <span
-                      className={`ah-pill ${row.changed ? 'is-changed' : 'is-same'}`}
-                      title={row.changed ? `${row.aiStatus} → ${row.humanStatus}` : 'Same'}
+                      className={`ah-pill ${row.statusMatched ? 'is-same' : 'is-changed'}`}
+                      title={row.statusMatched ? `${row.aiStatus} matches ${row.humanStatus}` : `${row.aiStatus} → ${row.humanStatus}`}
                     >
-                      {row.changed ? 'Changed' : 'Same'}
+                      {row.statusMatched ? 'Yes' : 'No'}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`ah-pill ${row.nearlyMatched ? 'is-near' : 'is-no'}`}
+                      title={row.nearlyMatched ? `${row.aiStatus} and ${row.humanStatus} are close (Hot, Warm, Won)` : 'Not a near match'}
+                    >
+                      {row.nearlyMatched ? 'Yes' : 'No'}
                     </span>
                   </td>
                 </tr>
@@ -685,7 +708,7 @@ const Lead = () => {
         .ah-btn:disabled { opacity: .45; cursor: not-allowed; }
 
         /* tabs */
-        .ah-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+        .ah-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
         .ah-tab { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; transition: border-color .15s, box-shadow .15s; }
         .ah-tab:hover { border-color: #cfd3de; }
         .ah-tab__label { color: var(--muted); font-weight: 600; font-size: 12px; }
@@ -693,6 +716,7 @@ const Lead = () => {
         .ah-tab--ai-called strong { color: var(--ai); }
         .ah-tab--changed strong { color: var(--warn); }
         .ah-tab--same strong { color: var(--human); }
+        .ah-tab--nearly strong { color: #c2410c; }
         .ah-tab.is-active { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
         .ah-tab.is-active .ah-tab__label { color: var(--ink); }
 
@@ -743,7 +767,7 @@ const Lead = () => {
         .ah-icon-btn:hover { color: var(--ink); }
 
         .ah-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: auto; }
-        .ah-table { width: 100%; min-width: 1280px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+        .ah-table { width: 100%; min-width: 1404px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 12px; }
         .ah-col-lead { width: 150px; min-width: 150px; }
         .ah-col-mobile { width: 118px; min-width: 118px; }
         .ah-col-course { width: 160px; min-width: 160px; }
@@ -752,13 +776,14 @@ const Lead = () => {
         .ah-col-call { width: 72px; min-width: 72px; }
         .ah-col-status { width: 108px; min-width: 108px; }
         .ah-col-remark { width: 190px; min-width: 190px; }
-        .ah-col-compare { width: 88px; min-width: 88px; }
+        .ah-col-compare { width: 124px; min-width: 124px; }
         .ah-table th { position: sticky; top: 0; text-align: left; background: #fafbfd; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; padding: 0 10px; height: 36px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ah-table td { padding: 0 10px; height: 40px; min-height: 40px; max-height: 40px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--ink); background: var(--surface); font-size: 12px; overflow: hidden; white-space: nowrap; }
         .ah-table tbody tr:last-child td { border-bottom: none; }
         .ah-table tbody tr:hover td { background: #fafbfd; }
         .ah-table tbody tr td:first-child { box-shadow: inset 3px 0 0 var(--human); }
         .ah-table tbody tr.is-changed td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+        .ah-table tbody tr.is-near td:first-child { box-shadow: inset 3px 0 0 #ea580c; }
         .ah-clip { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ah-person { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; height: 40px; }
         .ah-person strong { font-weight: 600; font-size: 12.5px; flex: 1; }
@@ -768,6 +793,7 @@ const Lead = () => {
         .ah-pill.is-yes, .ah-pill.is-same { background: var(--human-soft); color: var(--human); }
         .ah-pill.is-no { background: #f1f2f6; color: var(--muted); }
         .ah-pill.is-changed { background: var(--warn-soft); color: var(--warn); }
+        .ah-pill.is-near { background: #fff7ed; color: #c2410c; }
         .ah-status--ai { background: var(--ai-soft); color: var(--ai); }
         .ah-status--human { background: var(--human-soft); color: var(--human); }
         .ah-remark { width: 100%; text-align: left; background: transparent; border: none; padding: 0; color: var(--ink); font-size: 12px; line-height: 40px; }

@@ -9,9 +9,9 @@ const DataDeletion = () => {
         <div className="col-lg-10 col-xl-8">
           <div className="card border-0 shadow-lg mb-5">
             <div className="card-header text-white text-center py-4" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
-              <h1 className="display-4 mb-3">🗑️ User Data Deletion Instructions</h1>
-              <h4 className="fw-light">Focalyt Portal - Educational Management Platform</h4>
-              <p className="mb-0 opacity-75">How to request deletion of personal data collected through Meta Lead Ads and Focalyt CRM</p>
+              <h1 className="h2 mb-3">User Data Deletion Instructions</h1>
+              <p className="mb-1">Focalyt CRM Lead Integration</p>
+              <p className="mb-0 opacity-75">How to request deletion of personal data collected through Facebook and Instagram Lead Ads and stored in Focalyt CRM</p>
             </div>
           </div>
 
@@ -19,15 +19,15 @@ const DataDeletion = () => {
             <div className="d-flex align-items-center">
               <span className="fs-2 me-3">📖</span>
               <div>
-                <h5 className="alert-heading mb-2">Overview</h5>
-                <p className="mb-0">This page explains how you can request deletion of personal data that Focalyt collected when you submitted a Meta (Facebook or Instagram) Lead Ad form, or that is stored in Focalyt CRM. Deletion requests are handled by email. There is currently no in-app or self-service “Delete Lead” option in Focalyt CRM.</p>
+                <h2 className="alert-heading h5 mb-2">Overview</h2>
+                <p className="mb-0">This page explains how you can ask <strong>Focal Skill Development Pvt. Ltd.</strong> (Focalyt) to delete personal data that the Meta application <strong>Focalyt CRM Lead Integration</strong> stored in Focalyt CRM after you submitted a Facebook or Instagram Lead Ad form. Deletion requests are handled by email to <a href="mailto:info@focalyt.com">info@focalyt.com</a>. There is no in-app or self-service delete option, and opening this page does not delete a record.</p>
               </div>
             </div>
           </div>
 
           <div className="card shadow-sm mb-4">
             <div className="card-header bg-info text-white">
-              <h3 className="card-title mb-0">📊 1. Data This Request Can Cover</h3>
+              <h2 className="card-title h3 mb-0">📊 1. Data This Request Can Cover</h2>
             </div>
             <div className="card-body">
               <div className="row g-4">
@@ -37,13 +37,14 @@ const DataDeletion = () => {
                       <h5 className="mb-0">📱 Meta Lead Ads</h5>
                     </div>
                     <div className="card-body">
-                      <p className="small">Personal information you submitted on a Focalyt or partner institute Lead Ad form, which may include:</p>
+                      <p className="small">Personal information Focalyt CRM Lead Integration stores from a connected Lead Ad form:</p>
                       <ul className="list-unstyled">
                         <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Name</li>
-                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Phone number</li>
-                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Email address</li>
-                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>City or other form fields you provided</li>
-                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Lead form, campaign, and related Meta identifiers stored with the lead</li>
+                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Mobile number</li>
+                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Email address, when the form included one</li>
+                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>WhatsApp number, or the mobile number when the form had no separate WhatsApp answer</li>
+                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Gender, only when the answer was male or female</li>
+                        <li className="mb-2"><i className="bi bi-dot text-primary fs-4"></i>Lead ID, Page ID, Form ID, and, when Meta sent them, Ad ID and submission time</li>
                       </ul>
                     </div>
                   </div>
@@ -70,7 +71,7 @@ const DataDeletion = () => {
 
           <div className="card shadow-sm mb-4">
             <div className="card-header bg-success text-white">
-              <h3 className="card-title mb-0">✉️ 2. How to Request Deletion by Email</h3>
+              <h2 className="card-title h3 mb-0">✉️ 2. How to Request Deletion by Email</h2>
             </div>
             <div className="card-body">
               <p>To request deletion of your personal data, send an email to <a href="mailto:info@focalyt.com"><strong>info@focalyt.com</strong></a> with the subject line <strong>User Data Deletion Request</strong>.</p>
@@ -78,12 +79,12 @@ const DataDeletion = () => {
               <div className="row g-3">
                 <div className="col-md-6">
                   <div className="p-3 bg-light rounded h-100">
-                    <h6 className="text-primary mb-2">Required</h6>
+                    <h6 className="text-primary mb-2">Needed to find the record</h6>
                     <ul className="small mb-0">
                       <li>Full name</li>
-                      <li>Phone number used on the lead form</li>
-                      <li>Email address used on the lead form</li>
+                      <li>Mobile number used on the lead form</li>
                       <li>A clear statement that you want your personal data deleted</li>
+                      <li>Email address, if the form included one</li>
                     </ul>
                   </div>
                 </div>
@@ -102,14 +103,14 @@ const DataDeletion = () => {
               <div className="alert alert-secondary mt-2 mb-0">
                 <p className="small mb-1"><strong>To:</strong> info@focalyt.com</p>
                 <p className="small mb-1"><strong>Subject:</strong> User Data Deletion Request</p>
-                <p className="small mb-0">I request deletion of my personal data collected through Meta Lead Ads and stored in Focalyt CRM. My name is [your name], phone [your phone], email [your email]. I submitted a lead form on or around [date], for [institute or course if known].</p>
+                <p className="small mb-0">I request deletion of my personal data collected through Focalyt CRM Lead Integration and stored in Focalyt CRM. My name is [your name], mobile [your mobile], email [your email, if you provided one]. I submitted a Facebook or Instagram lead form on or around [date], for [institute, course, or job if known].</p>
               </div>
             </div>
           </div>
 
           <div className="card shadow-sm mb-4">
             <div className="card-header bg-warning text-dark">
-              <h3 className="card-title mb-0">🛠️ 3. How Focalyt Processes Your Request</h3>
+              <h2 className="card-title h3 mb-0">🛠️ 3. How Focalyt Processes Your Request</h2>
             </div>
             <div className="card-body">
               <div className="alert alert-warning border-0 mb-3">
@@ -117,8 +118,8 @@ const DataDeletion = () => {
               </div>
               <ol className="mb-0">
                 <li className="mb-2">We acknowledge your email and verify that we can identify the matching records.</li>
-                <li className="mb-2">A Focalyt team member reviews Meta Lead Ads and CRM records associated with the details you provided.</li>
-                <li className="mb-2">If the request is verified, we manually remove or de-identify the personal data we hold for that request, using our internal data-handling process.</li>
+                <li className="mb-2">A Focalyt team member reviews the Focalyt CRM record and the stored Lead Ads identifiers associated with the details you provided. The educational institute does not complete this request through a self-service control.</li>
+                <li className="mb-2">If the request is verified, Focalyt manually removes or de-identifies the matching personal data held in Focalyt CRM. There is no automatic deletion.</li>
                 <li className="mb-0">We reply by email to confirm the outcome of the request.</li>
               </ol>
             </div>
@@ -126,7 +127,7 @@ const DataDeletion = () => {
 
           <div className="card shadow-sm mb-4">
             <div className="card-header bg-primary text-white">
-              <h3 className="card-title mb-0">⏱️ 4. Timeframe and Scope</h3>
+              <h2 className="card-title h3 mb-0">⏱️ 4. Timeframe and Scope</h2>
             </div>
             <div className="card-body">
               <div className="row g-4">
@@ -139,7 +140,7 @@ const DataDeletion = () => {
                 <div className="col-md-6">
                   <div className="p-3 border rounded h-100">
                     <h6 className="text-success">What this does not change automatically</h6>
-                    <p className="small mb-0">This process does not change Meta’s own copies of your lead form data. To manage data held by Meta, use Facebook or Instagram settings and Meta’s tools in addition to contacting Focalyt.</p>
+                    <p className="small mb-0">Deleting Focalyt CRM information does not delete information Meta stores independently. To manage data held by Meta, use Facebook or Instagram settings and Meta’s own tools in addition to contacting Focalyt.</p>
                   </div>
                 </div>
               </div>
@@ -149,7 +150,7 @@ const DataDeletion = () => {
 
           <div className="card shadow-sm mb-4">
             <div className="card-header bg-danger text-white">
-              <h3 className="card-title mb-0">🔐 5. Identity Verification</h3>
+              <h2 className="card-title h3 mb-0">🔐 5. Identity Verification</h2>
             </div>
             <div className="card-body">
               <p className="mb-0">To protect other people’s data, we only process a deletion request after we can reasonably match it to records we hold. We may ask you to confirm a phone number or email already associated with the lead. We will not delete records based on incomplete or unmatched requests.</p>
@@ -159,10 +160,11 @@ const DataDeletion = () => {
           <div className="text-center mb-5">
             <div className="card border-0 bg-light">
               <div className="card-body">
+                <p className="mb-2"><strong>Legal Company:</strong> Focal Skill Development Pvt. Ltd.</p>
                 <p className="mb-2"><strong>Contact:</strong> <a href="mailto:info@focalyt.com">info@focalyt.com</a></p>
-                <p className="mb-2"><strong>Related policy:</strong> <a href="/privacy-policy">Privacy Policy</a></p>
-                <p className="mb-2"><strong>Last Updated:</strong> 27th October 2026</p>
-                <p className="mb-0">These instructions apply to personal data Focalyt collects through Meta Lead Ads and stores in Focalyt CRM. They do not create a self-service delete function in the product.</p>
+                <p className="mb-2"><strong>Related policy:</strong> <a href="https://focalyt.com/privacy-policy">Privacy Policy</a></p>
+                <p className="mb-2"><strong>Last Updated:</strong> 2nd November 2026</p>
+                <p className="mb-0">These instructions apply to personal data Focalyt CRM Lead Integration stores in Focalyt CRM. They do not create a self-service delete function, and they do not delete Meta’s independently retained copy.</p>
               </div>
             </div>
           </div>

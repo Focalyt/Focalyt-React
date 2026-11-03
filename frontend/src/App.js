@@ -163,6 +163,7 @@ import StatusB2C from './Pages/App/College/Status/statusB2C'
 import MilestoneB2C from './Pages/App/College/Status/milestoneB2C'
 import MilestoneB2B from './Pages/App/College/Status/milestoneB2B'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
+import PrivacyPolicyPage from './Pages/App/College/Register/privacyPolicyPage';
 import DataDeletion from './Pages/App/College/Register/dataDeletion';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
 import Attendance from './Pages/App/College/Attendance/Attendance';
@@ -322,6 +323,7 @@ const Layout = () => {
 
         <Route path="/institute/login" element={<CollegeLogin />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacypolicy" element={<PrivacyPolicyPage />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/institute/register" element={<CollegeRegister />} />

@@ -2609,7 +2609,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
 			hasFollowUpCall, hasFollowUpVisit, leadSource, includeKyc,
-			aiCalled, aiCallFromDate, aiCallToDate, statusDiff,
+			aiCalled, aiCallFromDate, aiCallToDate, statusDiff, statusNear,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2731,6 +2731,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			aiCallFromDate,
 			aiCallToDate,
 			statusDiff,
+			statusNear,
 		};
 
 		const countPipeline = buildSimplifiedPipeline({
@@ -2772,7 +2773,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		const facetCount = (key) => Number(countResult?.[key]?.[0]?.n || 0);
 		const totalCount = compareMode ? facetCount('total') : countResult;
 		const compare = compareMode
-			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same') }
+			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same'), nearly: facetCount('nearly') }
 			: null;
 
 
@@ -2949,6 +2950,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					_id: doc._aiLeadStatus?._id || null,
 					title: doc._aiLeadStatus?.title || 'Untouch',
 				},
+				statusMatched: statusesMatch(doc._leadStatus, doc._aiLeadStatus),
+				nearlyMatched: statusesNearlyMatch(doc._leadStatus, doc._aiLeadStatus),
 				_leadSubStatus: selectedSubstatus ? selectedSubstatus._id : doc._leadSubStatus || null,
 				selectedSubstatus: {
 					_id: selectedSubstatus ? selectedSubstatus._id : null,
@@ -2971,6 +2974,16 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				kyc: doc.kyc === true,
 				kycDoneAt: doc.kycDoneAt || null,
 				kycDoneBy: doc.kycDoneBy || null,
+				_milestone: doc._milestone || null,
+				milestoneHistory: Array.isArray(doc.milestoneHistory)
+					? doc.milestoneHistory.map((row) => ({
+						milestone: row.milestone,
+						title: row.title || '',
+						reachedAt: row.reachedAt || null,
+						droppedOut: row.droppedOut === true,
+						droppedAt: row.droppedAt || null,
+					}))
+					: [],
 				followup,
 				followUpCall,
 				followUpVisit,
@@ -3949,12 +3962,31 @@ async function resolveB2cCandidateSearchIds(name) {
 	return rows.map((row) => row._id);
 }
 
+function comparableStatusTitle(status) {
+	const title = String(status?.title || '').trim().toLowerCase();
+	if (!title || title === 'no status') return 'untouch';
+	return title;
+}
+
+const NEARLY_MATCH_STATUSES = new Set(['hot', 'warm', 'won']);
+
+function statusesMatch(humanStatus, aiStatus) {
+	return comparableStatusTitle(humanStatus) === comparableStatusTitle(aiStatus);
+}
+
+function statusesNearlyMatch(humanStatus, aiStatus) {
+	const human = comparableStatusTitle(humanStatus);
+	const ai = comparableStatusTitle(aiStatus);
+	return human !== ai && NEARLY_MATCH_STATUSES.has(human) && NEARLY_MATCH_STATUSES.has(ai);
+}
+
 function aiCompareRequested(filters = {}) {
 	return String(filters.aiCalled) === 'true'
 		|| Boolean(filters.aiCallFromDate)
 		|| Boolean(filters.aiCallToDate)
 		|| filters.statusDiff === 'true'
-		|| filters.statusDiff === 'false';
+		|| filters.statusDiff === 'false'
+		|| filters.statusNear === 'true';
 }
 
 function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
@@ -4010,24 +4042,37 @@ function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
 
 	const sameMatch = { $expr: { $eq: ['$_cmpAi', '$_cmpHuman'] } };
 	const changedMatch = { $expr: { $ne: ['$_cmpAi', '$_cmpHuman'] } };
-	const narrowed = filters.statusDiff === 'true'
-		? changedMatch
-		: filters.statusDiff === 'false'
-			? sameMatch
-			: null;
-	if (narrowed) pipeline.push({ $match: narrowed });
+	const nearlyMatch = {
+		$expr: {
+			$and: [
+				{ $ne: ['$_cmpAi', '$_cmpHuman'] },
+				{ $in: ['$_cmpAi', ['hot', 'warm', 'won']] },
+				{ $in: ['$_cmpHuman', ['hot', 'warm', 'won']] },
+			],
+		},
+	};
+	const narrowed = filters.statusNear === 'true'
+		? nearlyMatch
+		: filters.statusDiff === 'true'
+			? changedMatch
+			: filters.statusDiff === 'false'
+				? sameMatch
+				: null;
 
 	if (forCount) {
 		pipeline.push({
 			$facet: {
-				total: [{ $count: 'n' }],
+				total: narrowed ? [{ $match: narrowed }, { $count: 'n' }] : [{ $count: 'n' }],
 				aiCalled: [{ $match: { 'aiVoice.lastEvent': 'CALL_COMPLETED' } }, { $count: 'n' }],
 				same: [{ $match: sameMatch }, { $count: 'n' }],
 				changed: [{ $match: changedMatch }, { $count: 'n' }],
+				nearly: [{ $match: nearlyMatch }, { $count: 'n' }],
 			},
 		});
 		return true;
 	}
+
+	if (narrowed) pipeline.push({ $match: narrowed });
 
 	pipeline.push({ $project: { _cmpHumanDoc: 0, _cmpAiDoc: 0, _cmpHuman: 0, _cmpAi: 0 } });
 	return false;
@@ -4319,6 +4364,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 			followUpCall: 1,
 			followUpVisit: 1,
 			aiVoice: 1,
+			_milestone: 1,
+			milestoneHistory: 1,
 		}
 	});
 
@@ -8614,7 +8661,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 	}
 });
 
-// Save the B2C milestone chosen on an admitted lead, the same way status is stored on the lead.
+// Save the B2C milestone chosen on a Won lead, the same way status is stored on the lead.
 router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 	try {
 		const { id } = req.params;
@@ -8628,15 +8675,18 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 			return res.status(400).json({ success: false, message: 'Invalid lead or milestone' });
 		}
 
-		const doc = await AppliedCourses.findById(id).populate('_course', 'project college name');
+		const doc = await AppliedCourses.findById(id)
+			.populate('_course', 'project college name')
+			.populate('_leadStatus', 'title');
 		if (!doc) {
 			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
 		}
 		if (String(doc._course?.college) !== String(collegeId)) {
 			return res.status(403).json({ success: false, message: 'Lead does not belong to this college' });
 		}
-		if (doc.admissionDone !== true) {
-			return res.status(400).json({ success: false, message: 'Milestone can be set after admission' });
+		const statusTitle = String(doc._leadStatus?.title || '').trim().toLowerCase();
+		if (statusTitle !== 'won') {
+			return res.status(400).json({ success: false, message: 'Milestone can be set when the lead status is Won' });
 		}
 
 		const milestone = await B2cMilestone.findOne({ _id: milestoneId, college: collegeId }).lean();
@@ -8667,6 +8717,8 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 			milestone: row.milestone,
 			title: row.title || '',
 			reachedAt: row.reachedAt || null,
+			droppedOut: row.droppedOut === true,
+			droppedAt: row.droppedAt || null,
 		}));
 
 		await ensureMilestonePositions(collegeId);
@@ -8697,9 +8749,18 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 			}
 		}
 
-		const currentId = doc.milestoneHistory.length
-			? String(doc.milestoneHistory[doc.milestoneHistory.length - 1].milestone)
-			: '';
+		const droppedRow = doc.milestoneHistory.find((row) => row.droppedOut);
+		if (droppedRow) {
+			return res.status(400).json({
+				success: false,
+				message: `This lead dropped out from "${droppedRow.title || 'a milestone'}". The next milestone cannot be updated.`,
+			});
+		}
+
+		const currentRow = doc.milestoneHistory.length
+			? doc.milestoneHistory[doc.milestoneHistory.length - 1]
+			: null;
+		const currentId = currentRow ? String(currentRow.milestone) : '';
 		const requestedId = String(milestone._id);
 
 		if (reachedIds.has(requestedId)) {
@@ -8762,6 +8823,114 @@ router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
 		});
 	} catch (error) {
 		console.error('[Lead Milestone Change] Error:', error);
+		return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
+	}
+});
+
+// Mark dropout on one reached milestone. This does not use the admission dropout fields.
+router.put('/lead/milestone_dropout/:id', [isCollege], async (req, res) => {
+	try {
+		const { id } = req.params;
+		const requestedMilestoneId = req.body.milestoneId;
+		const userId = req.user._id;
+		const collegeId = req.user?.college?._id;
+		if (!collegeId) {
+			return res.status(400).json({ success: false, message: 'College not found for this user' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(String(requestedMilestoneId || ''))) {
+			return res.status(400).json({ success: false, message: 'Invalid lead or milestone' });
+		}
+
+		const doc = await AppliedCourses.findById(id)
+			.populate('_course', 'college project')
+			.populate('_leadStatus', 'title')
+			.populate('_milestone', 'title description');
+		if (!doc) {
+			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
+		}
+		if (String(doc._course?.college) !== String(collegeId)) {
+			return res.status(403).json({ success: false, message: 'Lead does not belong to this college' });
+		}
+		const statusTitle = String(doc._leadStatus?.title || '').trim().toLowerCase();
+		if (statusTitle !== 'won') {
+			return res.status(400).json({ success: false, message: 'Milestone dropout can be set when the lead status is Won' });
+		}
+
+		if (!Array.isArray(doc.milestoneHistory)) doc.milestoneHistory = [];
+		const currentMilestoneId = doc._milestone?._id || doc._milestone;
+		if (currentMilestoneId && !doc.milestoneHistory.some((item) => String(item.milestone) === String(currentMilestoneId))) {
+			doc.milestoneHistory.push({
+				milestone: currentMilestoneId,
+				title: doc._milestone?.title || '',
+				reachedAt: doc.updatedAt || new Date(),
+				reachedBy: userId,
+				droppedOut: false,
+			});
+		}
+
+		const milestone = await B2cMilestone.findOne({ _id: requestedMilestoneId, college: collegeId }).select('title description').lean();
+		if (!milestone) {
+			return res.status(404).json({ success: false, message: 'Milestone not found' });
+		}
+		const projectId = doc._course?.project;
+		if (!projectId) {
+			return res.status(400).json({ success: false, message: "This lead's course has no project, so it has no milestones" });
+		}
+		const assigned = await B2cMilestoneAssignment.findOne({
+			college: collegeId,
+			milestone: milestone._id,
+			project: projectId,
+		}).select('_id').lean();
+		if (!assigned) {
+			return res.status(400).json({ success: false, message: "This milestone is not aligned to the lead's project" });
+		}
+
+		let row = doc.milestoneHistory.find((item) => String(item.milestone) === String(milestone._id));
+		if (!row) {
+			return res.status(400).json({ success: false, message: 'Save this milestone on the lead before marking dropout' });
+		}
+		const milestoneTitle = row.title || milestone.title || '';
+		if (row.droppedOut) {
+			return res.status(400).json({
+				success: false,
+				message: `This lead already dropped out from "${milestoneTitle}"`,
+			});
+		}
+
+		row.droppedOut = true;
+		row.droppedAt = new Date();
+		row.droppedBy = userId;
+		doc.logs.push({
+			user: userId,
+			timestamp: new Date(),
+			action: `Dropped out from milestone "${row.title || milestoneTitle}". The next milestone cannot be updated.`,
+			remarks: '',
+		});
+		await doc.save();
+
+		return res.json({
+			success: true,
+			message: `Dropped out from "${row.title || milestoneTitle}"`,
+			data: {
+				_id: doc._id,
+				_milestone: doc._milestone
+					? {
+						_id: currentMilestoneId,
+						title: doc._milestone.title || '',
+						description: doc._milestone.description || '',
+					}
+					: null,
+				milestoneHistory: (doc.milestoneHistory || []).map((item) => ({
+					milestone: item.milestone,
+					title: item.title || '',
+					reachedAt: item.reachedAt || null,
+					droppedOut: item.droppedOut === true,
+					droppedAt: item.droppedAt || null,
+				})),
+			},
+		});
+	} catch (error) {
+		console.error('[Lead Milestone Dropout] Error:', error);
 		return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
 	}
 });

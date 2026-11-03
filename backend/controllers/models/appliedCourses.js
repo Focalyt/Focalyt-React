@@ -73,6 +73,10 @@ const appliedCoursesSchema = new Schema(
       title: { type: String, trim: true, default: '' },
       reachedAt: { type: Date, default: Date.now },
       reachedBy: { type: ObjectId, ref: "User" },
+      // Set on the milestone the lead dropped out from. The next milestone stays blocked.
+      droppedOut: { type: Boolean, default: false },
+      droppedAt: { type: Date },
+      droppedBy: { type: ObjectId, ref: "User" },
     }],
     // Testing-only AI copy of lead status. VoiceX writes here while AI_LEAD_STATUS_TESTING is on.
     // Flip that env to false (or stop using these fields) when AI should own the real status.
