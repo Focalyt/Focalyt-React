@@ -2609,7 +2609,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
 			hasFollowUpCall, hasFollowUpVisit, leadSource, includeKyc,
-			aiCalled, aiCallFromDate, aiCallToDate, statusDiff,
+			aiCalled, aiCallFromDate, aiCallToDate, statusDiff, statusNear,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2731,6 +2731,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			aiCallFromDate,
 			aiCallToDate,
 			statusDiff,
+			statusNear,
 		};
 
 		const countPipeline = buildSimplifiedPipeline({
@@ -2772,7 +2773,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		const facetCount = (key) => Number(countResult?.[key]?.[0]?.n || 0);
 		const totalCount = compareMode ? facetCount('total') : countResult;
 		const compare = compareMode
-			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same') }
+			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same'), nearly: facetCount('nearly') }
 			: null;
 
 
@@ -2949,6 +2950,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					_id: doc._aiLeadStatus?._id || null,
 					title: doc._aiLeadStatus?.title || 'Untouch',
 				},
+				statusMatched: statusesMatch(doc._leadStatus, doc._aiLeadStatus),
+				nearlyMatched: statusesNearlyMatch(doc._leadStatus, doc._aiLeadStatus),
 				_leadSubStatus: selectedSubstatus ? selectedSubstatus._id : doc._leadSubStatus || null,
 				selectedSubstatus: {
 					_id: selectedSubstatus ? selectedSubstatus._id : null,
@@ -3959,12 +3962,31 @@ async function resolveB2cCandidateSearchIds(name) {
 	return rows.map((row) => row._id);
 }
 
+function comparableStatusTitle(status) {
+	const title = String(status?.title || '').trim().toLowerCase();
+	if (!title || title === 'no status') return 'untouch';
+	return title;
+}
+
+const NEARLY_MATCH_STATUSES = new Set(['hot', 'warm', 'won']);
+
+function statusesMatch(humanStatus, aiStatus) {
+	return comparableStatusTitle(humanStatus) === comparableStatusTitle(aiStatus);
+}
+
+function statusesNearlyMatch(humanStatus, aiStatus) {
+	const human = comparableStatusTitle(humanStatus);
+	const ai = comparableStatusTitle(aiStatus);
+	return human !== ai && NEARLY_MATCH_STATUSES.has(human) && NEARLY_MATCH_STATUSES.has(ai);
+}
+
 function aiCompareRequested(filters = {}) {
 	return String(filters.aiCalled) === 'true'
 		|| Boolean(filters.aiCallFromDate)
 		|| Boolean(filters.aiCallToDate)
 		|| filters.statusDiff === 'true'
-		|| filters.statusDiff === 'false';
+		|| filters.statusDiff === 'false'
+		|| filters.statusNear === 'true';
 }
 
 function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
@@ -4020,24 +4042,37 @@ function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
 
 	const sameMatch = { $expr: { $eq: ['$_cmpAi', '$_cmpHuman'] } };
 	const changedMatch = { $expr: { $ne: ['$_cmpAi', '$_cmpHuman'] } };
-	const narrowed = filters.statusDiff === 'true'
-		? changedMatch
-		: filters.statusDiff === 'false'
-			? sameMatch
-			: null;
-	if (narrowed) pipeline.push({ $match: narrowed });
+	const nearlyMatch = {
+		$expr: {
+			$and: [
+				{ $ne: ['$_cmpAi', '$_cmpHuman'] },
+				{ $in: ['$_cmpAi', ['hot', 'warm', 'won']] },
+				{ $in: ['$_cmpHuman', ['hot', 'warm', 'won']] },
+			],
+		},
+	};
+	const narrowed = filters.statusNear === 'true'
+		? nearlyMatch
+		: filters.statusDiff === 'true'
+			? changedMatch
+			: filters.statusDiff === 'false'
+				? sameMatch
+				: null;
 
 	if (forCount) {
 		pipeline.push({
 			$facet: {
-				total: [{ $count: 'n' }],
+				total: narrowed ? [{ $match: narrowed }, { $count: 'n' }] : [{ $count: 'n' }],
 				aiCalled: [{ $match: { 'aiVoice.lastEvent': 'CALL_COMPLETED' } }, { $count: 'n' }],
 				same: [{ $match: sameMatch }, { $count: 'n' }],
 				changed: [{ $match: changedMatch }, { $count: 'n' }],
+				nearly: [{ $match: nearlyMatch }, { $count: 'n' }],
 			},
 		});
 		return true;
 	}
+
+	if (narrowed) pipeline.push({ $match: narrowed });
 
 	pipeline.push({ $project: { _cmpHumanDoc: 0, _cmpAiDoc: 0, _cmpHuman: 0, _cmpAi: 0 } });
 	return false;
