@@ -456,12 +456,44 @@ const markLeadDuplicateOnReapply = async (alreadyApplied, source) => {
     if (!Array.isArray(alreadyApplied.logs)) alreadyApplied.logs = [];
     alreadyApplied.logs.push({
         action: 'Lead marked Duplicate on reapply (same mobile + same course)',
-        remarks: source || 'Digital Lead',
+        remarks: source || '',
         timestamp: new Date(),
     });
     await alreadyApplied.save();
     return alreadyApplied;
 };
+
+function escapeSourceRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function pickIncomingSource(body) {
+    if (!body || typeof body !== 'object') return '';
+    const keys = ['source', 'Source', 'SOURCE', 'leadSource', 'LeadSource', 'lead_source', 'Lead Source'];
+    for (const key of keys) {
+        const value = body[key];
+        if (value != null && String(value).trim()) return value;
+    }
+    return '';
+}
+
+// Sheet/API source can be a Source name or a Source id. No Digital Lead default.
+async function resolveSheetLeadSource(rawSource) {
+    const value = String(rawSource || '').trim();
+    if (!value) return { sourceName: '', registeredBy: null };
+
+    if (/^[a-fA-F0-9]{24}$/.test(value)) {
+        const byId = await Source.findById(value).select('_id name').lean();
+        if (byId) return { sourceName: byId.name || value, registeredBy: byId._id };
+    }
+
+    const byName = await Source.findOne({
+        name: { $regex: new RegExp(`^${escapeSourceRegex(value)}$`, 'i') },
+    }).select('_id name').lean();
+
+    if (byName) return { sourceName: byName.name, registeredBy: byName._id };
+    return { sourceName: value, registeredBy: null };
+}
 
 // ===================================
 // BATCH PROCESSOR CLASS - Queue Logic
@@ -863,16 +895,18 @@ const batchProcessor = new BatchProcessor();
 router.route("/addleaddandcourseapply")
     .post(async (req, res) => {
         try {
+            const incomingSource = pickIncomingSource(req.body);
             console.log('[DigitalLead] POST /addleaddandcourseapply →', {
                 name: req.body.FirstName,
                 mobile: req.body.MobileNumber,
                 courseId: req.body.courseId,
                 center: req.body.Field4,
-                source: req.body.source || 'Digital Lead'
+                source: incomingSource
             });
 
             // Basic validation only
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks, status,subStatus } = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, Remarks, status,subStatus } = req.body;
+            let source = incomingSource;
 
 
             if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4 || !status || !subStatus) {
@@ -881,9 +915,9 @@ router.route("/addleaddandcourseapply")
                     msg: "All fields are required"
                 });
             }
-            if (!source) {
-                source = 'Digital Lead';
-            }
+            const resolvedSource = await resolveSheetLeadSource(source);
+            source = resolvedSource.sourceName;
+            const registeredBy = resolvedSource.registeredBy;
             if (MobileNumber) {
                 MobileNumber = MobileNumber.toString();
 
@@ -915,7 +949,6 @@ router.route("/addleaddandcourseapply")
             let sex = Gender;
             let dob = DateOfBirth;
             let email = Email;
-            let registeredBy = new mongoose.Types.ObjectId('68c16764eeda1e3f36a329d9');
 
             if (typeof courseId === 'string') {
                 courseId = new mongoose.Types.ObjectId(courseId);
@@ -968,6 +1001,10 @@ router.route("/addleaddandcourseapply")
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
+                if (source) {
+                    existingCandidate.source = source;
+                    await existingCandidate.save();
+                }
                 console.log('existingCandidate:', existingCandidate);
                 let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
                 console.log('alreadyApplied:', alreadyApplied);
@@ -978,7 +1015,7 @@ router.route("/addleaddandcourseapply")
                         course: courseId,
                         reEnquireDate: new Date(),
                         counselorName:  alreadyApplied.counsellor,
-                        source: source || 'Digital Lead',
+                        source: source || '',
                     });
                     await markLeadDuplicateOnReapply(alreadyApplied, source);
                     return res.json({
@@ -997,7 +1034,8 @@ router.route("/addleaddandcourseapply")
                         _course: courseId,
                         _center: selectedCenter,
                         _leadStatus: statusId._id,
-                        _leadSubStatus: subStatusId._id
+                        _leadSubStatus: subStatusId._id,
+                        ...(registeredBy ? { registeredBy, registeredByModel: 'Source' } : {}),
                     });
 
                     console.log('[DigitalLead] AppliedCourses created ←', {
@@ -1063,7 +1101,7 @@ router.route("/addleaddandcourseapply")
                     _candidate: candidate._id,
                     _course: courseId,
                     _center: selectedCenter,
-                    registeredBy: registeredBy,
+                    ...(registeredBy ? { registeredBy, registeredByModel: 'Source' } : {}),
                     remarks:Remarks || "",
                     _leadStatus: statusId._id,
                     _leadSubStatus: subStatusId._id
@@ -1082,7 +1120,7 @@ router.route("/addleaddandcourseapply")
 
 
             const newLogEntry = {
-                action: `Lead added with ${status.title} and ${subStatus.title} from digital lead`, // Combine all actions in one log message
+                action: `Lead added with ${status.title} and ${subStatus.title}${source ? ` from ${source}` : ''}`, // Combine all actions in one log message
                 remarks: Remarks || '', // Optional remarks in the log
                 timestamp: new Date() // Add timestamp if your schema supports it
             };
