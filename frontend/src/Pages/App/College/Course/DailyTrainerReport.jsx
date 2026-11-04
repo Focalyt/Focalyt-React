@@ -65,6 +65,7 @@ const DailyTrainerReport = ({
   const [removedIds, setRemovedIds] = useState([]);
   const [savedContext, setSavedContext] = useState(null);
   const [templates, setTemplates] = useState([]);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [answers, setAnswers] = useState({});
   const [answerFiles, setAnswerFiles] = useState({});
   const [savedAnswerFiles, setSavedAnswerFiles] = useState({});
@@ -90,8 +91,34 @@ const DailyTrainerReport = ({
       };
       choices.set(id, next);
     });
-    return [...choices.values()];
-  }, [sessions]);
+
+    const trainerId = String(userId || '');
+    const allowed = new Set();
+    templates.forEach((template) => {
+      if (template.enabled === false) return;
+      const trainers = (template.trainerIds || []).map(String).filter(Boolean);
+      if (!trainerId || !trainers.includes(trainerId)) return;
+      (template.batchIds || []).forEach((rawId, index) => {
+        const id = String(rawId || '');
+        if (!id) return;
+        allowed.add(id);
+        if (choices.has(id)) return;
+        choices.set(id, {
+          id,
+          batchCode: template.batchNames?.[index] || 'Batch',
+          projectName: (template.projectNames || [])[0] || template.projectName || '',
+          location: (template.centerNames || [])[0] || template.centerName || '',
+          jobRole: (template.courseNames || [])[0] || template.courseName || '',
+          courseId: String((template.courseIds || [])[0] || template.courseId || ''),
+          centerId: String((template.centerIds || [])[0] || template.centerId || ''),
+          batchSize: 0,
+        });
+      });
+    });
+
+    if (!templatesLoaded) return [];
+    return [...choices.values()].filter((choice) => allowed.has(choice.id));
+  }, [sessions, templates, templatesLoaded, userId]);
 
   const selectedBatch = batchChoices.find((choice) => choice.id === form.batchId) || null;
   const editingReport = reports.find((report) => report.id === editingId) || null;
@@ -168,9 +195,12 @@ const DailyTrainerReport = ({
     axios.get(`${backendUrl}/college/trainer/daily-report-settings`, {
       headers: { 'x-auth': token },
     }).then((response) => {
-      if (!cancelled) setTemplates(response.data?.data?.templates || []);
+      if (cancelled) return;
+      setTemplates(response.data?.data?.templates || []);
+      setTemplatesLoaded(true);
     }).catch((error) => {
       console.error('Failed to load DTR settings:', error);
+      if (!cancelled) setTemplatesLoaded(true);
     });
     return () => { cancelled = true; };
   }, [backendUrl, token]);
@@ -581,6 +611,9 @@ const DailyTrainerReport = ({
                 </tr>
               </tbody>
             </table>
+            {templatesLoaded && !batchChoices.length && (
+              <p className="dtr-empty">No batch is assigned to you. The coordinator selects your batch in Settings → DTR.</p>
+            )}
             {form.batchId && !formTemplate && (
               <p className="dtr-empty">This DTR is not assigned to you for this batch. The coordinator selects the trainer in Settings → DTR.</p>
             )}
