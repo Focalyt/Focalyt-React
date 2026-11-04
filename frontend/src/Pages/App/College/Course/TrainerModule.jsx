@@ -2988,22 +2988,6 @@ const getPendingTotQuestions = (session = {}) => {
   return (session.totQuestionBank || []).filter((question, index) => !answered.has(getTotQuestionId(question, index)));
 };
 
-const sessionHasTotAssignment = (session = {}) => (
-  Array.isArray(session.totQuestionBank) && session.totQuestionBank.length > 0
-);
-
-const hasTrainerPassedTot = (session = {}) => {
-  if (String(session.totStatus || '').toLowerCase() === 'passed') return true;
-  if (session.totAssignmentSubmission?.pass === true) return true;
-  return getTotSubmissionHistory(session).some((item) => item.pass === true);
-};
-
-const isSessionTotUnlocked = (session = {}) => (
-  !sessionHasTotAssignment(session) || hasTrainerPassedTot(session)
-);
-
-const TOT_LOCK_MESSAGE = 'Pass the ToT assignment for this session first.';
-
 const TotMcqAssignmentModal = ({ session, notify, token, backendUrl, onSubmitted, onClose }) => {
   const history = getTotSubmissionHistory(session);
   const questions = getPendingTotQuestions(session);
@@ -3319,28 +3303,11 @@ const SessionCard = ({
     };
   }, [actionsMenuOpen]);
 
-  const totUnlocked = isSessionTotUnlocked(activeSession);
-  const totLockTitle = totUnlocked ? '' : TOT_LOCK_MESSAGE;
   const attendanceDone = isSessionAttendanceDone(activeSession);
-  const canMarkAttendance = totUnlocked && sessionMeta.countable;
-  const canViewAttendance = totUnlocked;
-  const canMarkSessionDone = totUnlocked && (
-    attendanceDone || activeSession.status === 'Completed' || activeSession.workflowStatus === 'Completed'
-  );
-  const displayStatItems = totUnlocked
-    ? statItems
-    : [
-      { icon: 'fa-users', val: '0', lbl: 'Total Candidates', cls: 'blue' },
-      { icon: 'fa-check-circle', val: '0', lbl: 'Present', cls: 'green' },
-      { icon: 'fa-times-circle', val: '0', lbl: 'Absent', cls: 'red' },
-      { icon: 'fa-percentage', val: '0%', lbl: 'Attendance', cls: 'amber' },
-    ];
-
-  useEffect(() => {
-    if (!totUnlocked && (activeTab === 'evidence' || activeTab === 'standard' || activeTab === 'trainer')) {
-      setActiveTab('details');
-    }
-  }, [totUnlocked, activeTab]);
+  const canMarkAttendance = sessionMeta.countable;
+  const canViewAttendance = true;
+  const canMarkSessionDone = attendanceDone || activeSession.status === 'Completed' || activeSession.workflowStatus === 'Completed';
+  const displayStatItems = statItems;
 
   const closeDoneModal = () => {
     setDoneModalOpen(false);
@@ -3354,7 +3321,7 @@ const SessionCard = ({
       return;
     }
     if (!canMarkSessionDone) {
-      notify(totUnlocked ? 'Save attendance before marking this session done.' : TOT_LOCK_MESSAGE);
+      notify('Save attendance before marking this session done.');
       return;
     }
     if (typeof onMarkSessionDone !== 'function') {
@@ -3407,16 +3374,8 @@ const SessionCard = ({
             className="sc-actions-item"
             role="menuitem"
             disabled={!canMarkAttendance}
-            title={
-              !totUnlocked
-                ? totLockTitle
-                : (sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label)
-            }
+            title={sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label}
             onClick={() => {
-              if (!totUnlocked) {
-                notify(TOT_LOCK_MESSAGE);
-                return;
-              }
               if (!sessionMeta.countable) {
                 notify(sessionMeta.label || 'Attendance cannot be marked on Sunday.');
                 return;
@@ -3433,12 +3392,8 @@ const SessionCard = ({
             className="sc-actions-item"
             role="menuitem"
             disabled={!canViewAttendance}
-            title={totUnlocked ? 'View attendance for this session' : totLockTitle}
+            title="View attendance for this session"
             onClick={() => {
-              if (!totUnlocked) {
-                notify(TOT_LOCK_MESSAGE);
-                return;
-              }
               closeActionsMenu();
               onOpenAttendance(activeSession, 'register');
             }}
@@ -3451,16 +3406,8 @@ const SessionCard = ({
             className="sc-actions-item"
             role="menuitem"
             disabled={!canMarkSessionDone}
-            title={
-              !totUnlocked
-                ? totLockTitle
-                : (canMarkSessionDone ? 'Mark this session done' : 'Save attendance before marking this session done')
-            }
+            title={canMarkSessionDone ? 'Mark this session done' : 'Save attendance before marking this session done'}
             onClick={() => {
-              if (!totUnlocked) {
-                notify(TOT_LOCK_MESSAGE);
-                return;
-              }
               if (!canMarkSessionDone) {
                 notify('Save attendance before marking this session done.');
                 return;
@@ -3588,9 +3535,9 @@ const SessionCard = ({
           </div>
         </div>
 
-        <div className="sc-stats" title={totUnlocked ? undefined : totLockTitle}>
+        <div className="sc-stats">
           {displayStatItems.map(({ icon, val, lbl, cls }) => (
-            <div key={lbl} className={`sc-stat${totUnlocked ? '' : ' sc-stat--locked'}`}>
+            <div key={lbl} className="sc-stat">
               <div className={`sc-stat__icon sc-stat__icon--${cls}`}>
                 <i className={`fas ${icon}`} />
               </div>
@@ -3665,30 +3612,26 @@ const SessionCard = ({
             >
               <i className="far fa-list-alt" /> Session Details
             </button>
-            {totUnlocked && (
-              <button
-                type="button"
-                className={`sc-tab${activeTab === 'standard' ? ' sc-tab--active' : ''}`}
-                onClick={() => setActiveTab('standard')}
-              >
-                <i className="fas fa-book" /> Senior Trainer (Standard TLM)
-                {standardTlmDocs.length > 0 && (
-                  <span className="sc-tab-count">{uploadedStandardCount}/{standardTlmDocs.length}</span>
-                )}
-              </button>
-            )}
-            {totUnlocked && (
-              <button
-                type="button"
-                className={`sc-tab${activeTab === 'trainer' ? ' sc-tab--active' : ''}`}
-                onClick={() => setActiveTab('trainer')}
-              >
-                <i className="fas fa-file-alt" /> Flexible (Trainer-based TLM)
-                {trainerTlmDocs.length > 0 && (
-                  <span className="sc-tab-count">{uploadedTrainerCount}/{trainerTlmDocs.length}</span>
-                )}
-              </button>
-            )}
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'standard' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('standard')}
+            >
+              <i className="fas fa-book" /> Senior Trainer (Standard TLM)
+              {standardTlmDocs.length > 0 && (
+                <span className="sc-tab-count">{uploadedStandardCount}/{standardTlmDocs.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'trainer' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('trainer')}
+            >
+              <i className="fas fa-file-alt" /> Flexible (Trainer-based TLM)
+              {trainerTlmDocs.length > 0 && (
+                <span className="sc-tab-count">{uploadedTrainerCount}/{trainerTlmDocs.length}</span>
+              )}
+            </button>
             <button
               type="button"
               className={`sc-tab${activeTab === 'tlm' ? ' sc-tab--active' : ''}`}
@@ -3737,12 +3680,12 @@ const SessionCard = ({
             </div>
           )}
 
-          {totUnlocked && activeTab === 'standard' && renderMaterialTab(
+          {activeTab === 'standard' && renderMaterialTab(
             standardTlmDocs,
             'No Standard TLM added for this session yet.'
           )}
 
-          {totUnlocked && activeTab === 'trainer' && renderMaterialTab(
+          {activeTab === 'trainer' && renderMaterialTab(
             trainerTlmDocs,
             'No trainer-based TLM added for this session yet.'
           )}
@@ -4892,10 +4835,6 @@ const TrainerModule = () => {
     }
   };
   const openAttendanceModal = async (session, view = 'summary') => {
-    if (!isSessionTotUnlocked(session)) {
-      notify(TOT_LOCK_MESSAGE);
-      return;
-    }
     const meta = getSessionAttendanceMeta(session);
     if (!meta.countable && view === 'summary') {
       notify(meta.label || 'Attendance cannot be marked on Sunday.');

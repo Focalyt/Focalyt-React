@@ -1043,13 +1043,19 @@ router.get('/batch-students/:batchId', authorizeTrainingAccess, async (req, res)
 			}
 		}
 
-		const students = await AppliedCourses.find({
+		const batchStudentFilter = {
 			batch: batchId,
 			$or: [
 				{ isBatchAssigned: true },
 				{ admissionDone: true },
 			],
-		})
+		};
+		if (String(req.query.countOnly || '') === '1') {
+			const count = await AppliedCourses.countDocuments(batchStudentFilter);
+			return res.status(200).json({ success: true, count });
+		}
+
+		const students = await AppliedCourses.find(batchStudentFilter)
 			.populate('_candidate', 'name mobile email personalInfo')
 			.populate({
 				path: '_course',
@@ -1643,7 +1649,7 @@ const mapDailyReport = (doc) => {
 		courseName: item.courseName || item.jobRole || '',
 		verticalName: item.verticalName || '',
 		templateId: item.template ? String(item.template) : '',
-		answers: (item.answers || []).map((answer) => ({
+		answers: (item.answers || []).filter((answer) => answer.key !== 'batchAttendance').map((answer) => ({
 			key: answer.key || '',
 			label: answer.label || '',
 			type: answer.type || 'text',
@@ -1775,9 +1781,16 @@ const loadReportBatchContext = async (req, batchId) => {
 		}
 	}
 
-	const [courseDoc, centerDoc] = await Promise.all([
+	const [courseDoc, centerDoc, batchSize] = await Promise.all([
 		batchDoc.courseId ? Courses.findById(batchDoc.courseId).select('name projectName project vertical') : null,
 		batchDoc.centerId ? Center.findById(batchDoc.centerId).select('name') : null,
+		AppliedCourses.countDocuments({
+			batch: batchDoc._id,
+			$or: [
+				{ isBatchAssigned: true },
+				{ admissionDone: true },
+			],
+		}),
 	]);
 	let verticalName = '';
 	if (courseDoc?.vertical) {
@@ -1795,6 +1808,7 @@ const loadReportBatchContext = async (req, batchId) => {
 		verticalName,
 		center: centerDoc?._id || batchDoc.centerId || null,
 		centerName: centerDoc?.name || '',
+		batchSize,
 	};
 };
 
@@ -1905,16 +1919,17 @@ const mapTemplate = (doc) => {
 		batchNames: Array.isArray(doc.batchNames) ? doc.batchNames : [],
 		trainerIds: (doc.trainers || []).map((id) => String(id)),
 		trainerNames: Array.isArray(doc.trainerNames) ? doc.trainerNames : [],
-		fields: (doc.fields || []).map(mapTemplateField),
+		fields: (doc.fields || []).map(mapTemplateField).filter((field) => field.key !== 'batchAttendance'),
 	};
 };
 
 const normalizeTemplateFields = (fields) => {
-	if (!Array.isArray(fields) || !fields.length) {
+	const source = (Array.isArray(fields) ? fields : []).filter((field) => field?.key !== 'batchAttendance');
+	if (!source.length) {
 		throw reportHttpError(400, 'Add at least one field');
 	}
 	const used = new Set();
-	return fields.map((field, index) => {
+	return source.map((field, index) => {
 		const label = String(field?.label || '').trim();
 		if (!label) throw reportHttpError(400, 'Every field needs a label');
 		const type = DTR_FIELD_TYPES.includes(field?.type) ? field.type : 'text';
@@ -2101,7 +2116,7 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 	}
 	const previousByKey = new Map((previousAnswers || []).map((answer) => [answer.key, answer]));
 	const answers = [];
-	for (const field of template.fields || []) {
+	for (const field of (template.fields || []).filter((item) => item.key !== 'batchAttendance')) {
 		if (field.type === 'file') {
 			const incoming = asUploadArray(files?.[`file_${field.key}`]);
 			const allowed = field.fileKind === 'video'

@@ -239,7 +239,7 @@ const DtrSettings = () => {
       courseIds: savedIds(template.courseIds, template.courseId),
       batchIds: template.batchIds || [],
       trainerIds: template.trainerIds || [],
-      fields: (template.fields || []).map((field) => {
+      fields: (template.fields || []).filter((field) => field.key !== 'batchAttendance').map((field) => {
         const options = Array.isArray(field.options) ? field.options.filter(Boolean) : [];
         const type = field.type === 'yesno' ? 'radio' : field.type;
         return {
@@ -308,7 +308,7 @@ const DtrSettings = () => {
       courseIds: draft.courseIds,
       batchIds: draft.batchIds,
       trainerIds: draft.trainerIds,
-      fields: draft.fields.map((field) => ({
+      fields: draft.fields.filter((field) => field.key !== 'batchAttendance').map((field) => ({
         key: field.key,
         label: field.label,
         type: field.type,
@@ -494,7 +494,7 @@ const DtrSettings = () => {
               <h3 style={{ margin: 0 }}>Fields</h3>
               <button type="button" className="dtr-set-ghost" onClick={() => setDraft({ ...draft, fields: draft.fields.concat(emptyField()) })}>Add field</button>
             </div>
-            {draft.fields.map((field, index) => (
+            {draft.fields.filter((field) => field.key !== 'batchAttendance').map((field, index) => (
               <div className="dtr-field" key={field.key}>
                 <div className="dtr-field-row">
                   <label>Label

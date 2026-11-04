@@ -64,10 +64,49 @@ const mediaKind = (file) => {
   return 'file';
 };
 
+const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const knownFieldValue = (field, context) => {
+  if (!field || field.type === 'file') return '';
+  const key = field.portalKey || labelKey(field.label);
+  const pick = {
+    project: context.project,
+    projectname: context.project,
+    location: context.location,
+    locationname: context.location,
+    center: context.location,
+    centre: context.location,
+    centername: context.location,
+    trainer: context.trainer,
+    trainername: context.trainer,
+    nameoftrainer: context.trainer,
+    jobrole: context.jobRole,
+    jobrolename: context.jobRole,
+    course: context.jobRole,
+    coursename: context.jobRole,
+    batch: context.batch,
+    batchid: context.batch,
+    batchsize: context.batchSize,
+    batchno: context.batch,
+    batchcode: context.batch,
+    batchname: context.batch,
+    batchnumber: context.batch,
+    department: context.department,
+    departmentname: context.department,
+    date: context.date,
+    reportdate: context.date,
+  }[key];
+  const value = String(pick || '').trim();
+  if (!value) return '';
+  if ((field.type === 'select' || field.type === 'radio') && !(field.options || []).includes(value)) return '';
+  return value;
+};
+
   const DailyTrainerReport = ({
   backendUrl,
   token,
   userId,
+  trainerName = '',
   sessions = [],
   notify,
 }) => {
@@ -88,6 +127,8 @@ const mediaKind = (file) => {
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [batchSize, setBatchSize] = useState('');
+  const [touchedAnswers, setTouchedAnswers] = useState({});
   const [answerFiles, setAnswerFiles] = useState({});
   const [savedAnswerFiles, setSavedAnswerFiles] = useState({});
   const notifyRef = useRef(notify);
@@ -122,7 +163,24 @@ const mediaKind = (file) => {
         const id = String(rawId || '');
         if (!id) return;
         allowed.add(id);
-        if (choices.has(id)) return;
+        if (choices.has(id)) {
+          const current = choices.get(id);
+          const onlyName = (list, single) => {
+            const names = (list || []).map((name) => String(name || '').trim()).filter(Boolean);
+            if (names.length === 1) return names[0];
+            return String(single || '').trim();
+          };
+          choices.set(id, {
+            ...current,
+            batchCode: template.batchNames?.[index] || (current.batchCode && current.batchCode !== 'Batch' ? current.batchCode : 'Batch'),
+            projectName: onlyName(template.projectNames, template.projectName) || current.projectName || '',
+            location: onlyName(template.centerNames, template.centerName) || current.location || '',
+            jobRole: onlyName(template.courseNames, template.courseName) || current.jobRole || '',
+            courseId: current.courseId || String((template.courseIds || [])[0] || template.courseId || ''),
+            centerId: current.centerId || String((template.centerIds || [])[0] || template.centerId || ''),
+          });
+          return;
+        }
         choices.set(id, {
           id,
           batchCode: template.batchNames?.[index] || 'Batch',
@@ -169,7 +227,7 @@ const mediaKind = (file) => {
         courseName: editingReport.courseName || editingReport.jobRole || '',
         departmentName: editingReport.verticalName || '',
         projectName: editingReport.projectName || '',
-        fields: editingReport.answers.map((answer) => ({
+        fields: editingReport.answers.filter((answer) => answer.key !== 'batchAttendance').map((answer) => ({
           key: answer.key,
           label: answer.label || answer.key,
           type: answer.type || 'text',
@@ -183,6 +241,46 @@ const mediaKind = (file) => {
     }
     return null;
   }, [editingReport, selectedBatch, templates, userId]);
+
+  const knownContext = useMemo(() => {
+    const trainerIds = (formTemplate?.trainerIds || []).map(String);
+    const trainerIndex = trainerIds.findIndex((id) => id === String(userId || ''));
+    const assignedTrainer = trainerIndex >= 0 ? formTemplate?.trainerNames?.[trainerIndex] : '';
+    return {
+      project: selectedBatch?.projectName || formTemplate?.projectName || '',
+      location: selectedBatch?.location || formTemplate?.centerName || '',
+      trainer: assignedTrainer || trainerName || (formTemplate?.trainerNames || [])[0] || '',
+      jobRole: selectedBatch?.jobRole || formTemplate?.courseName || '',
+      batch: selectedBatch?.batchCode || '',
+      batchSize,
+      department: formTemplate?.departmentName || '',
+      date: form.reportDate || '',
+    };
+  }, [batchSize, form.reportDate, formTemplate, selectedBatch, trainerName, userId]);
+
+  useEffect(() => {
+    if (!token || !form.batchId) {
+      setBatchSize('');
+      return undefined;
+    }
+    let cancelled = false;
+    axios.get(`${backendUrl}/college/trainer/batch-students/${form.batchId}?countOnly=1`, {
+      headers: { 'x-auth': token },
+    }).then((response) => {
+      if (cancelled) return;
+      const count = Number(response.data?.count);
+      setBatchSize(Number.isInteger(count) && count >= 0 ? String(count) : '');
+    }).catch(() => {
+      if (!cancelled) setBatchSize('');
+    });
+    return () => { cancelled = true; };
+  }, [backendUrl, form.batchId, token]);
+
+  const filledAnswer = (field, source = answers) => {
+    const typed = source[field.key];
+    if (touchedAnswers[field.key] || String(typed || '').trim()) return typed || '';
+    return knownFieldValue(field, knownContext);
+  };
 
   const loadReports = useCallback(async () => {
     if (!token) {
@@ -216,7 +314,10 @@ const mediaKind = (file) => {
       headers: { 'x-auth': token },
     }).then((response) => {
       if (cancelled) return;
-      setTemplates(response.data?.data?.templates || []);
+      setTemplates((response.data?.data?.templates || []).map((template) => ({
+        ...template,
+        fields: (template.fields || []).filter((field) => field.key !== 'batchAttendance'),
+      })));
       setTemplatesLoaded(true);
     }).catch((error) => {
       console.error('Failed to load DTR settings:', error);
@@ -232,6 +333,7 @@ const mediaKind = (file) => {
     setRemovedIds([]);
     setSavedContext(null);
     setAnswers({});
+    setTouchedAnswers({});
     setAnswerFiles({});
     setSavedAnswerFiles({});
   };
@@ -263,10 +365,12 @@ const mediaKind = (file) => {
     const nextAnswers = {};
     const nextFiles = {};
     (report.answers || []).forEach((answer) => {
+      if (answer.key === 'batchAttendance') return;
       nextAnswers[answer.key] = answer.value || '';
       nextFiles[answer.key] = answer.files || [];
     });
     setAnswers(nextAnswers);
+    setTouchedAnswers({});
     setAnswerFiles({});
     setSavedAnswerFiles(nextFiles);
     setRemovedIds([]);
@@ -286,7 +390,7 @@ const mediaKind = (file) => {
         if (!kept.length && !added.length) throw new Error(`${field.label} is required`);
         return;
       }
-      if (!String(answers[field.key] || '').trim()) throw new Error(`${field.label} is required`);
+      if (!String(filledAnswer(field) || '').trim()) throw new Error(`${field.label} is required`);
     });
     return '';
   };
@@ -307,7 +411,12 @@ const mediaKind = (file) => {
     data.append('templateId', formTemplate.id);
     data.append('reportDate', form.reportDate);
     data.append('batchId', form.batchId);
-    data.append('answers', JSON.stringify(answers));
+    const answersToSave = {};
+    (formTemplate.fields || []).forEach((field) => {
+      if (field.type === 'file') return;
+      answersToSave[field.key] = filledAnswer(field);
+    });
+    data.append('answers', JSON.stringify(answersToSave));
     data.append('removeFileIds', JSON.stringify(removedIds));
     Object.entries(answerFiles).forEach(([key, files]) => {
       (files || []).forEach((file) => data.append(`file_${key}`, file));
@@ -388,7 +497,14 @@ const mediaKind = (file) => {
   };
 
   const detailFields = form.reportDate && form.batchId && formTemplate?.fields?.length
-    ? formTemplate.fields
+    ? (() => {
+      const fields = formTemplate.fields.filter((field) => field.key !== 'batchAttendance' && field.key !== 'batchSize' && labelKey(field.label) !== 'batchsize');
+      const batchSizeField = { key: 'batchSize', label: 'Batch size', type: 'number', required: false, locked: true };
+      const batchIdIndex = fields.findIndex((field) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(field.label)));
+      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, batchSizeField);
+      else fields.push(batchSizeField);
+      return fields;
+    })()
     : [];
 
   const openPreview = (file) => {
@@ -403,8 +519,12 @@ const mediaKind = (file) => {
   };
 
   const renderCell = (field) => {
-    const locked = readOnly;
-    const value = answers[field.key] || '';
+    const locked = readOnly || field.locked;
+    const value = filledAnswer(field);
+    const writeAnswer = (nextValue) => {
+      setTouchedAnswers((prev) => ({ ...prev, [field.key]: true }));
+      setAnswers((prev) => ({ ...prev, [field.key]: nextValue }));
+    };
     if (field.type === 'file') {
       const rule = fileRule(field);
       const kept = (savedAnswerFiles[field.key] || []).filter((file) => !removedIds.includes(file.id));
@@ -433,7 +553,7 @@ const mediaKind = (file) => {
     }
     if (locked && field.type !== 'textarea') return <div className="dtr-readonly">{value || '-'}</div>;
     if (field.type === 'textarea') {
-      return <textarea value={value} disabled={locked} placeholder={field.placeholder || ''} onChange={(event) => setAnswers((prev) => ({ ...prev, [field.key]: event.target.value }))} />;
+      return <textarea value={value} disabled={locked} placeholder={field.placeholder || ''} onChange={(event) => writeAnswer(event.target.value)} />;
     }
     if (field.type === 'radio' || field.type === 'yesno') {
       const options = field.type === 'yesno' ? ['Yes', 'No'] : (field.options || []);
@@ -447,7 +567,7 @@ const mediaKind = (file) => {
                 value={option}
                 checked={value === option}
                 disabled={locked}
-                onChange={() => setAnswers((prev) => ({ ...prev, [field.key]: option }))}
+                onChange={() => writeAnswer(option)}
               />
               {option}
             </label>
@@ -458,7 +578,7 @@ const mediaKind = (file) => {
     if (field.type === 'select') {
       const options = field.options || [];
       return (
-        <select value={value} disabled={locked} onChange={(event) => setAnswers((prev) => ({ ...prev, [field.key]: event.target.value }))}>
+        <select value={value} disabled={locked} onChange={(event) => writeAnswer(event.target.value)}>
           <option value="">Select</option>
           {options.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
@@ -471,7 +591,7 @@ const mediaKind = (file) => {
         value={value}
         disabled={locked}
         placeholder={field.placeholder || ''}
-        onChange={(event) => setAnswers((prev) => ({ ...prev, [field.key]: event.target.value }))}
+        onChange={(event) => writeAnswer(event.target.value)}
       />
     );
   };
@@ -681,6 +801,7 @@ const mediaKind = (file) => {
                   ['Project', viewingReport.projectName],
                   ['Course', viewingReport.courseName || viewingReport.jobRole],
                   ['Batch', viewingReport.batchCode],
+                  ['Batch size', viewingReport.batchSize ?? ''],
                   ['Location', viewingReport.location],
                 ].map(([label, value]) => (
                   <div key={label}>
