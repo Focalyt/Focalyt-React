@@ -57,15 +57,16 @@ function jobFieldMessage(vacancy, field, value) {
     }
   }
 
-  if (field === 'qualification' && vacancy?._qualification) {
-    const requiredId = String(vacancy._qualification._id || vacancy._qualification);
-    if (String(value) !== requiredId) {
-      const name = vacancy._qualification.name;
-      return name
-        ? `This job requires ${name}. Choose that qualification exactly.`
-        : 'Your qualification does not match the qualification required for this job.';
-    }
-  }
+  // Qualification check is commented out.
+  // if (field === 'qualification' && vacancy?._qualification) {
+  //   const requiredId = String(vacancy._qualification._id || vacancy._qualification);
+  //   if (String(value) !== requiredId) {
+  //     const name = vacancy._qualification.name;
+  //     return name
+  //       ? `This job requires ${name}. Choose that qualification exactly.`
+  //       : 'Your qualification does not match the qualification required for this job.';
+  //   }
+  // }
 
   return '';
 }
@@ -79,13 +80,14 @@ function jobProfileMatchMessage(vacancy, candidate) {
     }
   }
 
-  const required = vacancy?._qualification;
-  if (required) {
-    const requiredId = String(required._id || required);
-    if (!candidateQualificationIds(candidate).has(requiredId)) {
-      return 'Your qualification does not match the qualification required for this job.';
-    }
-  }
+  // Qualification check is commented out.
+  // const required = vacancy?._qualification;
+  // if (required) {
+  //   const requiredId = String(required._id || required);
+  //   if (!candidateQualificationIds(candidate).has(requiredId)) {
+  //     return 'Your qualification does not match the qualification required for this job.';
+  //   }
+  // }
 
   return '';
 }

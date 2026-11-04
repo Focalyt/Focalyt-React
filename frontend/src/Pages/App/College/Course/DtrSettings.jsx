@@ -408,7 +408,7 @@ const DtrSettings = () => {
       <section className="dtr-set-card">
         {loading ? <p>Loading...</p> : (
           <>
-            <h2>{draft.id ? 'Edit DTR' : 'Create DTR'}</h2>
+            <h2>{draft.id ? 'Edit DTR (Daily Training Report)' : 'Create DTR (Daily Training Report)'}</h2>
             <p>Same order as the portal: department, project, center, course, then batch. You can select more than one in each.</p>
             <div className="dtr-set-grid" ref={scopeRef}>
               <label>Report name

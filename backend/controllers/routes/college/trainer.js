@@ -2161,7 +2161,41 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 		}
 		answers.push({ key: field.key, label: field.label, type: field.type, value, files: [] });
 	}
+	const studentCounts = [
+		{ key: 'presentStudent', label: 'Present student' },
+		{ key: 'absentStudent', label: 'Absent student' },
+		{ key: 'dropoutStudent', label: 'Dropout student' },
+	];
+	studentCounts.forEach((field) => {
+		if (answers.some((answer) => answer.key === field.key)) return;
+		const value = String(values[field.key] ?? '').trim();
+		if (value && (!Number.isInteger(Number(value)) || Number(value) < 0)) {
+			throw reportHttpError(400, `${field.label} must be a whole number`);
+		}
+		answers.push({ key: field.key, label: field.label, type: 'number', value, files: [] });
+	});
 	return answers;
+};
+
+const studentCountTotalError = (answers, batchSize) => {
+	const size = Number(batchSize);
+	if (!Number.isInteger(size) || size < 0) {
+		return 'Batch size is not available for this batch.';
+	}
+	const keys = ['presentStudent', 'absentStudent', 'dropoutStudent'];
+	let total = 0;
+	for (const key of keys) {
+		const raw = String((answers.find((answer) => answer.key === key) || {}).value || '').trim();
+		const num = Number(raw);
+		if (raw === '' || !Number.isInteger(num) || num < 0) {
+			return 'Present student, Absent student and Dropout student must be whole numbers, and their total must equal the batch size.';
+		}
+		total += num;
+	}
+	if (total !== size) {
+		return `Present student + Absent student + Dropout student is ${total}. It must equal the batch size of ${size}.`;
+	}
+	return '';
 };
 
 const applyPortalSnapshot = (target, template, answers) => {
@@ -2354,6 +2388,10 @@ router.post('/daily-reports', authorizeTrainingAccess, async (req, res) => {
 				});
 			}
 			const answers = await buildTemplateAnswers(template, req.body, req.files, req.college._id);
+			const countError = studentCountTotalError(answers, context.batchSize);
+			if (countError) {
+				return res.status(400).json({ status: false, message: countError });
+			}
 			const report = new DailyTrainerReport({
 				college: req.college._id,
 				trainer: req.user._id,
@@ -2474,6 +2512,10 @@ router.put('/daily-reports/:id', authorizeTrainingAccess, async (req, res) => {
 				});
 			}
 			report.answers = await buildTemplateAnswers(template, req.body, req.files, req.college._id, report.answers);
+			const countError = studentCountTotalError(report.answers, context.batchSize);
+			if (countError) {
+				return res.status(400).json({ status: false, message: countError });
+			}
 			Object.assign(report, context, {
 				template: template._id,
 				reportDateKey,

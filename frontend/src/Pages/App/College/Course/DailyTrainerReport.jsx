@@ -66,6 +66,13 @@ const mediaKind = (file) => {
 
 const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
+const studentCountFields = [
+  { key: 'presentStudent', label: 'Present student', type: 'number', required: false },
+  { key: 'absentStudent', label: 'Absent student', type: 'number', required: false },
+  { key: 'dropoutStudent', label: 'Dropout student', type: 'number', required: false },
+];
+const studentCountKeys = new Set(studentCountFields.map((field) => field.key));
+
 const knownFieldValue = (field, context) => {
   if (!field || field.type === 'file') return '';
   const key = field.portalKey || labelKey(field.label);
@@ -269,17 +276,51 @@ const knownFieldValue = (field, context) => {
     }).then((response) => {
       if (cancelled) return;
       const count = Number(response.data?.count);
-      setBatchSize(Number.isInteger(count) && count >= 0 ? String(count) : '');
+      if (Number.isInteger(count) && count >= 0) setBatchSize(String(count));
     }).catch(() => {
-      if (!cancelled) setBatchSize('');
+      if (cancelled) return;
+      const fallback = Number(selectedBatch?.batchSize);
+      setBatchSize(Number.isInteger(fallback) && fallback > 0 ? String(fallback) : '');
     });
     return () => { cancelled = true; };
-  }, [backendUrl, form.batchId, token]);
+  }, [backendUrl, form.batchId, selectedBatch?.batchSize, token]);
+
+  const liveBatchSize = (() => {
+    const fetched = String(batchSize || '').trim();
+    if (fetched) return fetched;
+    const fromBatch = Number(selectedBatch?.batchSize);
+    return Number.isInteger(fromBatch) && fromBatch > 0 ? String(fromBatch) : '';
+  })();
 
   const filledAnswer = (field, source = answers) => {
+    if (field.key === 'batchSize' || labelKey(field.label) === 'batchsize') return liveBatchSize;
     const typed = source[field.key];
     if (touchedAnswers[field.key] || String(typed || '').trim()) return typed || '';
-    return knownFieldValue(field, knownContext);
+    return knownFieldValue(field, { ...knownContext, batchSize: liveBatchSize });
+  };
+
+  const readStudentCount = (key) => {
+    const raw = String(filledAnswer({ key, label: '', type: 'number' }) || '').trim();
+    if (raw === '') return null;
+    const num = Number(raw);
+    if (!Number.isInteger(num) || num < 0) return NaN;
+    return num;
+  };
+
+  const studentCountMessage = (requireAll = false) => {
+    const size = Number(liveBatchSize);
+    if (liveBatchSize === '' || !Number.isInteger(size) || size < 0) return '';
+    const values = studentCountFields.map((field) => readStudentCount(field.key));
+    if (values.some((value) => Number.isNaN(value))) {
+      return 'Present student, Absent student and Dropout student must be whole numbers.';
+    }
+    const missing = values.some((value) => value == null);
+    if (!requireAll && values.every((value) => value == null)) return '';
+    const total = values.reduce((sum, value) => sum + (Number.isInteger(value) ? value : 0), 0);
+    if (missing || total !== size) {
+      return `Present + Absent + Dropout is ${total}. It must equal the batch size of ${size}.`;
+    }
+    return '';
   };
 
   const loadReports = useCallback(async () => {
@@ -392,7 +433,7 @@ const knownFieldValue = (field, context) => {
       }
       if (!String(filledAnswer(field) || '').trim()) throw new Error(`${field.label} is required`);
     });
-    return '';
+    return studentCountMessage(true);
   };
 
   const saveReport = async () => {
@@ -414,6 +455,10 @@ const knownFieldValue = (field, context) => {
     const answersToSave = {};
     (formTemplate.fields || []).forEach((field) => {
       if (field.type === 'file') return;
+      if (studentCountKeys.has(field.key)) return;
+      answersToSave[field.key] = filledAnswer(field);
+    });
+    studentCountFields.forEach((field) => {
       answersToSave[field.key] = filledAnswer(field);
     });
     data.append('answers', JSON.stringify(answersToSave));
@@ -498,11 +543,18 @@ const knownFieldValue = (field, context) => {
 
   const detailFields = form.reportDate && form.batchId && formTemplate?.fields?.length
     ? (() => {
-      const fields = formTemplate.fields.filter((field) => field.key !== 'batchAttendance' && field.key !== 'batchSize' && labelKey(field.label) !== 'batchsize');
-      const batchSizeField = { key: 'batchSize', label: 'Batch size', type: 'number', required: false, locked: true };
+      const fields = formTemplate.fields.filter((field) => (
+        field.key !== 'batchAttendance'
+        && field.key !== 'batchSize'
+        && labelKey(field.label) !== 'batchsize'
+        && !studentCountKeys.has(field.key)
+        && !['presentstudent', 'absentstudent', 'dropoutstudent'].includes(labelKey(field.label))
+      ));
+      const batchSizeField = { key: 'batchSize', label: 'Batch size', type: 'number', required: false, locked: true, portalKey: 'batchsize' };
       const batchIdIndex = fields.findIndex((field) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(field.label)));
-      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, batchSizeField);
-      else fields.push(batchSizeField);
+      const countFields = [batchSizeField, ...studentCountFields];
+      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, ...countFields);
+      else fields.push(...countFields);
       return fields;
     })()
     : [];
@@ -655,6 +707,8 @@ const knownFieldValue = (field, context) => {
         .dtr-radio input { width: auto; min-height: 0; }
         .dtr-field textarea { min-height: 74px; resize: vertical; }
         .dtr-readonly { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-weight: 600; color: #0f172a; min-height: 36px; }
+        .dtr-field.is-invalid { color: #be123c; }
+        .dtr-field.is-invalid input { border-color: #e11d48; background: #fff1f2; color: #be123c; }
         .dtr-section { border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
         .dtr-section h3 { margin: 0; font-size: 14px; color: #0f172a; }
         .dtr-slot { border: 1px dashed #cbd5e1; border-radius: 10px; padding: 10px; background: #f8fafc; }
@@ -724,15 +778,18 @@ const knownFieldValue = (field, context) => {
             {detailFields.length > 0 && (
               <div className="dtr-details">
                 <div className="dtr-grid">
-                  {detailFields.map((field) => (
-                    <div
-                      key={field.key}
-                      className={`dtr-field${field.type === 'textarea' || field.type === 'file' || field.type === 'radio' || field.type === 'yesno' ? ' dtr-span-3' : ''}`}
-                    >
-                      <span>{field.label}{field.required ? ' *' : ''}</span>
-                      {renderCell(field)}
-                    </div>
-                  ))}
+                  {detailFields.map((field) => {
+                    const invalid = Boolean(studentCountMessage()) && studentCountKeys.has(field.key);
+                    return (
+                      <div
+                        key={field.key}
+                        className={`dtr-field${field.type === 'textarea' || field.type === 'file' || field.type === 'radio' || field.type === 'yesno' ? ' dtr-span-3' : ''}${invalid ? ' is-invalid' : ''}`}
+                      >
+                        <span>{field.label}{field.required ? ' *' : ''}</span>
+                        {renderCell(field)}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="dtr-submit">
                   <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
@@ -802,6 +859,9 @@ const knownFieldValue = (field, context) => {
                   ['Course', viewingReport.courseName || viewingReport.jobRole],
                   ['Batch', viewingReport.batchCode],
                   ['Batch size', viewingReport.batchSize ?? ''],
+                  ['Present student', (viewingReport.answers || []).find((answer) => answer.key === 'presentStudent')?.value || ''],
+                  ['Absent student', (viewingReport.answers || []).find((answer) => answer.key === 'absentStudent')?.value || ''],
+                  ['Dropout student', (viewingReport.answers || []).find((answer) => answer.key === 'dropoutStudent')?.value || ''],
                   ['Location', viewingReport.location],
                 ].map(([label, value]) => (
                   <div key={label}>
@@ -811,7 +871,7 @@ const knownFieldValue = (field, context) => {
                 ))}
               </div>
               <div className="dtr-answers">
-              {(viewingReport.answers || []).map((answer) => {
+              {(viewingReport.answers || []).filter((answer) => !studentCountKeys.has(answer.key)).map((answer) => {
                 const wide = answer.type === 'file' || answer.type === 'textarea' || String(answer.value || '').length > 80 || (answer.files || []).length > 0;
                 return (
                 <div className={`dtr-answer${wide ? ' dtr-answer-wide' : ''}`} key={answer.key}>
