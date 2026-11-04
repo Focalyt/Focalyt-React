@@ -43,6 +43,7 @@ const {
 } = require('../../models');
 const Candidate = require('../../models/candidateProfile');
 const { mobileLookupValues, markLeadDuplicateOnReapply, ensureCandidateUser } = require('../../../helpers/b2cDuplicate');
+const { jobProfileMatchMessage, jobFieldMessage } = require('../../../helpers/jobProfileMatch');
 
 module.exports.getProfileDetail = async (req, res) => {
   try {
@@ -1112,17 +1113,6 @@ module.exports.centerList = async (req, res) => {
   }
 };
 
-function applicantAge(dob) {
-  if (!dob) return null;
-  const birth = new Date(dob);
-  if (Number.isNaN(birth.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const month = today.getMonth() - birth.getMonth();
-  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
-  return age;
-}
-
 module.exports.jobApplyRules = async (req, res) => {
   try {
     const vacancy = await Vacancy.findById(req.params.id)
@@ -1150,6 +1140,30 @@ module.exports.jobApplyRules = async (req, res) => {
     });
   } catch (err) {
     return res.send({ status: false, message: err.message || 'Failed to load job requirements.' });
+  }
+};
+
+module.exports.jobFieldCheck = async (req, res) => {
+  try {
+    const { field, dob, qualificationId } = req.body || {};
+    if (field !== 'dob' && field !== 'qualification') {
+      return res.send({ status: false, message: 'Choose date of birth or qualification to check.' });
+    }
+    const vacancy = await Vacancy.findById(req.params.id)
+      .select('ageMin ageMax _qualification')
+      .populate({ path: '_qualification', select: 'name' })
+      .lean();
+    if (!vacancy) {
+      return res.send({ status: false, message: 'Job not found.' });
+    }
+    const value = field === 'dob' ? dob : qualificationId;
+    return res.send({
+      status: true,
+      field,
+      message: jobFieldMessage(vacancy, field, value) || '',
+    });
+  } catch (err) {
+    return res.send({ status: false, message: err.message || 'Failed to check this field.' });
   }
 };
 
@@ -1191,28 +1205,9 @@ module.exports.publicApply = async (req, res) => {
         return res.send({ status: false, message: 'Job not found.' });
       }
 
-      const hasAgeRule = vacancy.ageMin != null && vacancy.ageMax != null;
-      if (hasAgeRule) {
-        const age = applicantAge(candidate.dob);
-        if (age == null || age < Number(vacancy.ageMin) || age > Number(vacancy.ageMax)) {
-          return res.send({
-            status: false,
-            message: `This job requires age between ${vacancy.ageMin} and ${vacancy.ageMax} years.`,
-          });
-        }
-      }
-
-      if (vacancy._qualification) {
-        const requiredQualification = String(vacancy._qualification);
-        const candidateQualification = candidate.highestQualification
-          ? String(candidate.highestQualification)
-          : '';
-        if (candidateQualification !== requiredQualification) {
-          return res.send({
-            status: false,
-            message: 'Your qualification does not match the qualification required for this job.',
-          });
-        }
+      const profileMismatch = jobProfileMatchMessage(vacancy, candidate);
+      if (profileMismatch) {
+        return res.send({ status: false, message: profileMismatch });
       }
 
       await Candidate.findOneAndUpdate(

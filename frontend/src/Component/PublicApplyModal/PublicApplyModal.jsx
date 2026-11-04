@@ -17,16 +17,6 @@ import { trackMetaConversion } from "../../utils/conversionTrakingRoutes";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
-function ageFromDob(value) {
-  if (!value) return null;
-  const birth = new Date(value);
-  if (Number.isNaN(birth.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const month = today.getMonth() - birth.getMonth();
-  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
-  return age;
-}
 const PublicApplyContext = createContext(null);
 
 export function isCandidateLoggedIn() {
@@ -152,9 +142,9 @@ function ApplyIllustration() {
   );
 }
 
-function Field({ icon: Icon, children }) {
+function Field({ icon: Icon, invalid, children }) {
   return (
-    <div className="pam-field">
+    <div className={`pam-field${invalid ? " is-invalid" : ""}`}>
       <span className="pam-field__icon">
         <Icon size={16} />
       </span>
@@ -186,8 +176,6 @@ function PublicApplyModal() {
   const [qualification, setQualification] = useState("");
   const [jobRules, setJobRules] = useState(null);
   const [rulesLoading, setRulesLoading] = useState(false);
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [educationConfirmed, setEducationConfirmed] = useState(false);
   const [docFiles, setDocFiles] = useState({});
   const [isNewUser, setIsNewUser] = useState(true);
   const [otpSent, setOtpSent] = useState(false);
@@ -196,7 +184,10 @@ function PublicApplyModal() {
   const [verifying, setVerifying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [dobError, setDobError] = useState("");
+  const [qualificationError, setQualificationError] = useState("");
   const [success, setSuccess] = useState("");
+  const fieldCheckRef = useRef({ dob: 0, qualification: 0 });
   const [applied, setApplied] = useState(false);
   const [mobileTab, setMobileTab] = useState("apply");
 
@@ -217,8 +208,6 @@ function PublicApplyModal() {
     setQualification("");
     setJobRules(null);
     setRulesLoading(false);
-    setAgeConfirmed(false);
-    setEducationConfirmed(false);
     setDocFiles({});
     setIsNewUser(true);
     setOtpSent(false);
@@ -228,6 +217,8 @@ function PublicApplyModal() {
     setSubmitting(false);
     submittingRef.current = false;
     setError("");
+    setDobError("");
+    setQualificationError("");
     setSuccess("");
     setApplied(false);
   }, []);
@@ -438,6 +429,52 @@ function PublicApplyModal() {
     }
   };
 
+  const checkJobField = async (field, value) => {
+    if (!target || target.kind !== "job" || !target.id || !value) return "";
+    const res = await axios.post(`${backendUrl}/api/jobFieldCheck/${target.id}`, {
+      field,
+      dob: field === "dob" ? value : undefined,
+      qualificationId: field === "qualification" ? value : undefined,
+    });
+    const message = typeof res.data?.message === "string" ? res.data.message : "";
+    if (res.data?.status === false && !message) {
+      throw new Error("Could not check this field.");
+    }
+    return message;
+  };
+
+  const handleDobChange = async (value) => {
+    setDob(value);
+    setDobError("");
+    if (!value || target?.kind !== "job") return;
+    const ticket = fieldCheckRef.current.dob + 1;
+    fieldCheckRef.current.dob = ticket;
+    try {
+      const message = await checkJobField("dob", value);
+      if (fieldCheckRef.current.dob === ticket) setDobError(message);
+    } catch (err) {
+      if (fieldCheckRef.current.dob === ticket) {
+        setDobError(err.message || "Could not check age for this job.");
+      }
+    }
+  };
+
+  const handleQualificationChange = async (value) => {
+    setQualification(value);
+    setQualificationError("");
+    if (!value || target?.kind !== "job") return;
+    const ticket = fieldCheckRef.current.qualification + 1;
+    fieldCheckRef.current.qualification = ticket;
+    try {
+      const message = await checkJobField("qualification", value);
+      if (fieldCheckRef.current.qualification === ticket) setQualificationError(message);
+    } catch (err) {
+      if (fieldCheckRef.current.qualification === ticket) {
+        setQualificationError(err.message || "Could not check qualification for this job.");
+      }
+    }
+  };
+
   const uploadMandatoryDocs = async () => {
     const docs = Array.isArray(jobRules?.docs) ? jobRules.docs : [];
     if (!docs.length || target?.kind !== "job") return;
@@ -528,26 +565,25 @@ function PublicApplyModal() {
         return;
       }
       const docs = Array.isArray(jobRules.docs) ? jobRules.docs : [];
-      if (jobRules.ageMin != null && jobRules.ageMax != null) {
-        if (!ageConfirmed) {
-          setError("Please confirm that your age is eligible for this job.");
+      if (isNewUser) {
+        let nextDobError = "";
+        let nextQualificationError = "";
+        if (!dob) nextDobError = "Please select your date of birth.";
+        if (!qualification) nextQualificationError = "Please select your qualification.";
+        try {
+          if (dob) nextDobError = await checkJobField("dob", dob);
+          if (qualification) nextQualificationError = await checkJobField("qualification", qualification);
+        } catch (err) {
+          const message = err.message || "Could not check this job's requirements.";
+          if (/qualification/i.test(message)) setQualificationError(message);
+          else setDobError(message);
           return;
         }
-        if (isNewUser) {
-          const age = ageFromDob(dob);
-          if (age == null || age < Number(jobRules.ageMin) || age > Number(jobRules.ageMax)) {
-            setError(`This job requires age between ${jobRules.ageMin} and ${jobRules.ageMax} years.`);
-            return;
-          }
-        }
-      }
-      if (jobRules.qualificationId) {
-        if (!educationConfirmed) {
-          setError(`Please confirm your qualification is ${jobRules.qualificationName || "the required qualification"}.`);
-          return;
-        }
-        if (isNewUser && String(qualification) !== String(jobRules.qualificationId)) {
-          setError(`This job requires ${jobRules.qualificationName || "the listed qualification"}. Choose that qualification exactly.`);
+        setDobError(nextDobError);
+        setQualificationError(nextQualificationError);
+        if (nextDobError || nextQualificationError) {
+          const fieldId = nextDobError ? "pam-dob-field" : "pam-qualification-field";
+          document.getElementById(fieldId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
           return;
         }
       }
@@ -580,7 +616,7 @@ function PublicApplyModal() {
         return;
       }
       if (!dob) {
-        setError("Please select your date of birth.");
+        setDobError("Please select your date of birth.");
         return;
       }
       if (!gender) {
@@ -588,7 +624,7 @@ function PublicApplyModal() {
         return;
       }
       if (!qualification) {
-        setError("Please select your qualification.");
+        setQualificationError("Please select your qualification.");
         return;
       }
       if (!address.trim() || !latitude || !longitude || !state) {
@@ -653,7 +689,16 @@ function PublicApplyModal() {
       await loginAndContinue({ treatAsExisting: !isNewUser });
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
-      setError(typeof errorMsg === "string" ? errorMsg : "Something went wrong. Please try again.");
+      const message = typeof errorMsg === "string" ? errorMsg : "Something went wrong. Please try again.";
+      if (/age between|date of birth/i.test(message)) {
+        setDobError(message);
+        document.getElementById("pam-dob-field")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else if (/qualification/i.test(message)) {
+        setQualificationError(message);
+        document.getElementById("pam-qualification-field")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else {
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -858,11 +903,14 @@ function PublicApplyModal() {
             </Field>
           </label>
 
-          <label className="pam-line">
+          <label className="pam-line" id="pam-dob-field">
             <span>Date of Birth <i>*</i></span>
-            <Field icon={Calendar}>
-              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-            </Field>
+            <div className="pam-control">
+              <Field icon={Calendar} invalid={Boolean(dobError)}>
+                <input type="date" value={dob} onChange={(e) => handleDobChange(e.target.value)} />
+              </Field>
+              {dobError ? <p className="pam-field-error" role="alert">{dobError}</p> : null}
+            </div>
           </label>
 
           <label className="pam-line">
@@ -877,15 +925,18 @@ function PublicApplyModal() {
             </div>
           </label>
 
-          <label className="pam-line">
+          <label className="pam-line" id="pam-qualification-field">
             <span>Qualification <i>*</i></span>
-            <div className="pam-select-wrap">
-              <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
-                <option value="">Select qualification</option>
-                {qualifications.map((item) => (
-                  <option key={item._id} value={item._id}>{item.name}</option>
-                ))}
-              </select>
+            <div className="pam-control">
+              <div className={`pam-select-wrap${qualificationError ? " is-invalid" : ""}`}>
+                <select value={qualification} onChange={(e) => handleQualificationChange(e.target.value)}>
+                  <option value="">Select qualification</option>
+                  {qualifications.map((item) => (
+                    <option key={item._id} value={item._id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+              {qualificationError ? <p className="pam-field-error" role="alert">{qualificationError}</p> : null}
             </div>
           </label>
 
@@ -909,26 +960,6 @@ function PublicApplyModal() {
           {otpVerified && target.kind === "job" ? (
             <div className="pam-job-rules">
               {rulesLoading ? <p className="pam-rules-note">Checking this job's requirements...</p> : null}
-              {jobRules?.ageMin != null && jobRules?.ageMax != null ? (
-                <label className="pam-check">
-                  <input
-                    type="checkbox"
-                    checked={ageConfirmed}
-                    onChange={(e) => setAgeConfirmed(e.target.checked)}
-                  />
-                  <span>I confirm that my age is eligible for this job.</span>
-                </label>
-              ) : null}
-              {jobRules?.qualificationId ? (
-                <label className="pam-check">
-                  <input
-                    type="checkbox"
-                    checked={educationConfirmed}
-                    onChange={(e) => setEducationConfirmed(e.target.checked)}
-                  />
-                  <span>My qualification is {jobRules.qualificationName || "the required qualification"}.</span>
-                </label>
-              ) : null}
               {Array.isArray(jobRules?.docs) && jobRules.docs.length ? (
                 <div className="pam-docs">
                   <p>Upload the documents required for this job.</p>
@@ -1165,9 +1196,38 @@ function PublicApplyModal() {
 }
 .pam-line .pam-field,
 .pam-line .pam-mobile,
-.pam-line .pam-select-wrap {
+.pam-line .pam-select-wrap,
+.pam-line .pam-control {
   flex: 1;
   min-width: 0;
+}
+.pam-line:has(.pam-control) {
+  align-items: flex-start;
+}
+.pam-line:has(.pam-control) > span {
+  padding-top: 12px;
+}
+.pam-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pam-field-error {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+.pam-field.is-invalid,
+.pam-select-wrap.is-invalid select {
+  border-color: #f87171;
+  background-color: #fff7f7;
 }
 .pam-item {
   margin-top: 14px;
