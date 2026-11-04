@@ -180,6 +180,8 @@ import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
 import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 import TrainerModule from './Pages/App/College/Course/TrainerModule';
+import DtrSettings from './Pages/App/College/Course/DtrSettings';
+import DailyReportPage from './Pages/App/College/Course/DailyReportPage';
 import AcademicCoordinatorModule from './Pages/App/College/Training/AcademicCoordinatorModule';
 import SeniorTrainerModule from './Pages/App/College/Training/SeniorTrainerModule';
 import Editcoursecopy from './Pages/App/College/Course/EditCoursecopy';
@@ -364,6 +366,7 @@ const Layout = () => {
           <Route path="institute/courses/edit/:id" element={<Editcoursecopy />} />
           <Route path="courses/edit/:id" element={<Editcoursecopy />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
+          <Route path='dtr-settings' element={<DtrSettings/>}/>
           <Route path='projectmanagment' element={<CandidateManagementPortal/>}/>
           <Route path='candidatemanagment_old' element={<CandidateManagementPortal_old/>}/>
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
@@ -412,6 +415,7 @@ const Layout = () => {
           <Route path='lrp-view' element={<LrpView/>}/>
           <Route path='video-timestamp' element={<VideoTimestamp/>}/>
           <Route path='training' element={<TrainerModule/>}/>
+          <Route path='daily-report' element={<DailyReportPage/>}/>
           <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
           <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
           <Route path='registration' element={<Regitrationsold/>}/>

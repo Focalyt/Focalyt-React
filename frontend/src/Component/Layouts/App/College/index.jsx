@@ -1072,6 +1072,14 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
               )}
+              {((permissions?.permission_type === 'Custom' && (permissions?.custom_permissions?.can_be_academic_coordinator || permissions?.custom_permissions?.can_be_trainer)) || permissions?.permission_type === 'Admin') && (
+              <li className={`nav-item ${location.pathname === '/institute/daily-report' ? 'active' : ''}`}>
+                <Link to="/institute/daily-report" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faClipboardList} />
+                  <span className="menu-title">Daily Report</span>
+                </Link>
+              </li>
+              )}
 
               {/* Sales (B2C) */}
               {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
@@ -1528,6 +1536,14 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">{t('access_management')}</span>
                     </Link>
                   </li>
+                  {(permissions?.permission_type === 'Admin' || permissions?.custom_permissions?.can_be_academic_coordinator) && (
+                  <li className={`nav-item ${location.pathname === '/institute/dtr-settings' ? 'active' : ''}`}>
+                    <Link to="/institute/dtr-settings" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faClipboardList} />
+                      <span className="menu-title">DTR</span>
+                    </Link>
+                  </li>
+                  )}
                   {permissions?.permission_type === 'Admin' && (
                     <li className={`nav-item ${location.pathname === '/institute/meta-lead-ads' ? 'active' : ''}`}>
                       <Link to="/institute/meta-lead-ads" onClick={() => handleSidebarClose()}>
