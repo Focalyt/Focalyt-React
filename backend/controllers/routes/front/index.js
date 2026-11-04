@@ -665,6 +665,55 @@ function selectSocialPreviewImage(candidates, baseUrl) {
 	return { url: `${baseUrl}${PUBLIC_SOCIAL_PREVIEW_PATH}`, type: "image/jpeg" };
 }
 
+async function findSimilarCourses(course) {
+	const select = "name thumbnail photos videos duration city state courseType trainingMode qualification courseFeeType lastDateForApply sectors";
+	const excluded = [course._id];
+	const takeMore = async (filter, limit) => {
+		if (limit <= 0) return [];
+		return Courses.find({
+			status: true,
+			_id: { $nin: excluded },
+			...filter,
+		})
+			.select(select)
+			.populate({ path: "sectors", select: "name" })
+			.limit(limit)
+			.lean();
+	};
+
+	let similar = [];
+	const sectorIds = Array.isArray(course.sectors) ? course.sectors.filter(Boolean) : [];
+	if (sectorIds.length) {
+		similar = await takeMore({ sectors: { $in: sectorIds } }, 8);
+		excluded.push(...similar.map((item) => item._id));
+	}
+	if (similar.length < 8 && course.courseType) {
+		const more = await takeMore({ courseType: course.courseType }, 8 - similar.length);
+		similar = similar.concat(more);
+		excluded.push(...more.map((item) => item._id));
+	}
+	if (similar.length < 8 && course.city) {
+		const more = await takeMore({ city: course.city }, 8 - similar.length);
+		similar = similar.concat(more);
+		excluded.push(...more.map((item) => item._id));
+	}
+	if (similar.length < 4) {
+		const more = await Courses.find({ status: true, _id: { $nin: excluded } })
+			.select(select)
+			.populate({ path: "sectors", select: "name" })
+			.sort({ createdAt: -1 })
+			.limit(8 - similar.length)
+			.lean();
+		similar = similar.concat(more);
+	}
+	return similar.map((item) => ({
+		...item,
+		sectorNames: Array.isArray(item.sectors)
+			? item.sectors.map((sector) => sector?.name).filter(Boolean)
+			: [],
+	}));
+}
+
 router.get("/coursedetails/:id", async (req, res) => {
 	try {
 	const { id } = req.params
@@ -789,8 +838,10 @@ router.get("/coursedetails/:id", async (req, res) => {
 		return res.send(htmlContent);
 	}
 
+	const similarCourses = await findSimilarCourses(course);
 	return res.json({
 		course: coursePayload || course,
+		similarCourses,
 		storageScript: storageScript,
 	});
 	} catch (err) {
@@ -893,15 +944,32 @@ router.get("/jobdetailsmore/:jobId", async (req, res) => {
 			state = await State.findOne({ _id: job._company.stateId, status: true })
 			city = await City.findOne({ _id: job._company.cityId, status: true, stateId: job._company.stateId })
 		}
-		const recentJobs = await Vacancy.find({ status: true, _id: { $ne: jobId } }).populate([
-			{
-				path: '_company',
-				select: "name logo"
-			},
-			{
-				path: "city",
-				select: "name",
-			}]).sort({ createdAt: -1 }).limit(5)
+		const similarJobPopulate = [
+			{ path: "_company", select: "name logo" },
+			{ path: "city", select: "name" },
+			{ path: "state", select: "name" },
+			{ path: "_qualification", select: "name" },
+		];
+		const similarJobIds = [job._id];
+		const similarity = [];
+		if (job._industry?._id) similarity.push({ _industry: job._industry._id });
+		if (job.city?._id) similarity.push({ city: job.city._id });
+		if (job._jobCategory?._id) similarity.push({ _jobCategory: job._jobCategory._id });
+		let recentJobs = [];
+		if (similarity.length) {
+			recentJobs = await Vacancy.find({ status: true, _id: { $nin: similarJobIds }, $or: similarity })
+				.populate(similarJobPopulate)
+				.sort({ createdAt: -1 })
+				.limit(8);
+			similarJobIds.push(...recentJobs.map((item) => item._id));
+		}
+		if (recentJobs.length < 4) {
+			const moreJobs = await Vacancy.find({ status: true, _id: { $nin: similarJobIds } })
+				.populate(similarJobPopulate)
+				.sort({ createdAt: -1 })
+				.limit(8 - recentJobs.length);
+			recentJobs = recentJobs.concat(moreJobs);
+		}
 
 		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 }).limit(10)
 

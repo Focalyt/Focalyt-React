@@ -4,6 +4,10 @@ import { Helmet } from 'react-helmet-async';
 import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
 import { buildJobApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
+import publicDetailTheme from '../publicDetailTheme';
+import SimilarStrip from '../SimilarStrip';
+import { JobCard } from '../Jobs/Jobs';
+import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
 
 function JobDetails() {
     const { jobId } = useParams();
@@ -11,6 +15,7 @@ function JobDetails() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     
     const [job, setJob] = useState(null);
+    const [similarJobs, setSimilarJobs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('pills-home');
@@ -40,6 +45,7 @@ function JobDetails() {
                 } else {
                     setError("Job data not found in response");
                 }
+                setSimilarJobs(Array.isArray(response.data.recentJobs) ? response.data.recentJobs : []);
             } catch (err) {
                 setError("Failed to load job details");
                 console.error("Error fetching job details:", err);
@@ -111,9 +117,9 @@ function JobDetails() {
         openApply(buildJobApplyTarget(job, bucketUrl));
     };
 
-    if (loading) return <FrontLayout><div className="text-center py-5">Loading job details...</div></FrontLayout>;
-    if (error) return <FrontLayout><div className="text-center py-5 text-danger">Error: {error}</div></FrontLayout>;
-    if (!job) return <FrontLayout><div className="text-center py-5">Job not found</div></FrontLayout>;
+    if (loading) return <FrontLayout><div className="foc-public-detail text-center py-5">Loading job details...</div></FrontLayout>;
+    if (error) return <FrontLayout><div className="foc-public-detail text-center py-5 text-danger">Error: {error}</div></FrontLayout>;
+    if (!job) return <FrontLayout><div className="foc-public-detail text-center py-5">Job not found</div></FrontLayout>;
 
     const mediaGallery = job._company?.mediaGallery || [];
     const videoUrl = job._company?.mediaGalaryVideo ? `${bucketUrl}/${job._company.mediaGalaryVideo}` : '';
@@ -201,6 +207,7 @@ function JobDetails() {
                 <meta name="twitter:image" content={shareImage} />
                 <meta name="twitter:image:src" content={shareImage} />
             </Helmet>
+            <div className="foc-public-detail">
             <section className="section-padding-120 mt-5">
                 <div className="container">
                     <div className="row">
@@ -234,7 +241,7 @@ function JobDetails() {
                                 </div>
                                 <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 my-xxl-0 my-xl-0 my-lg-0 my-mt-0 my-sm-3 my-3">
                                     <div className="student_video">
-                                        <div id="carouselExampleIndicators" className="carousel slide" data-bs-ride="carousel">
+                                        <div id="carouselExampleIndicators" className="carousel slide" data-bs-ride={mediaGallery.length > 1 ? "carousel" : undefined}>
                                             <div className="carousel-indicators">
                                                 {mediaGallery.length > 0 ? (
                                                     mediaGallery.map((_, i) => (
@@ -253,8 +260,9 @@ function JobDetails() {
                                                         type="button"
                                                         data-bs-target="#carouselExampleIndicators"
                                                         data-bs-slide-to="0"
-                                                        aria-label="Slide 2"
-                                                        className="activeclass"
+                                                        aria-current="true"
+                                                        aria-label="Slide 1"
+                                                        className="active activeclass"
                                                     />
                                                 )}
                                             </div>
@@ -273,29 +281,13 @@ function JobDetails() {
                                                         </div>
                                                     ))
                                                 ) : (
-                                                    <>
-                                                        <div className="carousel-item active">
-                                                            <img
-                                                                src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
-                                                                className="d-block mx-auto"
-                                                                alt="Default"
-                                                            />
-                                                        </div>
-                                                        <div className="carousel-item">
-                                                            <img
-                                                                src="/Assets/public_assets/images/newjoblisting/stu_img.svg"
-                                                                className="d-block mx-auto"
-                                                                alt="Default"
-                                                            />
-                                                        </div>
-                                                        <div className="carousel-item">
-                                                            <img
-                                                                src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
-                                                                className="d-block mx-auto"
-                                                                alt="Default"
-                                                            />
-                                                        </div>
-                                                    </>
+                                                    <div className="carousel-item active">
+                                                        <img
+                                                            src="/Assets/public_assets/images/newjoblisting/stu_img_one.svg"
+                                                            className="d-block mx-auto"
+                                                            alt="Default"
+                                                        />
+                                                    </div>
                                                 )}
                                             </div>
                                             {mediaGallery.length > 0 && (
@@ -761,6 +753,32 @@ function JobDetails() {
                 </div>
             </section>
 
+            {similarJobs.length > 0 && (
+                <SimilarStrip title="Similar" accent="Jobs" className="foc-jobs-page">
+                    {similarJobs.map((item) => (
+                        <JobCard
+                            key={item._id}
+                            job={item}
+                            bucketUrl={bucketUrl}
+                            thumbUrl={resolveMediaUrl(bucketUrl, item.thumbnail || item.jobVideoThumbnail || item._company?.logo)}
+                            onPlayVideo={handleVideoClick}
+                            onShare={async (id, title) => {
+                                const url = `${window.location.origin}/jobdetailsmore/${id}`;
+                                if (navigator.share) {
+                                    try {
+                                        await navigator.share({ title: title || "Job", url });
+                                        return;
+                                    } catch (error) {
+                                        console.error(error);
+                                    }
+                                }
+                                navigator.clipboard?.writeText(url);
+                            }}
+                        />
+                    ))}
+                </SimilarStrip>
+            )}
+
             {/* Video Modal */}
             <div
                 className="modal fade"
@@ -800,11 +818,6 @@ function JobDetails() {
 
                 {
                     `
-                    * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
 div#videoModal .modal-content {
     background: transparent;
     border: 0;
@@ -813,9 +826,6 @@ video#courseVid {
     width: 100%;
     height: auto;
     border-radius: 6px;
-}
-body{
-    background-color: #121212!important;
 }
 figure {
     margin: 0;
@@ -1275,9 +1285,6 @@ button.accordion-button {
 a {
     text-decoration: none;
 }
-header{
-    background-color: #121212;
-}
 .margin-top-120{
     margin-top: 120px;
 }
@@ -1475,10 +1482,6 @@ div#apply_modal img {
 }
 .pree {
     background: transparent !important;
-}
-
-body {
-    background-color: #121212;
 }
 
 .footer {
@@ -2114,6 +2117,8 @@ ul.h-100.d-flex.align-items-center.justify-content-between {
 `
                 }
             </style>
+            <style>{publicDetailTheme}</style>
+            </div>
         </FrontLayout>
     );
 }
