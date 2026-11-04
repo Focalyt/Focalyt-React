@@ -467,6 +467,16 @@ function escapeSourceRegex(value) {
     return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function pickIncomingSource(body) {
+    if (!body || typeof body !== 'object') return '';
+    const keys = ['source', 'Source', 'SOURCE', 'leadSource', 'LeadSource', 'lead_source', 'Lead Source'];
+    for (const key of keys) {
+        const value = body[key];
+        if (value != null && String(value).trim()) return value;
+    }
+    return '';
+}
+
 // Sheet/API source can be a Source name or a Source id. No Digital Lead default.
 async function resolveSheetLeadSource(rawSource) {
     const value = String(rawSource || '').trim();
@@ -885,16 +895,18 @@ const batchProcessor = new BatchProcessor();
 router.route("/addleaddandcourseapply")
     .post(async (req, res) => {
         try {
+            const incomingSource = pickIncomingSource(req.body);
             console.log('[DigitalLead] POST /addleaddandcourseapply →', {
                 name: req.body.FirstName,
                 mobile: req.body.MobileNumber,
                 courseId: req.body.courseId,
                 center: req.body.Field4,
-                source: req.body.source || ''
+                source: incomingSource
             });
 
             // Basic validation only
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks, status,subStatus } = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, Remarks, status,subStatus } = req.body;
+            let source = incomingSource;
 
 
             if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4 || !status || !subStatus) {
@@ -989,6 +1001,10 @@ router.route("/addleaddandcourseapply")
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
+                if (source) {
+                    existingCandidate.source = source;
+                    await existingCandidate.save();
+                }
                 console.log('existingCandidate:', existingCandidate);
                 let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
                 console.log('alreadyApplied:', alreadyApplied);
