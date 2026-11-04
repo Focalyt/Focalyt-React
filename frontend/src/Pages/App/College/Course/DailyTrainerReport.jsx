@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const todayKey = () => {
   const date = new Date();
@@ -46,10 +48,25 @@ const formatReportDate = (value) => {
   return `${day}/${month}/${year}`;
 };
 
-const DailyTrainerReport = ({
+const mediaUrl = (file) => {
+  const backend = String(process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '');
+  const onLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+  const base = onLocalhost ? `${backend}/api/upload` : '';
+  return resolveMediaUrl(base, file?.fileUrl || '');
+};
+
+const mediaKind = (file) => {
+  const mime = String(file?.mimeType || '').toLowerCase();
+  const name = `${file?.fileName || ''} ${file?.fileUrl || ''}`.toLowerCase();
+  if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)(\?|$)/.test(name)) return 'image';
+  if (mime.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi|wmv)(\?|$)/.test(name)) return 'video';
+  if (mime.includes('pdf') || /\.pdf(\?|$)/.test(name)) return 'pdf';
+  return 'file';
+};
+
+  const DailyTrainerReport = ({
   backendUrl,
   token,
-  trainerName,
   userId,
   sessions = [],
   notify,
@@ -66,12 +83,15 @@ const DailyTrainerReport = ({
   const [savedContext, setSavedContext] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
+  const [viewingReport, setViewingReport] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewRotation, setPreviewRotation] = useState(0);
   const [answers, setAnswers] = useState({});
   const [answerFiles, setAnswerFiles] = useState({});
   const [savedAnswerFiles, setSavedAnswerFiles] = useState({});
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
-  const prefillKey = useRef('');
 
   const batchChoices = useMemo(() => {
     const choices = new Map();
@@ -206,7 +226,6 @@ const DailyTrainerReport = ({
   }, [backendUrl, token]);
 
   const openNew = () => {
-    prefillKey.current = '';
     setEditingId('');
     setReadOnly(false);
     setForm(emptyForm());
@@ -218,7 +237,6 @@ const DailyTrainerReport = ({
   };
 
   const openReport = (report) => {
-    prefillKey.current = `${report.batchId}|${report.reportDate}`;
     setEditingId(report.id);
     setReadOnly(Boolean(userId) && String(report.trainerId || '') !== String(userId));
     setSavedContext({
@@ -253,51 +271,6 @@ const DailyTrainerReport = ({
     setSavedAnswerFiles(nextFiles);
     setRemovedIds([]);
   };
-
-  useEffect(() => {
-    if (editingId || !form.batchId || !formTemplate) return undefined;
-    const key = `${form.batchId}|${form.reportDate}|${formTemplate.id}`;
-    if (prefillKey.current === key) return undefined;
-    prefillKey.current = key;
-    const choice = batchChoices.find((item) => item.id === form.batchId);
-    const match = sessions.find((session) => (
-      String(session.batch || '') === form.batchId
-      && toDateKey(session.sessionDate || session.date) === form.reportDate
-    ));
-    const portal = {
-      trainerName: trainerName || '',
-      project: choice?.projectName || match?.projectName || '',
-      location: choice?.location || match?.centerName || '',
-      jobRole: choice?.jobRole || match?.courseName || '',
-      batch: choice?.batchCode || match?.batchCode || '',
-      inTime: toTimeInput(match?.startTime),
-      outTime: toTimeInput(match?.endTime),
-      batchSize: String(match?.studentCount || match?.totalCandidates || choice?.batchSize || ''),
-      totalPresent: match ? String(match.presentCandidates ?? '') : '',
-      totalAbsent: match ? String(match.absentCandidates ?? '') : '',
-      topic: match?.topicCovered || '',
-      softSkill: (match?.sessionActivities || []).map((item) => item.name).filter(Boolean).join(', '),
-    };
-    setForm((prev) => ({
-      ...prev,
-      inTime: portal.inTime || prev.inTime,
-      outTime: portal.outTime || prev.outTime,
-      topic: portal.topic || prev.topic,
-      softSkillTopic: portal.softSkill || prev.softSkillTopic,
-      batchSize: portal.batchSize || prev.batchSize || '',
-      totalPresent: portal.totalPresent || prev.totalPresent,
-      totalAbsent: portal.totalAbsent || prev.totalAbsent,
-    }));
-    setAnswers((prev) => {
-      const next = { ...prev };
-      (formTemplate.fields || []).forEach((field) => {
-        if (!field.portalKey) return;
-        if (portal[field.portalKey]) next[field.key] = portal[field.portalKey];
-      });
-      return next;
-    });
-    return undefined;
-  }, [batchChoices, editingId, form.batchId, form.reportDate, formTemplate, sessions, trainerName]);
 
   const onField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -414,41 +387,23 @@ const DailyTrainerReport = ({
     });
   };
 
-  const viewFields = useMemo(() => {
-    const fields = new Map();
-    templates.forEach((template) => {
-      (template.fields || []).forEach((field) => fields.set(field.key, field));
-    });
-    reports.forEach((report) => {
-      (report.answers || []).forEach((answer) => {
-        if (!fields.has(answer.key)) {
-          fields.set(answer.key, { key: answer.key, label: answer.label || answer.key, type: answer.type || 'text' });
-        }
-      });
-    });
-    return [...fields.values()];
-  }, [reports, templates]);
-
-  const assignedTemplate = templates.find((template) => (
-    template.enabled !== false
-    && (!template.trainerIds?.length || template.trainerIds.includes(String(userId || '')))
-  ));
-  const tableFields = formTemplate?.fields?.length
+  const detailFields = form.reportDate && form.batchId && formTemplate?.fields?.length
     ? formTemplate.fields
-    : (assignedTemplate?.fields || templates.find((template) => template.enabled !== false)?.fields || []);
+    : [];
 
-  const answerText = (report, field) => {
-    const answer = (report.answers || []).find((item) => item.key === field.key);
-    if (!answer) return '-';
-    if (field.type === 'file' || answer.type === 'file') {
-      const names = (answer.files || []).map((file) => file.fileName).filter(Boolean);
-      return names.length ? names.join(', ') : '-';
-    }
-    return answer.value || '-';
+  const openPreview = (file) => {
+    setPreview(file);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
+  };
+
+  const closeView = () => {
+    setViewingReport(null);
+    setPreview(null);
   };
 
   const renderCell = (field) => {
-    const locked = readOnly || Boolean(field.portalKey && answers[field.key]);
+    const locked = readOnly;
     const value = answers[field.key] || '';
     if (field.type === 'file') {
       const rule = fileRule(field);
@@ -467,16 +422,41 @@ const DailyTrainerReport = ({
               }}
             />
           )}
-          {[...kept.map((file) => file.fileName || 'File'), ...added.map((file) => file.name)].join(', ')}
+          {(kept.length > 0 || added.length > 0) && (
+            <div className="dtr-files">
+              {kept.map((file) => <span className="dtr-file" key={file.id || file.fileName}>{file.fileName || 'File'}</span>)}
+              {added.map((file) => <span className="dtr-file" key={`${file.name}-${file.size}`}>{file.name}</span>)}
+            </div>
+          )}
         </div>
       );
     }
-    if (locked && field.type !== 'textarea') return <span>{value || '-'}</span>;
+    if (locked && field.type !== 'textarea') return <div className="dtr-readonly">{value || '-'}</div>;
     if (field.type === 'textarea') {
       return <textarea value={value} disabled={locked} placeholder={field.placeholder || ''} onChange={(event) => setAnswers((prev) => ({ ...prev, [field.key]: event.target.value }))} />;
     }
-    if (field.type === 'yesno' || field.type === 'select') {
+    if (field.type === 'radio' || field.type === 'yesno') {
       const options = field.type === 'yesno' ? ['Yes', 'No'] : (field.options || []);
+      return (
+        <div className="dtr-radios">
+          {options.map((option) => (
+            <label className="dtr-radio" key={option}>
+              <input
+                type="radio"
+                name={field.key}
+                value={option}
+                checked={value === option}
+                disabled={locked}
+                onChange={() => setAnswers((prev) => ({ ...prev, [field.key]: option }))}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      );
+    }
+    if (field.type === 'select') {
+      const options = field.options || [];
       return (
         <select value={value} disabled={locked} onChange={(event) => setAnswers((prev) => ({ ...prev, [field.key]: event.target.value }))}>
           <option value="">Select</option>
@@ -514,22 +494,45 @@ const DailyTrainerReport = ({
         .dtr-btn--ghost { background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
         .dtr-btn:disabled { opacity: 0.6; cursor: default; }
         .dtr-table-wrap { overflow: auto; }
-        .dtr-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px; }
-        .dtr-table th, .dtr-table td { padding: 8px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; min-width: 140px; }
-        .dtr-table th { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: #f8fafc; position: sticky; top: 0; }
-        .dtr-table td input, .dtr-table td select, .dtr-table td textarea { width: 100%; min-width: 120px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; font-size: 12px; font-weight: 500; background: #fff; }
-        .dtr-table td textarea { min-height: 52px; resize: vertical; }
-        .dtr-fill td { background: #fff7f9; }
-        .dtr-saved { cursor: pointer; }
-        .dtr-saved:hover td { background: #f8fafc; }
+        .dtr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .dtr-table th, .dtr-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
+        .dtr-table th { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: #f8fafc; }
+        .dtr-table td.dtr-action, .dtr-table th.dtr-action { width: 90px; text-align: right; }
+        .dtr-modal { position: fixed; inset: 0; z-index: 10050; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .dtr-modal-card { width: min(1040px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); }
+        .dtr-modal-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .dtr-modal-head h3 { margin: 0; font-size: 16px; }
+        .dtr-modal-head p { margin: 2px 0 0; color: #64748b; font-size: 12px; }
+        .dtr-modal-close { border: 0; background: transparent; font-size: 26px; line-height: 1; cursor: pointer; color: #334155; }
+        .dtr-modal-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .dtr-meta, .dtr-answers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .dtr-meta div, .dtr-answer { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px; }
+        .dtr-answer-wide { grid-column: 1 / -1; }
+        .dtr-meta span, .dtr-answer span { display: block; color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+        .dtr-meta strong, .dtr-answer p { display: block; margin: 2px 0 0; color: #0f172a; font-size: 13px; white-space: pre-wrap; }
+        .dtr-gallery { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .dtr-thumb { width: 180px; height: 140px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; }
+        .dtr-file-link { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fff; color: #0f172a; font-size: 12px; font-weight: 700; text-decoration: none; }
+        .dtr-preview { position: fixed; inset: 0; z-index: 10060; background: rgba(15, 23, 42, 0.88); display: flex; flex-direction: column; }
+        .dtr-preview-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; }
+        .dtr-preview-bar button, .dtr-preview-bar a { border: 0; border-radius: 8px; background: #fff; color: #0f172a; padding: 6px 10px; font-weight: 700; cursor: pointer; text-decoration: none; }
+        .dtr-preview-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 12px; }
+        .dtr-preview-stage img, .dtr-preview-stage video { max-width: 100%; max-height: 78vh; background: #fff; }
+        .dtr-preview-stage iframe { width: min(900px, 100%); height: 78vh; background: #fff; border: 0; }
         .dtr-cell-file { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
         .dtr-topic { white-space: normal; min-width: 180px; max-width: 280px; }
         .dtr-form { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
+        .dtr-pick { display: grid; grid-template-columns: 220px minmax(240px, 420px); gap: 12px; }
+        .dtr-details { border-top: 1px solid #e2e8f0; padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+        .dtr-submit { display: flex; justify-content: flex-end; gap: 8px; }
         .dtr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .dtr-span-2 { grid-column: span 2; }
         .dtr-span-3 { grid-column: span 3; }
         .dtr-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; }
         .dtr-field input, .dtr-field select, .dtr-field textarea { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 500; background: #fff; }
+        .dtr-radios { display: flex; flex-wrap: wrap; gap: 8px 16px; min-height: 36px; align-items: center; }
+        .dtr-radio { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #334155; }
+        .dtr-radio input { width: auto; min-height: 0; }
         .dtr-field textarea { min-height: 74px; resize: vertical; }
         .dtr-readonly { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-weight: 600; color: #0f172a; min-height: 36px; }
         .dtr-section { border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -543,7 +546,7 @@ const DailyTrainerReport = ({
         .dtr-yes { color: #047857; font-weight: 800; }
         .dtr-no { color: #b45309; font-weight: 800; }
         @media (max-width: 900px) {
-          .dtr-grid, .dtr-span-2, .dtr-span-3 { grid-template-columns: 1fr; }
+          .dtr-pick, .dtr-grid, .dtr-span-2, .dtr-span-3, .dtr-meta, .dtr-answers { grid-template-columns: 1fr; }
           .dtr-span-2, .dtr-span-3 { grid-column: auto; }
         }
       `}</style>
@@ -556,69 +559,70 @@ const DailyTrainerReport = ({
         <div className="dtr-bar">
           <div>
             <h2>{screen === 'add' ? 'Add daily report' : 'View reports'}</h2>
-            <p>{screen === 'add' ? 'Fill the row, then save.' : `${visibleReports.length} saved report${visibleReports.length === 1 ? '' : 's'}`}</p>
+            <p>{screen === 'add' ? 'Select the date and batch. The fields open below.' : `${visibleReports.length} saved report${visibleReports.length === 1 ? '' : 's'}`}</p>
           </div>
           <div className="dtr-actions">
-            <input
-              className="dtr-search"
-              placeholder="Search trainer, course, batch..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            {screen === 'add' && (
-              <>
-                <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
-                {!readOnly && (
-                  <button type="button" className="dtr-btn dtr-btn--primary" onClick={saveReport} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save row'}
-                  </button>
-                )}
-              </>
+            {screen === 'view' && (
+              <input
+                className="dtr-search"
+                placeholder="Search trainer, course, batch..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
             )}
           </div>
         </div>
         {loading ? (
           <div className="dtr-empty">Loading reports...</div>
         ) : screen === 'add' ? (
-          <div className="dtr-table-wrap">
-            <table className="dtr-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Batch</th>
-                  {tableFields.map((field) => (
-                    <th key={field.key}>{field.label}{field.required ? ' *' : ''}</th>
+          <div className="dtr-form">
+            <div className="dtr-pick">
+              <label className="dtr-field">Date
+                <input type="date" value={form.reportDate} disabled={readOnly} onChange={(event) => onField('reportDate', event.target.value)} />
+              </label>
+              <label className="dtr-field">Batch
+                <select value={form.batchId} disabled={readOnly} onChange={(event) => onField('batchId', event.target.value)}>
+                  <option value="">Select batch</option>
+                  {batchChoices.map((choice) => (
+                    <option key={choice.id} value={choice.id}>{choice.batchCode}{choice.jobRole ? ` · ${choice.jobRole}` : ''}</option>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="dtr-fill">
-                  <td>
-                    <input type="date" value={form.reportDate} disabled={readOnly} onChange={(event) => onField('reportDate', event.target.value)} />
-                  </td>
-                  <td>
-                    <select value={form.batchId} disabled={readOnly} onChange={(event) => onField('batchId', event.target.value)}>
-                      <option value="">Select batch</option>
-                      {batchChoices.map((choice) => (
-                        <option key={choice.id} value={choice.id}>{choice.batchCode}{choice.jobRole ? ` · ${choice.jobRole}` : ''}</option>
-                      ))}
-                      {form.batchId && !selectedBatch && (
-                        <option value={form.batchId}>{savedContext?.batchCode || 'Batch'}</option>
-                      )}
-                    </select>
-                  </td>
-                  {tableFields.map((field) => <td key={field.key}>{renderCell(field)}</td>)}
-                </tr>
-              </tbody>
-            </table>
+                  {form.batchId && !selectedBatch && (
+                    <option value={form.batchId}>{savedContext?.batchCode || 'Batch'}</option>
+                  )}
+                </select>
+              </label>
+            </div>
             {templatesLoaded && !batchChoices.length && (
               <p className="dtr-empty">No batch is assigned to you. The coordinator selects your batch in Settings → DTR.</p>
             )}
             {form.batchId && !formTemplate && (
               <p className="dtr-empty">This DTR is not assigned to you for this batch. The coordinator selects the trainer in Settings → DTR.</p>
             )}
-            {!tableFields.length && (
-              <p className="dtr-empty">No DTR columns yet. The coordinator sets the fields, batches and trainers in Settings → DTR.</p>
+            {form.batchId && formTemplate && !detailFields.length && (
+              <p className="dtr-empty">No fields on this DTR yet. The coordinator adds them in Settings → DTR.</p>
+            )}
+            {detailFields.length > 0 && (
+              <div className="dtr-details">
+                <div className="dtr-grid">
+                  {detailFields.map((field) => (
+                    <div
+                      key={field.key}
+                      className={`dtr-field${field.type === 'textarea' || field.type === 'file' || field.type === 'radio' || field.type === 'yesno' ? ' dtr-span-3' : ''}`}
+                    >
+                      <span>{field.label}{field.required ? ' *' : ''}</span>
+                      {renderCell(field)}
+                    </div>
+                  ))}
+                </div>
+                <div className="dtr-submit">
+                  <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
+                  {!readOnly && (
+                    <button type="button" className="dtr-btn dtr-btn--primary" onClick={saveReport} disabled={saving}>
+                      {saving ? 'Saving...' : 'Save row'}
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         ) : (
@@ -635,19 +639,21 @@ const DailyTrainerReport = ({
                     <th>Project</th>
                     <th>Course</th>
                     <th>Batch</th>
-                    {viewFields.map((field) => <th key={field.key}>{field.label}</th>)}
+                    <th className="dtr-action">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleReports.map((report) => (
-                    <tr key={report.id} className="dtr-saved" onClick={() => { openReport(report); setScreen('add'); }}>
+                    <tr key={report.id}>
                       <td>{formatReportDate(report.reportDate)}</td>
                       <td>{report.trainerName || '-'}</td>
                       <td>{report.verticalName || '-'}</td>
                       <td>{report.projectName || '-'}</td>
                       <td>{report.courseName || report.jobRole || '-'}</td>
                       <td>{report.batchCode || '-'}</td>
-                      {viewFields.map((field) => <td key={field.key}>{answerText(report, field)}</td>)}
+                      <td className="dtr-action">
+                        <button type="button" className="dtr-btn dtr-btn--ghost" onClick={() => setViewingReport(report)}>View</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -656,6 +662,106 @@ const DailyTrainerReport = ({
           </div>
         )}
       </div>
+      {viewingReport && createPortal(
+        <div className="dtr-modal" onClick={closeView}>
+          <div className="dtr-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="dtr-modal-head">
+              <div>
+                <h3>{formatReportDate(viewingReport.reportDate) || 'Daily report'}</h3>
+                <p>{[viewingReport.trainerName, viewingReport.batchCode, viewingReport.courseName].filter(Boolean).join(' · ')}</p>
+              </div>
+              <button type="button" className="dtr-modal-close" onClick={closeView} aria-label="Close">×</button>
+            </div>
+            <div className="dtr-modal-body">
+              <div className="dtr-meta">
+                {[
+                  ['Date', formatReportDate(viewingReport.reportDate)],
+                  ['Trainer', viewingReport.trainerName],
+                  ['Department', viewingReport.verticalName],
+                  ['Project', viewingReport.projectName],
+                  ['Course', viewingReport.courseName || viewingReport.jobRole],
+                  ['Batch', viewingReport.batchCode],
+                  ['Location', viewingReport.location],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <strong>{value || '-'}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="dtr-answers">
+              {(viewingReport.answers || []).map((answer) => {
+                const wide = answer.type === 'file' || answer.type === 'textarea' || String(answer.value || '').length > 80 || (answer.files || []).length > 0;
+                return (
+                <div className={`dtr-answer${wide ? ' dtr-answer-wide' : ''}`} key={answer.key}>
+                  <span>{answer.label || answer.key}</span>
+                  {answer.type === 'file' || (answer.files || []).length ? (
+                    (answer.files || []).length ? (
+                      <div className="dtr-gallery">
+                        {answer.files.map((file) => {
+                          const url = mediaUrl(file);
+                          if (mediaKind(file) === 'image') {
+                            return (
+                              <img
+                                key={file.id}
+                                className="dtr-thumb"
+                                src={url}
+                                alt={file.fileName || 'Report photo'}
+                                onClick={() => openPreview(file)}
+                              />
+                            );
+                          }
+                          return (
+                            <button key={file.id} type="button" className="dtr-file-link" onClick={() => openPreview(file)}>
+                              {file.fileName || 'Open file'}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : <p>-</p>
+                  ) : <p>{answer.value || '-'}</p>}
+                </div>
+                );
+              })}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {preview && createPortal(
+        <div className="dtr-preview" onClick={() => setPreview(null)}>
+          <div className="dtr-preview-bar" onClick={(event) => event.stopPropagation()}>
+            <strong>{preview.fileName || 'File'}</strong>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {mediaKind(preview) === 'image' && (
+                <>
+                  <button type="button" onClick={() => setPreviewZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}>Zoom in</button>
+                  <button type="button" onClick={() => setPreviewZoom((value) => Math.max(0.5, Number((value - 0.25).toFixed(2))))}>Zoom out</button>
+                  <button type="button" onClick={() => setPreviewRotation((value) => (value + 90) % 360)}>Rotate</button>
+                </>
+              )}
+              <a href={mediaUrl(preview)} target="_blank" rel="noreferrer">Open</a>
+              <button type="button" onClick={() => setPreview(null)}>Close</button>
+            </div>
+          </div>
+          <div className="dtr-preview-stage" onClick={(event) => event.stopPropagation()}>
+            {mediaKind(preview) === 'image' && (
+              <img
+                src={mediaUrl(preview)}
+                alt={preview.fileName || 'Report photo'}
+                style={{ transform: `scale(${previewZoom}) rotate(${previewRotation}deg)`, transition: 'transform 0.2s ease' }}
+              />
+            )}
+            {mediaKind(preview) === 'video' && <video src={mediaUrl(preview)} controls />}
+            {mediaKind(preview) === 'pdf' && <iframe title={preview.fileName || 'PDF'} src={mediaUrl(preview)} />}
+            {mediaKind(preview) === 'file' && (
+              <a className="dtr-file-link" href={mediaUrl(preview)} target="_blank" rel="noreferrer">{preview.fileName || 'Open file'}</a>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
     </section>
   );
 };

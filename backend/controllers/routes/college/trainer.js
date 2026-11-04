@@ -1842,8 +1842,7 @@ const readRemovedReportFileIds = (body) => {
 	}
 };
 
-const DTR_FIELD_TYPES = ['text', 'textarea', 'number', 'date', 'time', 'yesno', 'select', 'file'];
-const DTR_PORTAL_KEYS = ['trainerName', 'project', 'location', 'jobRole', 'batch', 'inTime', 'outTime', 'batchSize', 'totalPresent', 'totalAbsent', 'topic', 'softSkill'];
+const DTR_FIELD_TYPES = ['text', 'textarea', 'number', 'date', 'time', 'yesno', 'select', 'radio', 'file'];
 
 const canSetDtr = (user) => user?.role === 2
 	|| user?.permissions?.permission_type === 'Admin'
@@ -1923,23 +1922,25 @@ const normalizeTemplateFields = (fields) => {
 		if (!key) key = `field_${index + 1}`;
 		while (used.has(key)) key = `${key}_${index + 1}`;
 		used.add(key);
-		const options = type === 'select'
+		const choiceType = type === 'yesno' ? 'radio' : type;
+		const options = choiceType === 'select' || choiceType === 'radio'
 			? String(field?.optionsText || (Array.isArray(field?.options) ? field.options.join('\n') : ''))
 				.split(/\n|,/)
 				.map((item) => item.trim())
 				.filter(Boolean)
 			: [];
-		if (type === 'select' && options.length < 2) {
+		const choices = type === 'yesno' && options.length < 2 ? ['Yes', 'No'] : options;
+		if ((choiceType === 'select' || choiceType === 'radio') && choices.length < 2) {
 			throw reportHttpError(400, `${label} needs at least two options`);
 		}
-		const portalKey = DTR_PORTAL_KEYS.includes(field?.portalKey) ? field.portalKey : '';
+		const portalKey = '';
 		return {
 			key,
 			label,
-			type,
+			type: choiceType,
 			required: field?.required === true,
 			placeholder: String(field?.placeholder || '').trim(),
-			options,
+			options: choices,
 			portalKey,
 			fileKind: ['image', 'video', 'document'].includes(field?.fileKind) ? field.fileKind : 'image',
 			maxFiles: Math.min(10, Math.max(1, Number(field?.maxFiles) || 1)),

@@ -8,25 +8,9 @@ const FIELD_TYPES = [
   { id: 'number', label: 'Number' },
   { id: 'date', label: 'Date' },
   { id: 'time', label: 'Time' },
-  { id: 'yesno', label: 'Yes / No' },
   { id: 'select', label: 'Dropdown' },
+  { id: 'radio', label: 'Radio button' },
   { id: 'file', label: 'File upload' },
-];
-
-const PORTAL_FILLS = [
-  { id: '', label: 'Trainer fills this' },
-  { id: 'trainerName', label: 'Trainer name' },
-  { id: 'project', label: 'Project' },
-  { id: 'location', label: 'Location / center' },
-  { id: 'jobRole', label: 'Job role / course name' },
-  { id: 'batch', label: 'Batch' },
-  { id: 'inTime', label: 'In time from session' },
-  { id: 'outTime', label: 'Out time from session' },
-  { id: 'batchSize', label: 'Batch size' },
-  { id: 'totalPresent', label: 'Present count' },
-  { id: 'totalAbsent', label: 'Absent count' },
-  { id: 'topic', label: 'Session topic' },
-  { id: 'softSkill', label: 'Soft skill from activity type' },
 ];
 
 const emptyField = () => ({
@@ -255,11 +239,16 @@ const DtrSettings = () => {
       courseIds: savedIds(template.courseIds, template.courseId),
       batchIds: template.batchIds || [],
       trainerIds: template.trainerIds || [],
-      fields: (template.fields || []).map((field) => ({
-        ...emptyField(),
-        ...field,
-        options: Array.isArray(field.options) ? field.options.filter(Boolean) : [],
-      })),
+      fields: (template.fields || []).map((field) => {
+        const options = Array.isArray(field.options) ? field.options.filter(Boolean) : [];
+        const type = field.type === 'yesno' ? 'radio' : field.type;
+        return {
+          ...emptyField(),
+          ...field,
+          type,
+          options: type === 'radio' && field.type === 'yesno' && options.length < 2 ? ['Yes', 'No'] : options,
+        };
+      }),
     });
   };
 
@@ -326,7 +315,7 @@ const DtrSettings = () => {
         required: field.required,
         placeholder: field.placeholder,
         optionsText: (field.options || []).join('\n'),
-        portalKey: field.portalKey,
+        portalKey: '',
         fileKind: field.fileKind,
         maxFiles: Number(field.maxFiles) || 1,
       })),
@@ -360,47 +349,56 @@ const DtrSettings = () => {
   return (
     <div className="dtr-set">
       <style>{`
-        .dtr-set { padding: 18px; display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
-        .dtr-set h2 { margin: 0 0 8px; font-size: 22px; }
-        .dtr-set p, .dtr-set small { color: #64748b; }
-        .dtr-set-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
-        .dtr-set-list button, .dtr-set-btn, .dtr-set-ghost { border-radius: 8px; font-weight: 700; cursor: pointer; }
-        .dtr-set-list button { width: 100%; text-align: left; border: 1px solid #e2e8f0; background: #fff; padding: 10px; margin-top: 8px; }
-        .dtr-set-list button strong { display: block; }
-        .dtr-set-btn { border: 0; background: #fa5579; color: #fff; padding: 8px 14px; }
-        .dtr-set-ghost { border: 1px solid #e2e8f0; background: #fff; padding: 8px 12px; }
-        .dtr-set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .dtr-multi { position: relative; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #334155; }
-        .dtr-multi-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff; font-weight: 500; color: #0f172a; cursor: pointer; }
+        .dtr-set { padding: 4px 2px 18px; display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; font-family: inherit; font-size: inherit; font-weight: 400; line-height: 1.45; color: #6e6b7b; }
+        .dtr-set button, .dtr-set input, .dtr-set select, .dtr-set textarea, .dtr-set label, .dtr-set h2, .dtr-set h3, .dtr-set p, .dtr-set small, .dtr-set a { font-family: inherit; }
+        .dtr-set h2 { margin: 0 0 4px; font-size: 1.1rem; font-weight: 600; color: #5e5873; }
+        .dtr-set h3 { margin: 0; font-size: 1rem; font-weight: 600; color: #5e5873; }
+        .dtr-set p, .dtr-set small { color: #b9b9c3; font-size: 0.875rem; font-weight: 400; line-height: 1.45; }
+        .dtr-set-card { background: #fff; border: 1px solid #ebe9f1; border-radius: 8px; padding: 16px; box-shadow: 0 4px 24px rgba(34, 41, 47, 0.06); }
+        .dtr-set-list button, .dtr-set-btn, .dtr-set-ghost { border-radius: 6px; font-size: 1rem; font-weight: 500; cursor: pointer; }
+        .dtr-set-list button { width: 100%; text-align: left; border: 1px solid #ebe9f1; background: #fff; padding: 10px 12px; margin-top: 8px; color: #6e6b7b; }
+        .dtr-set-list button.active { border-color: #FC2B5A; background: #fff5f7; }
+        .dtr-set-list button strong { display: block; font-size: 1rem; font-weight: 600; color: #5e5873; }
+        .dtr-set-list button small { display: block; margin-top: 2px; }
+        .dtr-set-btn { border: 0; background: #FC2B5A; color: #fff; padding: 8px 14px; }
+        .dtr-set-btn:disabled { opacity: 0.65; cursor: default; }
+        .dtr-set-ghost { border: 1px solid #ebe9f1; background: #fff; color: #6e6b7b; padding: 8px 12px; }
+        .dtr-set-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+        .dtr-multi { position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; font-weight: 500; color: #5e5873; }
+        .dtr-multi-btn { width: 100%; min-height: 38px; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border: 1px solid #d8d6de; border-radius: 6px; padding: 8px 10px; background: #fff; font-size: 1rem; font-weight: 400; color: #6e6b7b; cursor: pointer; }
         .dtr-multi-btn span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .dtr-multi-btn:disabled { color: #94a3b8; cursor: default; }
-        .dtr-multi-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 260px; overflow: auto; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08); padding: 6px; }
+        .dtr-multi-btn:disabled { color: #b9b9c3; background: #f8f8f8; cursor: default; }
+        .dtr-multi-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #ebe9f1; border-radius: 6px; max-height: 260px; overflow: auto; box-shadow: 0 4px 24px rgba(34, 41, 47, 0.1); padding: 6px; }
         .dtr-multi-search { position: sticky; top: 0; background: #fff; padding-bottom: 6px; z-index: 1; }
         .dtr-multi-search input { width: 100%; }
-        .dtr-set label.dtr-batch-item { flex-direction: row; align-items: center; gap: 8px; height: auto; font-weight: 600; padding: 6px; border-radius: 6px; cursor: pointer; }
-        .dtr-set label.dtr-batch-item:hover { background: #f8fafc; }
-        .dtr-set label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #334155; }
-        .dtr-set input, .dtr-set select, .dtr-set textarea { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; font-weight: 500; }
-        .dtr-field { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin-top: 10px; }
-        .dtr-field-row { display: flex; align-items: flex-end; gap: 8px; }
-        .dtr-field-row > label:not(.dtr-check) { flex: 1; min-width: 0; }
-        .dtr-set label.dtr-check { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; height: 36px; }
+        .dtr-set label.dtr-batch-item { flex-direction: row; align-items: center; gap: 8px; height: auto; font-size: 1rem; font-weight: 400; color: #6e6b7b; padding: 6px; border-radius: 6px; cursor: pointer; }
+        .dtr-set label.dtr-batch-item:hover { background: #f8f8f8; }
+        .dtr-set label { display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; font-weight: 500; color: #5e5873; }
+        .dtr-set input, .dtr-set select, .dtr-set textarea { border: 1px solid #d8d6de; border-radius: 6px; padding: 8px 10px; min-height: 38px; font-size: 1rem; font-weight: 400; color: #6e6b7b; background: #fff; }
+        .dtr-set input:focus, .dtr-set select:focus, .dtr-set textarea:focus { outline: none; border-color: #FC2B5A; }
+        .dtr-fields-head { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+        .dtr-field { border: 1px solid #ebe9f1; border-radius: 8px; padding: 12px; margin-top: 10px; background: #fff; }
+        .dtr-field-row { display: grid; grid-template-columns: minmax(160px, 1.6fr) minmax(140px, 1fr) auto auto; gap: 10px; align-items: end; }
+        .dtr-set label.dtr-check { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; min-height: 38px; font-size: 1rem; font-weight: 400; color: #6e6b7b; }
         .dtr-options, .dtr-file-extra { margin-top: 8px; }
         .dtr-option-add { display: flex; gap: 8px; align-items: center; }
         .dtr-option-add input { flex: 1; }
         .dtr-option-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-        .dtr-option { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e2e8f0; border-radius: 999px; padding: 4px 8px; font-size: 12px; font-weight: 600; }
-        .dtr-option button { border: 0; background: transparent; color: #be123c; cursor: pointer; font-weight: 800; }
+        .dtr-option { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ebe9f1; border-radius: 999px; padding: 4px 8px; font-size: 0.875rem; font-weight: 500; color: #5e5873; }
+        .dtr-option button { border: 0; background: transparent; color: #FC2B5A; cursor: pointer; font-weight: 600; }
         .dtr-file-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .dtr-note { color: #047857; font-size: 13px; }
-        @media (max-width: 980px) { .dtr-set, .dtr-set-grid, .dtr-file-extra { grid-template-columns: 1fr; } }
+        .dtr-save-row { display: flex; gap: 12px; align-items: center; margin-top: 16px; }
+        .dtr-save-row a { color: #FC2B5A; font-size: 1rem; font-weight: 500; }
+        .dtr-note { color: #28c76f; font-size: 0.875rem; }
+        @media (max-width: 1100px) { .dtr-field-row { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 980px) { .dtr-set, .dtr-set-grid, .dtr-file-extra, .dtr-field-row { grid-template-columns: 1fr; } }
       `}</style>
       <aside className="dtr-set-card dtr-set-list">
         <h2>DTR list</h2>
         <p>One report can cover many departments, projects, centers, courses and batches.</p>
         <button type="button" className="dtr-set-btn" onClick={() => { setDraft(blankDraft()); setOpenMenu(''); setMessage(''); }}>New DTR</button>
         {templates.map((template) => (
-          <button key={template.id} type="button" onClick={() => openTemplate(template)}>
+          <button key={template.id} type="button" className={template.id === draft.id ? 'active' : ''} onClick={() => openTemplate(template)}>
             <strong>{template.name || template.courseName}</strong>
             <small>{[template.departmentName, template.projectName, template.centerName, template.courseName].filter(Boolean).join(' · ') || 'No scope yet'}</small>
           </button>
@@ -492,7 +490,7 @@ const DtrSettings = () => {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+            <div className="dtr-fields-head">
               <h3 style={{ margin: 0 }}>Fields</h3>
               <button type="button" className="dtr-set-ghost" onClick={() => setDraft({ ...draft, fields: draft.fields.concat(emptyField()) })}>Add field</button>
             </div>
@@ -507,33 +505,13 @@ const DtrSettings = () => {
                       {FIELD_TYPES.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}
                     </select>
                   </label>
-                  <label>Fill from portal
-                    <select
-                      value={field.portalKey}
-                      onChange={(event) => {
-                        const portalKey = event.target.value;
-                        const type = portalKey === 'inTime' || portalKey === 'outTime'
-                          ? 'time'
-                          : ['batchSize', 'totalPresent', 'totalAbsent'].includes(portalKey)
-                            ? 'number'
-                            : portalKey === 'topic' || portalKey === 'softSkill'
-                              ? 'textarea'
-                              : portalKey
-                                ? 'text'
-                                : field.type;
-                        updateField(field.key, { portalKey, type });
-                      }}
-                    >
-                      {PORTAL_FILLS.map((item) => <option key={item.id || 'manual'} value={item.id}>{item.label}</option>)}
-                    </select>
-                  </label>
                   <label className="dtr-check">
                     <input type="checkbox" checked={field.required} onChange={(event) => updateField(field.key, { required: event.target.checked })} />
                     Required
                   </label>
                   <button type="button" className="dtr-set-ghost" onClick={() => setDraft({ ...draft, fields: draft.fields.filter((item) => item.key !== field.key) })}>Remove</button>
                 </div>
-                {field.type === 'select' && (
+                {(field.type === 'select' || field.type === 'radio') && (
                   <div className="dtr-options">
                     <div className="dtr-option-add">
                       <input
@@ -579,7 +557,7 @@ const DtrSettings = () => {
                 )}
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14 }}>
+            <div className="dtr-save-row">
               <button type="button" className="dtr-set-btn" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save DTR'}</button>
               <Link to="/institute/daily-report">Open daily report</Link>
             </div>
