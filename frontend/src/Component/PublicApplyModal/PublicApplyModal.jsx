@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import axios from "axios";
 import {
   Calendar,
+  Check,
+  Clock,
   Lock,
   Mail,
   MapPin,
@@ -16,6 +18,21 @@ import { parseAddressComponents, getCoordinates, isValidPlace } from "../../util
 import { trackMetaConversion } from "../../utils/conversionTrakingRoutes";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+
+function PerkMark({ type }) {
+  if (type === "gift") return <Check size={14} strokeWidth={2.6} />;
+  if (type === "clock") return <Clock size={14} strokeWidth={2.2} />;
+  if (type === "dot") return <span className="pam-perk-dot" />;
+  return <span className="pam-perk-diamond" aria-hidden="true" />;
+}
+
+function formatDetailPrice(details, badge) {
+  if (details?.isFree || details?.price === "Free") return "Free";
+  const price = String(details?.price || "").trim();
+  if (!price || price === "—") return badge || "";
+  if (/^[₹]|free/i.test(price)) return price;
+  return `₹ ${price}`;
+}
 
 const PublicApplyContext = createContext(null);
 
@@ -751,7 +768,7 @@ function PublicApplyModal() {
                 e.currentTarget.src = THUMB_FALLBACK;
               }}
             />
-            <p className="pam-detail__kicker">Course details</p>
+            <p className="pam-detail__kicker">{isCourse ? "Course details" : "Job details"}</p>
             <h2 id="pam-title">{target.name}</h2>
             <p className="pam-detail__meta">
               {target.location || "NA"}
@@ -761,13 +778,16 @@ function PublicApplyModal() {
             {Array.isArray(details.perks) && details.perks.length ? (
               <ul className="pam-detail__perks">
                 {details.perks.map((perk) => (
-                  <li key={perk.text}>{perk.text}</li>
+                  <li key={perk.text} className={`pam-perk pam-perk--${perk.type || "dot"}`}>
+                    <PerkMark type={perk.type} />
+                    <span>{perk.text}</span>
+                  </li>
                 ))}
               </ul>
             ) : null}
             {details.description ? <p className="pam-detail__desc">{details.description}</p> : null}
             <div className="pam-detail__price">
-              <strong>{details.isFree || details.price === "Free" ? "Free" : details.price ? `₹ ${details.price}` : target.badge}</strong>
+              <strong>{formatDetailPrice(details, target.badge)}</strong>
               {details.duration ? <span>{details.duration}</span> : null}
               {details.extraFee ? <span>{details.extraFee}</span> : null}
               {details.ratingCount ? <span>{details.ratingCount}</span> : null}
@@ -812,7 +832,11 @@ function PublicApplyModal() {
           <div className="pam-head">
             <div>
               <h2>Register</h2>
-              <p>Fill in your details to enroll in this course.</p>
+              <p>
+                {isCourse
+                  ? "Fill in your details to enroll in this course."
+                  : "Fill in your details to apply for this job."}
+              </p>
             </div>
           </div>
         ) : null}
@@ -1033,8 +1057,15 @@ function PublicApplyModal() {
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
   padding: 22px 22px 18px;
   position: relative;
-  font-family: inherit;
-  color: #0f172a;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: var(--foc-text-base, 1rem);
+  color: var(--foc-color-text, #0f172a);
+}
+.pam-card button,
+.pam-card input,
+.pam-card select,
+.pam-card textarea {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
 }
 .pam-card.is-split {
   width: min(980px, 100%);
@@ -1069,62 +1100,93 @@ function PublicApplyModal() {
 }
 .pam-detail__kicker {
   margin: 14px 0 4px;
-  font-size: 12px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #2563eb;
+  color: var(--foc-cyan, #1ba7ff);
 }
 .pam-detail h2 {
   margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: var(--foc-leading-tight, 1.12);
+  color: var(--foc-color-text, #061426);
 }
 .pam-detail__meta {
   margin: 6px 0 0;
-  color: #64748b;
+  color: var(--foc-color-text-muted, #3e5876);
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 .pam-detail__tag {
   display: inline-block;
   margin-top: 10px;
-  font-size: 12px;
-  color: #1d4ed8;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6570;
   background: #fff;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  padding: 3px 10px;
+  border: 1px solid #d7dbe2;
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 .pam-detail__perks {
   list-style: none;
   margin: 14px 0 0;
   padding: 0;
   display: grid;
+  gap: 7px;
+}
+.pam-detail__perks li,
+.pam-perk {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-}
-.pam-detail__perks li {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 13px;
-  color: #334155;
-  padding-left: 14px;
-  position: relative;
+  font-weight: 500;
+  line-height: 1.4;
+  padding-left: 0;
 }
-.pam-detail__perks li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
+.pam-detail__perks li::before { content: none; }
+.pam-perk svg,
+.pam-perk-dot,
+.pam-perk-diamond {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.pam-perk--gift { color: #1b8a3e; }
+.pam-perk--clock { color: #0a8a86; }
+.pam-perk--dot { color: var(--foc-color-text, #061426); }
+.pam-perk--heritage { color: #b0892e; }
+.pam-perk-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #4b5563;
+  margin-top: 6px;
+}
+.pam-perk-diamond {
+  width: 8px;
+  height: 8px;
+  background: #1a73e8;
+  transform: rotate(45deg);
+  margin-top: 5px;
+  border-radius: 1px;
 }
 .pam-detail__desc {
   margin: 14px 0 0;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 13px;
+  font-weight: 400;
   line-height: 1.5;
-  color: #475569;
+  color: var(--foc-color-text-muted, #3e5876);
 }
 .pam-detail__price {
   margin-top: 16px;
@@ -1132,11 +1194,17 @@ function PublicApplyModal() {
   gap: 2px;
 }
 .pam-detail__price strong {
-  font-size: 22px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--foc-color-text, #061426);
 }
 .pam-detail__price span {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 12px;
-  color: #64748b;
+  font-weight: 500;
+  color: var(--foc-color-text-muted, #3e5876);
 }
 .pam-register {
   padding: 22px 22px 18px;
@@ -1170,16 +1238,21 @@ function PublicApplyModal() {
 }
 .pam-head h2 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: var(--foc-leading-tight, 1.12);
+  color: var(--foc-color-text, #061426);
 }
 .pam-head p {
   margin: 6px 0 0;
-  color: #64748b;
-  font-size: 14px;
-  line-height: 1.4;
-  max-width: 230px;
+  color: var(--foc-color-text-muted, #3e5876);
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.6;
+  max-width: 280px;
 }
 .pam-register .pam-head p {
   max-width: none;
@@ -1275,9 +1348,14 @@ function PublicApplyModal() {
 .pam-form label {
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--foc-color-text-muted, #3e5876);
+}
+.pam-line > span {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .pam-form label i {
   color: #ef4444;
@@ -1298,8 +1376,11 @@ function PublicApplyModal() {
   outline: none;
   width: 100%;
   background: transparent;
-  font-size: 14px;
-  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--foc-color-text, #061426);
   min-height: 42px;
 }
 .pam-field__icon { color: #94a3b8; display: grid; place-items: center; }
@@ -1383,8 +1464,11 @@ function PublicApplyModal() {
   border-radius: 14px;
   min-height: 48px;
   color: #fff;
-  font-size: 16px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1442,7 +1526,7 @@ function PublicApplyModal() {
 @media (max-width: 520px) {
   .pam-card { padding: 18px 14px 14px; border-radius: 18px; }
   .pam-card.is-split { padding: 0; }
-  .pam-head h2 { font-size: 24px; }
+  .pam-head h2 { font-size: 1.05rem; }
   .pam-mobile { grid-template-columns: minmax(0, 1fr) auto; }
   .pam-otp-btn, .pam-verify-btn { min-width: 0; padding: 0 12px; }
   .pam-register { padding: 18px 14px 14px; }

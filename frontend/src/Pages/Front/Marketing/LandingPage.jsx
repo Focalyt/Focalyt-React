@@ -535,8 +535,20 @@ const LandingPage = ({ mode = "courses" }) => {
   padding-top: 88px;
   position: relative;
   overflow-x: hidden;
-  font-family: var(--foc-font-sans);
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: var(--foc-text-base, 1rem);
   color: var(--htl-text);
+}
+.foc-hotel-listing button,
+.foc-hotel-listing input {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+}
+.foc-hotel-listing .htl-name,
+.foc-hotel-listing .htl-similar {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--foc-color-text, var(--htl-text));
 }
 .foc-hotel-listing .htl-section {
   padding: 48px 0 64px;
@@ -762,9 +774,8 @@ const LandingPage = ({ mode = "courses" }) => {
 }
 .foc-hotel-listing .htl-name {
   margin: 0 0 6px;
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1.3;
+  font-size: clamp(17px, 2vw, 20px);
+  line-height: 1.2;
 }
 .foc-hotel-listing .htl-meta {
   margin: 0 0 8px;
@@ -854,9 +865,8 @@ const LandingPage = ({ mode = "courses" }) => {
 }
 .foc-hotel-listing .htl-similar {
   margin: 12px 0 0;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: clamp(18px, 2.4vw, 22px);
+  line-height: var(--foc-leading-tight, 1.12);
 }
 
 @media (min-width: 860px) {
