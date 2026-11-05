@@ -15,6 +15,9 @@ let Status = require('../../models/status');
 const Vertical = require('../../models/verticals');
 const Vacancy = require('../../models/vacancy');
 const AppliedJobs = require('../../models/appliedJobs');
+const HiringStatus = require('../../models/hiringstatus');
+const Company = require('../../models/company');
+const createHrHiring = require('./hrHiring');
 const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 const B2cStatusAssignment = require('../../models/b2cStatusAssignment');
 const { getStatusProjectScope, getAssignedForProjects } = require('../../../helpers/b2cStatusAssignment');
@@ -715,7 +718,7 @@ const APPLY_LEAD_POPULATE = [
   },
   {
     path: '_job',
-    select: 'title hr docsRequired',
+    select: 'title hr docsRequired _company isDeleted',
     populate: [
       { path: 'hr', select: 'name email' },
       { path: 'vertical', select: 'name' },
@@ -821,6 +824,7 @@ const mapApplyToLead = (apply, statusIndex) => {
     createdAt: apply.createdAt,
     updatedAt: apply.updatedAt,
     candidate: candidate._id || apply._candidate,
+    companyId: apply._company?._id || apply._company || job._company?._id || job._company || null,
     _job: job._id || apply._job,
   });
 };
@@ -1165,7 +1169,7 @@ router.get('/leads', isCollege, async (req, res) => {
     const skip = (page - 1) * limit;
     const { leads } = await queryAppliedLeads(req.query, req.user?.college?._id, req.user);
     const total = leads.length;
-    const paged = leads.slice(skip, skip + limit);
+    const paged = await hrHiring.attach(leads.slice(skip, skip + limit));
 
     return res.json({
       success: true,
@@ -2350,13 +2354,18 @@ router.route("/digitalhrleads").post(async (req, res) => {
       });
   }
 });
+const hrHiring = createHrHiring({ HiringStatus, Company, loadAppliedLead });
+router.get('/leads/:id/hiring', isCollege, hrHiring.get);
+router.put('/leads/:id/hiring', isCollege, hrHiring.update);
+
 router.get('/leads/:id', isCollege, async (req, res) => {
   try {
     const loaded = await loadAppliedLead(req.params.id, req.user?.college?._id);
     if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
-    return res.json({ success: true, data: loaded.lead });
+    const [lead] = await hrHiring.attach([loaded.lead]);
+    return res.json({ success: true, data: lead });
   } catch (error) {
     console.error('[HR leads] get error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch HR lead' });

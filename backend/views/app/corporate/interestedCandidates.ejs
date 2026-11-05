@@ -39,121 +39,21 @@
                         <div class="card mb-0">
                           <div class="card-content">
                             <div class="table-responsive">
-                              <table class="table table-hover-animation mb-0 table-hover" id="table">
-                                <thead>
-                                  <tr>
-                                    <th>Date</th>
-                                    <th>Display Name</th>
-                                    <th>Title</th>
-                                    <th class="long_text">Candidate</th>
-                                    <th>Number</th>
-                                    <th>Email</th>
-                                    <th>Gender</th>
-                                    <th>Qualification</th>
-                                    <th>Experience</th>
-                                    <th>Location</th>
-                                    <th>Download</th>
-                                    <th>Focalyt CV</th>
-                                  </tr>
-                                </thead>
-                                <tbody id="table-body">
-                                  <% if (appliedCandidates && appliedCandidates.length> 0) { %>
-                                    <% appliedCandidates.forEach((candidate)=> { %>
-                                      <tr>
-                                        <td>
-                                          <%= moment(candidate.createdAt).utcOffset("+05:30").format('MMM DD YYYY')%>
-                                        </td>
-                                        <td>
-                                          <%= candidate._job?.displayCompanyName || company.name || 'NA' %>
-                                        </td>
-                                        <td>
-                                          <%= candidate._job?.title || 'NA' %>
-                                        </td>
-                                        <td>
-                                          <%= candidate._candidate ? candidate._candidate.name : 'NA' %>
-                                        </td>
-                                        <td>
-                                          <% if (candidate.masked===true) { %>
-                                            <button id="maskunmask"
-                                              onclick="maskUnmask('<%= candidate._candidate ?._id %>')"
-                                              class="masked btn btn-primary me-3 waves-effect waves-light btn-sm"
-                                              data-bs-target="#editUser" data-bs-toggle="modal">UNMASK</button>
-                                            <% } else { %>
-                                              <%= candidate._candidate ?.mobile ? candidate._candidate ?.mobile : 'NA'
-                                                %>
-                                                <% } %>
-                                        </td>
-
-                                        <td>
-                                          <% if (candidate.masked===true) { %>
-                                            <button id="maskunmask"
-                                              onclick="maskUnmask('<%= candidate._candidate ?._id %>')"
-                                              class="masked btn btn-primary me-3 waves-effect waves-light btn-sm"
-                                              data-bs-target="#editUser" data-bs-toggle="modal">UNMASK</button>
-                                            <% } else { %>
-                                              <%= candidate._candidate ? candidate._candidate.email : 'NA' %>
-                                                <% } %>
-
-                                        </td>
-                                        <td>
-                                          <%= candidate._candidate ? candidate._candidate.sex : 'NA' %>
-                                        </td>
-                                        <td>
-                                          <%= candidate._candidate?.highestQualification?.name || 'NA' %>
-                                        </td>
-                                        <td>
-                                          <%= candidate._candidate ? (candidate._candidate.totalExperience || 'Fresher'
-                                            ) : 'NA' %>
-                                        </td>
-                                        <td>
-                                          <%= candidate._candidate?.city?.name || 'NA' %> , <%=
-                                              candidate._candidate?.state?.name || 'NA' %>
-                                        </td>
-
-                                        <td>
-                                          <% if (candidate.masked===true) { %>
-                                            <button id="maskunmask"
-                                              onclick="maskUnmask('<%= candidate._candidate ?._id %>')"
-                                              class="masked btn btn-primary me-3 waves-effect waves-light btn-sm"
-                                              data-bs-target="#editUser" data-bs-toggle="modal">
-                                              UNMASK
-                                            </button>
-                                            <% } else { %>
-                                              <% if (candidate.personalInfo && candidate.personalInfo.focalytProfile) {
-                                                %>
-                                                <a href="<%= candidate.personalInfo.focalytProfile %>" download
-                                                  class="download-resume">
-                                                  <i class="fa fa-download"></i>
-                                                </a>
-                                                <% } else { %>
-                                                  <span>NA</span>
-                                                  <% } %>
-                                                    <% } %>
-                                        </td>
-
-
-                                        <td>
-                                          <% if (candidate._candidate && candidate._candidate._id) { %>
-                                            <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%= candidate._candidate._id %>">
-                                              <i class="feather icon-eye fa-lg primary"></i>
-                                            </a>
-                                            <% } else { %>
-                                              Not Uploaded
-                                              <% } %>
-
-
-
-
-                                        </td>
-                                      </tr>
-                                      <% }) %>
-                                        <%} else {%>
-                                          <tr>
-                                            <td colspan="8" class="text-center">No Result Found</td>
-                                          </tr>
-                                          <%} %>
-                                </tbody>
-                              </table>
+                              <div class="company-student-list" id="table-body">
+                                <% if(appliedCandidates?.length) { appliedCandidates.forEach(function(application) { %>
+                                  <%- include('./partials/student-card', {studentCard: {
+                                    student: application._candidate || {}, contactVisible: application.masked !== true, masked: application.masked === true,
+                                    recordId: application._id, applicationId: application._id, source: 'profile',
+                                    companyFollowups: application.companyFollowups || [],
+                                    qualification: application._candidate?.highestQualification?.name,
+                                    location: [application._candidate?.city?.name,application._candidate?.state?.name].filter(Boolean).join(', '),
+                                    stage: application.hiringStatus?.status || (typeof application.hiringStatus === 'string' ? application.hiringStatus : '') || 'Interested',
+                                    jobTitle: application._job?.title || 'Job unavailable', companyName: application._job?.displayCompanyName || company.name,
+                                    contextTitle: 'Application', dateLabel: 'Applied on', date: moment(application.createdAt).utcOffset('+05:30').format('DD MMM YYYY'),
+                                    resumeUrl: application.personalInfo?.focalytProfile, applied: true
+                                  }}) %>
+                                <% }); } else { %><div class="recruiter-empty">No matching candidates</div><% } %>
+                              </div>
 
                               <!-- pagination -->
                               <% if (totalPages> 1) { %>

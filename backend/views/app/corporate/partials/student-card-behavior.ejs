@@ -1,0 +1,185 @@
+<script>
+(function () {
+  if (!document.querySelector('.company-student-card')) return;
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    node.className = className || '';
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function setExpanded(card, open) {
+    const details = card.querySelector('.company-student-details');
+    if (!details) return;
+    details.hidden = !open;
+    card.classList.toggle('company-student-card--expanded', open);
+    card.querySelectorAll('[aria-expanded]').forEach(button => button.setAttribute('aria-expanded', String(open)));
+    card.querySelectorAll('.company-student-expand .icon-chevron-down, .company-student-expand .icon-chevron-up').forEach(icon => {
+      icon.classList.toggle('icon-chevron-up', open);
+      icon.classList.toggle('icon-chevron-down', !open);
+    });
+  }
+  function selectTab(card, name) {
+    card.querySelectorAll('[data-student-tab]').forEach(tab => {
+      const active = tab.dataset.studentTab === name;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+    card.querySelectorAll('[data-student-panel]').forEach(panel => { panel.hidden = panel.dataset.studentPanel !== name; });
+  }
+  let viewer;
+  function previewDocument(doc) {
+    let url;
+    try { url = new URL(doc.url, window.location.origin); } catch (_) { return; }
+    if (!['http:', 'https:'].includes(url.protocol)) return;
+    if (!viewer) {
+      viewer = element('dialog', 'company-document-viewer');
+      viewer.addEventListener('click', event => { if (event.target === viewer) viewer.close(); });
+      document.body.appendChild(viewer);
+    }
+    viewer.replaceChildren();
+    const header = element('div', 'company-document-viewer-header');
+    header.appendChild(element('strong', '', doc.name));
+    const close = element('button', 'company-student-icon', '×');
+    close.type = 'button'; close.setAttribute('aria-label', 'Close document preview');
+    close.addEventListener('click', () => viewer.close());
+    header.appendChild(close); viewer.appendChild(header);
+    const body = element('div', 'company-document-viewer-body');
+    if (/\.(png|jpe?g|webp|gif)$/i.test(url.pathname)) {
+      const image = element('img'); image.src = url.href; image.alt = doc.name; body.appendChild(image);
+    } else if (/\.pdf$/i.test(url.pathname)) {
+      const frame = element('iframe'); frame.src = url.href; frame.title = doc.name; frame.setAttribute('sandbox', 'allow-same-origin'); body.appendChild(frame);
+    } else {
+      body.appendChild(element('p', '', 'Open this document in a new tab to view it.'));
+    }
+    viewer.appendChild(body);
+    const link = element('a', 'company-student-profile-button', 'Open / download document');
+    link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+    viewer.appendChild(link); viewer.showModal();
+  }
+  function renderDetails(card, data) {
+    const profile = card.querySelector('[data-student-panel="profile"]');
+    const docs = card.querySelector('[data-student-panel="documents"]');
+    profile.replaceChildren(); docs.replaceChildren();
+    const info = data.profile || {};
+    const lead = data.lead;
+    if (lead) {
+      profile.classList.add('company-student-detail-profile--lead');
+      const grid = element('div', 'company-lead-grid');
+      [
+        ['Lead age', lead.leadAge],
+        ['State', lead.state],
+        ['City', lead.city],
+        ['Type of project', lead.typeOfProject],
+        ['Project', lead.project],
+        ['Sector', lead.sector],
+        // ['Course / job name', lead.courseJobName],
+        // ['Branch name', lead.branchName],
+        ['Next action date', lead.nextActionDate],
+        ['Lead creation date', lead.leadCreationDate],
+        ['Remarks', lead.remarks],
+        ['AI remark', lead.aiRemark],
+        ['Lead modification date', lead.leadModificationDate],
+        ['Lead modification by', lead.leadModificationBy],
+        ['Counsellor name', lead.counsellorName],
+        // ['Lead owner', lead.leadOwner],
+      ].forEach(([label, value]) => {
+        const cell = element('div', 'company-lead-cell');
+        cell.append(element('div', 'company-lead-label', label), element('div', 'company-lead-value', value || 'N/A'));
+        grid.appendChild(cell);
+      });
+      profile.appendChild(grid);
+    } else {
+      [['Name', info.name], ['Qualification', info.qualification], ['Experience', info.experience ? info.experience + ' years' : 'Fresher'], ['Gender', info.gender], ['Hiring stage', info.stage], ['Professional title', info.title]].forEach(([label, value]) => {
+        if (!value) return;
+        const row = element('div', 'company-student-detail-field');
+        row.append(element('span', '', label), element('strong', '', value)); profile.appendChild(row);
+      });
+      if (info.summary) profile.appendChild(element('p', 'company-student-summary', info.summary));
+    }
+    if (data.documentsLocked) {
+      docs.appendChild(element('p', 'company-student-doc-message', 'Documents are locked. Unmask this candidate to view their resume and application documents.'));
+      return;
+    }
+    if (!data.documents?.length) {
+      docs.appendChild(element('p', 'company-student-doc-message', 'No resume or application documents uploaded yet.'));
+      return;
+    }
+    data.documents.forEach(doc => {
+      const tile = element('article', 'company-student-document');
+      tile.append(element('div', 'company-student-document-type', /\.pdf(?:[?#]|$)/i.test(doc.url || '') ? 'PDF' : 'FILE'));
+      tile.append(element('strong', '', doc.name), element('span', 'company-student-document-group', doc.group || ''));
+      tile.appendChild(element('span', 'company-student-document-status', doc.status + (doc.mandatory ? ' ? Required' : '')));
+      if (doc.url) {
+        const button = element('button', 'company-student-profile-button', 'View document'); button.type = 'button';
+        button.addEventListener('click', () => previewDocument(doc)); tile.appendChild(button);
+      }
+      docs.appendChild(tile);
+    });
+  }
+  async function loadDetails(card) {
+    if (card.dataset.detailsLoaded || card.dataset.detailsLoading) return;
+    const status = card.querySelector('.company-student-load-status');
+    card.dataset.detailsLoading = 'true'; status.textContent = 'Loading candidate details…';
+    const details = card.querySelector('.company-student-details'); details.setAttribute('aria-busy', 'true');
+    try {
+      const params = new URLSearchParams({ source: card.dataset.source });
+      if (card.dataset.applicationId) params.set('applicationId', card.dataset.applicationId);
+      const headers = { Accept: 'application/json' };
+      const token = localStorage.getItem('token'); if (token) headers['x-auth'] = token;
+      const response = await fetch('/company/candidate/' + encodeURIComponent(card.dataset.candidateId) + '/card-details?' + params, { headers, credentials: 'same-origin' });
+      if (response.redirected || response.status === 401 || response.status === 403) throw new Error('Please sign in again to view candidate details.');
+      const type = response.headers.get('content-type') || '';
+      if (!type.includes('application/json')) throw new Error('Unable to load candidate details. Please try again.');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Unable to load candidate details.');
+      renderDetails(card, data); card.dataset.detailsLoaded = 'true'; status.textContent = '';
+    } catch (error) {
+      status.textContent = error.message || 'Unable to load candidate details.';
+      const retry = element('button', 'company-student-retry', 'Retry'); retry.type = 'button';
+      retry.addEventListener('click', () => loadDetails(card)); status.appendChild(retry);
+    } finally { delete card.dataset.detailsLoading; details.removeAttribute('aria-busy'); }
+  }
+  function closeMenus(except) {
+    document.querySelectorAll('.company-student-more-menu').forEach(menu => {
+      if (menu === except) return;
+      menu.hidden = true;
+      const toggle = menu.parentElement && menu.parentElement.querySelector('.company-student-more-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    });
+  }
+  document.addEventListener('click', event => {
+    const toggle = event.target.closest('.company-student-more-toggle');
+    if (!toggle) { closeMenus(); return; }
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = toggle.parentElement.querySelector('.company-student-more-menu');
+    const open = menu.hidden;
+    closeMenus(open ? menu : null);
+    menu.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+      const rect = toggle.getBoundingClientRect();
+      menu.style.top = (rect.bottom + 6) + 'px';
+      menu.style.left = Math.max(8, rect.right - menu.offsetWidth) + 'px';
+    }
+  });
+  document.addEventListener('click', event => {
+    const button = event.target.closest('.company-student-expand, .company-student-open-documents, [data-student-tab]');
+    if (!button) return;
+    const card = button.closest('.company-student-card'); if (!card) return;
+    const details = card.querySelector('.company-student-details'); if (!details) return;
+    const documents = button.classList.contains('company-student-open-documents');
+    const open = button.dataset.studentTab || documents ? true : details.hidden;
+    document.querySelectorAll('.company-student-card--expanded').forEach(other => { if (other !== card) setExpanded(other, false); });
+    setExpanded(card, open);
+    if (open) { selectTab(card, button.dataset.studentTab || (documents ? 'documents' : 'profile')); loadDetails(card); }
+  });
+  document.addEventListener('keydown', event => {
+    if (!event.target.matches('[data-student-tab]') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const card = event.target.closest('.company-student-card');
+    const name = event.key === 'Home' ? 'profile' : event.key === 'End' ? 'documents' : event.target.dataset.studentTab === 'profile' ? 'documents' : 'profile';
+    selectTab(card, name); card.querySelector('[data-student-tab="' + name + '"]').focus();
+  });
+})();
+</script>

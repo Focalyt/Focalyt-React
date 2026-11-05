@@ -1,0 +1,116 @@
+<script>
+(function () {
+  if (!document.querySelector('.company-followup-panel')) return;
+  const el = (tag, className, text) => { const node = document.createElement(tag); node.className = className || ''; if (text != null) node.textContent = text; return node; };
+  const formatDate = value => new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const statusOf = item => item.status === 'planned' && new Date(item.followupDate) < new Date() ? 'missed' : item.status;
+  async function request(card, method, payload, id) {
+    const headers = { Accept: 'application/json' };
+    const token = localStorage.getItem('token'); if (token) headers['x-auth'] = token;
+    if (payload) headers['Content-Type'] = 'application/json';
+    const response = await fetch('/company/candidate/' + encodeURIComponent(card.dataset.candidateId) + '/followups' + (id ? '/' + encodeURIComponent(id) : ''), {
+      method, headers, credentials: 'same-origin', ...(payload ? { body: JSON.stringify(payload) } : {}),
+    });
+    if (response.redirected || response.status === 401 || response.status === 403) throw new Error('Please sign in again to manage follow-ups.');
+    if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('Unable to load follow-ups. Please try again.');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to save follow-up.');
+    return data;
+  }
+  function updatePanels(card, application) {
+    card.dataset.followupApplicationId = application.id;
+    card.querySelectorAll('.company-followup-panel').forEach(panel => {
+      const rows = application.followups.filter(item => item.type === panel.dataset.followupType);
+      const next = rows.filter(item => statusOf(item) === 'planned').sort((a,b) => new Date(a.followupDate) - new Date(b.followupDate))[0];
+      panel.classList.toggle('company-followup-panel--empty', !next);
+      const job = panel.querySelector('[data-followup-job]');
+      job.textContent = application.jobTitle; job.title = application.jobTitle; job.hidden = !!card.dataset.applicationId;
+      panel.querySelectorAll('[data-followup-count]').forEach(node => { node.textContent = String(rows.filter(item => statusOf(item) === node.dataset.followupCount).length).padStart(2,'0'); });
+      panel.querySelector('[data-followup-next]').textContent = next ? formatDate(next.followupDate) : 'Not scheduled';
+    });
+  }
+  let dialog;
+  async function openFollowups(card, type) {
+    if (!card.dataset.candidateId) return;
+    if (!dialog) { dialog = el('dialog', 'company-followup-dialog'); document.body.appendChild(dialog); }
+    dialog.replaceChildren();
+    const header = el('div', 'company-followup-dialog-header');
+    const heading = el('h2', '', 'Candidate follow-ups'); heading.id = 'company-followup-heading'; dialog.setAttribute('aria-labelledby', heading.id);
+    const close = el('button', 'company-student-icon', '×'); close.type = 'button'; close.setAttribute('aria-label', 'Close follow-ups'); close.addEventListener('click', () => dialog.close());
+    header.append(heading, close); dialog.appendChild(header);
+    const content = el('div', 'company-followup-dialog-content'); dialog.appendChild(content);
+    const message = el('div', 'company-followup-message', 'Loading follow-ups…'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite'); content.appendChild(message);
+    dialog.showModal();
+    let data;
+    try { data = await request(card, 'GET'); } catch(error) {
+      message.textContent = error.message;
+      const retry = el('button', 'company-followup-submit', 'Retry'); retry.type = 'button'; retry.addEventListener('click', () => { dialog.close(); openFollowups(card, type); }); content.appendChild(retry); return;
+    }
+    message.textContent = '';
+    const applications = (data.applications || []).filter(application => !card.dataset.applicationId || application.id === card.dataset.applicationId);
+    if (!applications.length) { message.textContent = 'Follow-ups can be scheduled after this candidate applies to one of your jobs.'; return; }
+    const form = el('form', 'company-followup-form');
+    function field(title, input) { const label = el('label', '', title); label.appendChild(input); form.appendChild(label); return input; }
+    const select = el('select', 'form-control'); select.name = 'applicationId'; select.required = true;
+    select.appendChild(new Option('Choose job application', ''));
+    applications.forEach(application => select.appendChild(new Option(application.jobTitle, application.id)));
+    const selectedId = card.dataset.applicationId || card.dataset.followupApplicationId || (applications.length === 1 ? applications[0].id : '');
+    select.value = selectedId; field('Job application', select);
+    const typeSelect = el('select', 'form-control'); typeSelect.name = 'type'; typeSelect.append(new Option('Call', 'Call'), new Option('Visit', 'Visit')); typeSelect.value = type; field('Follow-up type', typeSelect);
+    const date = el('input', 'form-control'); date.name = 'followupDate'; date.type = 'datetime-local'; date.required = true; date.min = new Date(Date.now() + 330 * 60000).toISOString().slice(0,16); field('Date and time · Asia/Kolkata (IST)', date);
+    const remarks = el('textarea', 'form-control'); remarks.name = 'remarks'; remarks.maxLength = 2000; remarks.rows = 3; field('Remarks', remarks).parentElement.classList.add('company-followup-full');
+    const submit = el('button', 'company-followup-submit', 'Schedule follow-up'); submit.type = 'submit'; form.appendChild(submit);
+    content.appendChild(form);
+    const history = el('div', 'company-followup-history'); content.appendChild(history);
+    function selected() { return applications.find(application => application.id === select.value); }
+    function syncApplication(application) {
+      applications.splice(applications.findIndex(item => item.id === application.id), 1, application);
+      document.querySelectorAll('.company-student-card').forEach(other => {
+        if (other === card || (other.dataset.candidateId === card.dataset.candidateId && other.dataset.applicationId === application.id)) updatePanels(other, application);
+      });
+    }
+    function renderHistory() {
+      history.replaceChildren();
+      const application = selected(); submit.disabled = !application;
+      if (!application) { history.appendChild(el('p', 'company-followup-message', 'Choose a job application to view its follow-ups.')); return; }
+      updatePanels(card, application);
+      history.appendChild(el('h3', '', typeSelect.value + ' follow-up history'));
+      const rows = application.followups.filter(item => item.type === typeSelect.value).sort((a,b) => new Date(b.followupDate) - new Date(a.followupDate));
+      if (!rows.length) history.appendChild(el('p', 'company-followup-message', 'No follow-ups scheduled yet.'));
+      rows.forEach(item => {
+        const row = el('div', 'company-followup-history-row');
+        const detail = el('div'); detail.append(el('strong', '', formatDate(item.followupDate)), el('span', 'company-followup-history-status', statusOf(item)));
+        if (item.remarks) detail.appendChild(el('p', '', item.remarks));
+        if (item.completedAt) detail.appendChild(el('small', '', 'Completed ' + formatDate(item.completedAt)));
+        row.appendChild(detail);
+        if (statusOf(item) !== 'done') {
+          const done = el('button', 'company-followup-done', 'Mark done'); done.type = 'button';
+          done.addEventListener('click', async () => {
+            done.disabled = true; message.textContent = '';
+            try { const result = await request(card, 'PATCH', { applicationId: application.id }, item.id); syncApplication(result.application); renderHistory(); message.textContent = 'Follow-up marked done.'; }
+            catch(error) { message.textContent = error.message; done.disabled = false; }
+          }); row.appendChild(done);
+        }
+        history.appendChild(row);
+      });
+    }
+    select.addEventListener('change', () => { message.textContent = ''; renderHistory(); });
+    typeSelect.addEventListener('change', () => { message.textContent = ''; renderHistory(); }); renderHistory();
+    form.addEventListener('submit', async event => {
+      event.preventDefault(); if (submit.disabled || !selected()) return;
+      submit.disabled = true; message.textContent = '';
+      try {
+        const localDate = new Date(date.value + ':00+05:30');
+        if (!Number.isFinite(localDate.getTime()) || localDate <= new Date()) throw new Error('Choose a future follow-up date and time.');
+        const result = await request(card, 'POST', { applicationId: select.value, type: typeSelect.value, followupDate: localDate.toISOString(), remarks: remarks.value.trim() });
+        syncApplication(result.application); date.value = ''; remarks.value = ''; renderHistory(); message.textContent = 'Follow-up scheduled.';
+      } catch(error) { message.textContent = error.message; }
+      finally { submit.disabled = !selected(); }
+    });
+  }
+  document.addEventListener('click', event => {
+    const button = event.target.closest('.company-followup-open'); if (!button) return;
+    openFollowups(button.closest('.company-student-card'), button.closest('[data-followup-type]').dataset.followupType);
+  });
+})();
+</script>

@@ -11,7 +11,7 @@
               <div class="content-header-left col-md-9 col-12 mb-2">
                 <div class="row breadcrumbs-top">
                   <div class="col-12">
-                    <h3 class="content-header-title float-left mb-0">List Candidates</h3>
+                    <h3 class="content-header-title float-left mb-0">Search candidates</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
@@ -27,15 +27,21 @@
             <section id="Concerned-Person ">
               <div class="row">
                 <div class="col-xl-12 col-lg-12">
-                  <div class="card">
+                  <div class="card recruiter-candidate-search">
                     <div class="card-header border border-top-0 border-left-0 border-right-0">
-                      <h4 class="card-title pb-1">Search Candidates</h4>
+                      <div><div class="recruiter-eyebrow">YOUR TALENT POOL</div><p class="recruiter-muted mt-1 mb-0">Find the right candidates for your company's hiring requirements.</p></div>
                       <p id="subscription"></p>
                     </div>
 
                     <div class="content-body px-2">
                       <div class="row mb-2">
                         <div class="col-xl-12 col-lg-12">
+                          <div class="recruiter-filter-toolbar">
+                            <strong><i class="feather icon-filter" aria-hidden="true"></i> Search filters</strong>
+                            <button type="button" class="recruiter-filter-toggle" id="candidate-filter-toggle" aria-expanded="true" aria-controls="candidate-filter-panel"><span>Hide filters</span><i class="feather icon-chevron-up" aria-hidden="true"></i></button>
+                          </div>
+                          <div class="recruiter-filter-collapse" id="candidate-filter-panel" aria-hidden="false">
+                          <div class="recruiter-filter-inner">
                           <form method="GET">
                             <div class="row">
                               <div class="col-xl-3  col-lg-6 col-md-6 col-sm-6 col-12 mt-1">
@@ -158,7 +164,7 @@
                                   <% }); %>
                                 </select>
                               </div>                              
-                               <div  class="col-xl-12  mt-xl-3 mt-lg-2 mt-md-3 mt-sm-2 mt-2 text-right">
+                               <div class="col-xl-12 mt-xl-3 mt-lg-2 mt-md-3 mt-sm-2 mt-2 text-right recruiter-search-actions">
                                 <button 
                                   class="btn btn-success  waves-effect waves-light  text-white d-inline px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
                                   id="submit-btn">Go</button>
@@ -175,6 +181,8 @@
                              
                             </div>
                           </form>
+                          </div>
+                          </div>
                         </div>
                       </div>
                       <div class="row">
@@ -182,66 +190,20 @@
                           <div class="card mb-0">
                             <div class="card-content">
                               <div class="table-responsive">
-                                <table class="table table-hover-animation mb-0 table-hover" id="table">
-                                  <thead>
-                                    <tr>
-                                      <th class="long_text">CANDIDATES</th>
-                                      <th>GENDER</th>
-                                      <th>Qualification</th>
-                                      <th class="long_text">Branch</th>
-                                      <th>Experience</th>
-                                      <th>ACTIONS</th>
-                                      <th >Location</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody id="table-body">
-                                    <% if(candidates?.length > 0){ %>
-                                    <%candidates.forEach((candidate)=>{%>
-                                      <tr id="<%=candidate._id%>">
-                                        <td class="appliedTag">
-                                          <%=candidate.name ? candidate.name: "NA" %>
-                                          <% if(candidate.appliedJobs.length> 0){%>
-                                              <span class="badge bg-success ml-1 rounded" style="position: relative;">
-                                                Applied
-                                              </span>
-                                              <%}%>
-                                        </td>
-                                        <td>
-                                          <%= candidate.sex ? candidate.sex : 'NA' %>
-                                          <input type="hidden" class="candidateId"  value="<%=candidate._id%>">
-                                        </td>
-                                        <td>
-                                          <%=candidate.highestQualification ? qualification.find(i=>i._id == candidate.highestQualification)?.name: "NA" %>
-                                        </td>
-                                        <td class="long_text">
-                                          <%=candidate.subQualifications[0]?.name ?
-                                            candidate.subQualifications[0].name : "NA" %>
-                                        </td>
-                                        <td>
-                                          <% if (candidate.totalExperience) { %>
-                                              <%= candidate.totalExperience %> Years
-                                          <% } else { %>
-                                              Fresher
-                                          <% } %>
-                                      </td>
-                                      
-                                                                               
-                                        <td class="actions">
-                                          <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%=candidate._id%>?src=list"><i
-                                              class="fa-regular fa-user"></i></a>
-                                        </td>
-                                        <td>
-                                            <a href="#"><i class="fa-sm fa-solid text-danger fa-location-dot font-small"><span
-                                                 id="open-map" onclick="openMap('<%= candidate.latitude %>','<%= candidate.longitude %>')" >
-                                                <%= Math.round(candidate.distance / 1000) + " KMs" %>
-                                              </span></i></a>
-                                            </td>
-                                      </tr>
-                                      <% }) } else {%>
-                                        <tr><td colspan="7" class="text-center">No Result Found</td></tr>
-                                    <%}%> 
-                                  </tbody>
-                                </table>
+                                <div class="recruiter-bar"><h2><%= count || 0 %> candidates found</h2><span class="recruiter-muted"><%= candidates?.length || 0 %> on this page</span></div>
+                                <div class="company-student-list" id="table-body">
+                                  <% if(candidates?.length) { candidates.forEach(function(candidate) { %>
+                                    <%- include('./partials/student-card', { studentCard: {
+                                      student: candidate, bulkCandidate: true, profileQuery: '?src=list', contactVisible: false,
+                                      qualification: qualification.find(function(q) { return String(q._id) === String(candidate.highestQualification); })?.name,
+                                      branch: candidate.subQualifications?.[0]?.name,
+                                      location: candidate.distance != null && Number.isFinite(Number(candidate.distance)) ? Math.round(candidate.distance / 1000) + ' km away' : '',
+                                      latitude: candidate.latitude, longitude: candidate.longitude,
+                                      applied: !!candidate.appliedJobs?.length, stage: 'Not shortlisted', contextTitle: 'Applications',
+                                      companyName: company.name
+                                    } }) %>
+                                  <% }); } else { %><div class="recruiter-empty"><i class="feather icon-search" aria-hidden="true"></i><h2>No matching candidates</h2><p>Try fewer filters or reset your search.</p></div><% } %>
+                                </div>
                                 <% if (totalPages> 1) { %>
                                   <ul class="pagination justify-content-end ml-2 mb-2">
                                     <% let first=1 %>
@@ -836,6 +798,20 @@
             }
 
 
+        </script>
+        <script>
+          (function () {
+            const toggle = document.getElementById('candidate-filter-toggle');
+            const panel = document.getElementById('candidate-filter-panel');
+            toggle.addEventListener('click', function () {
+              const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+              toggle.setAttribute('aria-expanded', String(expanded));
+              toggle.querySelector('span').textContent = expanded ? 'Hide filters' : 'Show filters';
+              panel.classList.toggle('is-collapsed', !expanded);
+              panel.setAttribute('aria-hidden', String(!expanded));
+              panel.inert = !expanded;
+            });
+          })();
         </script>
         <% include ./partials/footer%>
 
