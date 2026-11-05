@@ -2164,6 +2164,7 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 	const studentCounts = [
 		{ key: 'presentStudent', label: 'Present student' },
 		{ key: 'absentStudent', label: 'Absent student' },
+		{ key: 'onLeaveStudent', label: 'On leave student' },
 		{ key: 'dropoutStudent', label: 'Dropout student' },
 	];
 	studentCounts.forEach((field) => {
@@ -2182,18 +2183,18 @@ const studentCountTotalError = (answers, batchSize) => {
 	if (!Number.isInteger(size) || size < 0) {
 		return 'Batch size is not available for this batch.';
 	}
-	const keys = ['presentStudent', 'absentStudent', 'dropoutStudent'];
+	const keys = ['presentStudent', 'absentStudent', 'onLeaveStudent', 'dropoutStudent'];
 	let total = 0;
 	for (const key of keys) {
 		const raw = String((answers.find((answer) => answer.key === key) || {}).value || '').trim();
 		const num = Number(raw);
 		if (raw === '' || !Number.isInteger(num) || num < 0) {
-			return 'Present student, Absent student and Dropout student must be whole numbers, and their total must equal the batch size.';
+			return 'Present student, Absent student, On leave student and Dropout student must be whole numbers, and their total must equal the batch size.';
 		}
 		total += num;
 	}
 	if (total !== size) {
-		return `Present student + Absent student + Dropout student is ${total}. It must equal the batch size of ${size}.`;
+		return `Present student + Absent student + On leave student + Dropout student is ${total}. It must equal the batch size of ${size}.`;
 	}
 	return '';
 };
