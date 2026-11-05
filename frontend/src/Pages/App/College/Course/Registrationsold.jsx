@@ -95,6 +95,11 @@ const toHrFilterYmd = (value) => {
 
 const isHrDepartmentLabel = (label) => String(label || '').trim().toLowerCase() === 'hr';
 
+const statusScopeParams = (cycle = {}) => ({
+  ...(cycle.department ? { department: cycle.department } : {}),
+  ...(cycle.project ? { project: cycle.project } : {}),
+});
+
 const getHrDepartmentIds = (verticalOptions = []) => new Set(
   (verticalOptions || [])
     .filter((opt) => isHrDepartmentLabel(opt.label))
@@ -4110,7 +4115,7 @@ const CRMDashboard = () => {
     if (seletectedStatus || filterData.statuses) {
       fetchSubStatus()
     }
-  }, [seletectedStatus, filterData.statuses]);
+  }, [seletectedStatus, filterData.statuses, cycleFilters.department, cycleFilters.project]);
 
 
 
@@ -4745,17 +4750,17 @@ const CRMDashboard = () => {
         return;
       }
       const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       });
 
 
       if (response.data.success) {
-        const status = response.data.data;
-
-
-        setSubStatuses(response.data.data);
-
-
+        const list = Array.isArray(response.data.data) ? response.data.data : [];
+        setSubStatuses(list);
+        setSelectedSubStatus((current) => (
+          current?._id && list.some((item) => String(item._id) === String(current._id)) ? current : null
+        ));
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -7863,29 +7868,58 @@ console.log('API Response:', response.data);
     return [...new Set(profiles.map((profile) => getProfileProject(profile).id).filter(Boolean))];
   };
 
-  const statusIsForLeadProjects = (status, projectIds) => {
-    if (!projectIds.length) return true;
-    const assigned = (status?.assignedProjects || []).map(String).filter(Boolean);
-    if (!assigned.length) return true;
-    const assignedSet = new Set(assigned);
-    return projectIds.every((id) => assignedSet.has(id));
+  // Header department/project decides the edit list. The lead's course project is only
+  // used when those filters are on All, because one course can still point at another department.
+  const headerStatusProjectIds = () => {
+    const deptId = cycleFilters.department ? String(cycleFilters.department) : '';
+    const belongsToDepartment = (opt) => !deptId || String(opt.vertical || '') === deptId;
+    if (cycleFilters.project) {
+      const selected = projectOptions.find((opt) => String(opt.value) === String(cycleFilters.project));
+      if (selected && belongsToDepartment(selected)) return [String(selected.value)];
+    }
+    if (deptId) {
+      return projectOptions
+        .filter(belongsToDepartment)
+        .map((opt) => String(opt.value))
+        .filter(Boolean);
+    }
+    return [];
   };
 
-  const substatusIsForLeadProjects = (sub, status, projectIds) => {
-    if (!projectIds.length) return true;
-    const statusAssigned = (status?.assignedProjects || []).map(String).filter(Boolean);
-    if (!statusAssigned.length) return true;
-    const assigned = new Set((sub?.assignedProjects || []).map(String));
-    return projectIds.every((id) => assigned.has(id));
+  const listedForProjects = (assignedIds, projectIds, match) => {
+    const assigned = new Set((assignedIds || []).map(String).filter(Boolean));
+    if (!assigned.size || !projectIds.length) return false;
+    return match === 'any'
+      ? projectIds.some((id) => assigned.has(id))
+      : projectIds.every((id) => assigned.has(id));
   };
 
-  const statusesForLead = statuses.filter((status) => status._id && statusIsForLeadProjects(status, getLeadProjectIds()));
+  const leadStatusScope = () => {
+    if (cycleFilters.department || cycleFilters.project) {
+      return { ids: headerStatusProjectIds(), match: 'any' };
+    }
+    return { ids: getLeadProjectIds(), match: 'every' };
+  };
+
+  const statusesForLead = (() => {
+    const scope = leadStatusScope();
+    if (!scope.ids.length) return scope.match === 'any' ? [] : statuses.filter((status) => status._id);
+    return statuses.filter((status) => {
+      if (!status._id) return false;
+      const assigned = (status.assignedProjects || []).map(String).filter(Boolean);
+      if (!assigned.length) return true;
+      return listedForProjects(assigned, scope.ids, scope.match);
+    });
+  })();
 
   const substatusesForLead = (() => {
-    const projectIds = getLeadProjectIds();
+    const scope = leadStatusScope();
     const status = statuses.find((item) => String(item._id) === String(seletectedStatus));
     if (!status || !Array.isArray(status.substatuses)) return subStatuses;
-    return status.substatuses.filter((sub) => substatusIsForLeadProjects(sub, status, projectIds));
+    const statusAssigned = (status.assignedProjects || []).map(String).filter(Boolean);
+    if (!statusAssigned.length) return status.substatuses;
+    if (!scope.ids.length) return scope.match === 'any' ? [] : status.substatuses;
+    return status.substatuses.filter((sub) => listedForProjects(sub.assignedProjects, scope.ids, scope.match));
   })();
 
   const closeLeadMilestones = () => {
@@ -16228,6 +16262,7 @@ useEffect(() => {
     axios
       .get(`${backendUrl}/college/status/${crossSaleForm.leadStatus}/substatus`, {
         headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       })
       .then((response) => {
         if (cancelled) return;
@@ -16246,7 +16281,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token]);
+  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token, cycleFilters.department, cycleFilters.project]);
 
   const kycDocStatusColor = (status) => {
     switch (status?.toLowerCase()) {
