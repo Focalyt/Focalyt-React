@@ -95,6 +95,11 @@ const toHrFilterYmd = (value) => {
 
 const isHrDepartmentLabel = (label) => String(label || '').trim().toLowerCase() === 'hr';
 
+const statusScopeParams = (cycle = {}) => ({
+  ...(cycle.department ? { department: cycle.department } : {}),
+  ...(cycle.project ? { project: cycle.project } : {}),
+});
+
 const getHrDepartmentIds = (verticalOptions = []) => new Set(
   (verticalOptions || [])
     .filter((opt) => isHrDepartmentLabel(opt.label))
@@ -4129,7 +4134,7 @@ const CRMDashboard = () => {
     if (seletectedStatus || filterData.statuses) {
       fetchSubStatus()
     }
-  }, [seletectedStatus, filterData.statuses]);
+  }, [seletectedStatus, filterData.statuses, cycleFilters.department, cycleFilters.project]);
 
 
 
@@ -4762,17 +4767,17 @@ const CRMDashboard = () => {
         return;
       }
       const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       });
 
 
       if (response.data.success) {
-        const status = response.data.data;
-
-
-        setSubStatuses(response.data.data);
-
-
+        const list = Array.isArray(response.data.data) ? response.data.data : [];
+        setSubStatuses(list);
+        setSelectedSubStatus((current) => (
+          current?._id && list.some((item) => String(item._id) === String(current._id)) ? current : null
+        ));
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -15825,6 +15830,7 @@ useEffect(() => {
       if (value) {
         axios.get(`${backendUrl}/college/status/${value}/substatus`, {
           headers: { 'x-auth': token },
+          params: statusScopeParams(cycleFilters),
         })
           .then((response) => {
             setBulkUploadSubStatuses(response.data?.success ? (response.data.data || []) : []);
@@ -16150,6 +16156,7 @@ useEffect(() => {
     axios
       .get(`${backendUrl}/college/status/${crossSaleForm.leadStatus}/substatus`, {
         headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       })
       .then((response) => {
         if (cancelled) return;
@@ -16168,7 +16175,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token]);
+  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token, cycleFilters.department, cycleFilters.project]);
 
   const kycDocStatusColor = (status) => {
     switch (status?.toLowerCase()) {
