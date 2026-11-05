@@ -66,6 +66,14 @@ const mediaKind = (file) => {
 
 const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
+const studentCountFields = [
+  { key: 'presentStudent', label: 'Present student', type: 'number', required: false },
+  { key: 'absentStudent', label: 'Absent student', type: 'number', required: false },
+  { key: 'onLeaveStudent', label: 'On leave student', type: 'number', required: false },
+  { key: 'dropoutStudent', label: 'Dropout student', type: 'number', required: false },
+];
+const studentCountKeys = new Set(studentCountFields.map((field) => field.key));
+
 const knownFieldValue = (field, context) => {
   if (!field || field.type === 'file') return '';
   const key = field.portalKey || labelKey(field.label);
@@ -269,17 +277,51 @@ const knownFieldValue = (field, context) => {
     }).then((response) => {
       if (cancelled) return;
       const count = Number(response.data?.count);
-      setBatchSize(Number.isInteger(count) && count >= 0 ? String(count) : '');
+      if (Number.isInteger(count) && count >= 0) setBatchSize(String(count));
     }).catch(() => {
-      if (!cancelled) setBatchSize('');
+      if (cancelled) return;
+      const fallback = Number(selectedBatch?.batchSize);
+      setBatchSize(Number.isInteger(fallback) && fallback > 0 ? String(fallback) : '');
     });
     return () => { cancelled = true; };
-  }, [backendUrl, form.batchId, token]);
+  }, [backendUrl, form.batchId, selectedBatch?.batchSize, token]);
+
+  const liveBatchSize = (() => {
+    const fetched = String(batchSize || '').trim();
+    if (fetched) return fetched;
+    const fromBatch = Number(selectedBatch?.batchSize);
+    return Number.isInteger(fromBatch) && fromBatch > 0 ? String(fromBatch) : '';
+  })();
 
   const filledAnswer = (field, source = answers) => {
+    if (field.key === 'batchSize' || labelKey(field.label) === 'batchsize') return liveBatchSize;
     const typed = source[field.key];
     if (touchedAnswers[field.key] || String(typed || '').trim()) return typed || '';
-    return knownFieldValue(field, knownContext);
+    return knownFieldValue(field, { ...knownContext, batchSize: liveBatchSize });
+  };
+
+  const readStudentCount = (key) => {
+    const raw = String(filledAnswer({ key, label: '', type: 'number' }) || '').trim();
+    if (raw === '') return null;
+    const num = Number(raw);
+    if (!Number.isInteger(num) || num < 0) return NaN;
+    return num;
+  };
+
+  const studentCountMessage = (requireAll = false) => {
+    const size = Number(liveBatchSize);
+    if (liveBatchSize === '' || !Number.isInteger(size) || size < 0) return '';
+    const values = studentCountFields.map((field) => readStudentCount(field.key));
+    if (values.some((value) => Number.isNaN(value))) {
+      return 'Present student, Absent student, On leave student and Dropout student must be whole numbers.';
+    }
+    const missing = values.some((value) => value == null);
+    if (!requireAll && values.every((value) => value == null)) return '';
+    const total = values.reduce((sum, value) => sum + (Number.isInteger(value) ? value : 0), 0);
+    if (missing || total !== size) {
+      return `Present + Absent + On leave + Dropout is ${total}. It must equal the batch size of ${size}.`;
+    }
+    return '';
   };
 
   const loadReports = useCallback(async () => {
@@ -392,7 +434,7 @@ const knownFieldValue = (field, context) => {
       }
       if (!String(filledAnswer(field) || '').trim()) throw new Error(`${field.label} is required`);
     });
-    return '';
+    return studentCountMessage(true);
   };
 
   const saveReport = async () => {
@@ -414,6 +456,10 @@ const knownFieldValue = (field, context) => {
     const answersToSave = {};
     (formTemplate.fields || []).forEach((field) => {
       if (field.type === 'file') return;
+      if (studentCountKeys.has(field.key)) return;
+      answersToSave[field.key] = filledAnswer(field);
+    });
+    studentCountFields.forEach((field) => {
       answersToSave[field.key] = filledAnswer(field);
     });
     data.append('answers', JSON.stringify(answersToSave));
@@ -498,11 +544,18 @@ const knownFieldValue = (field, context) => {
 
   const detailFields = form.reportDate && form.batchId && formTemplate?.fields?.length
     ? (() => {
-      const fields = formTemplate.fields.filter((field) => field.key !== 'batchAttendance' && field.key !== 'batchSize' && labelKey(field.label) !== 'batchsize');
-      const batchSizeField = { key: 'batchSize', label: 'Batch size', type: 'number', required: false, locked: true };
+      const fields = formTemplate.fields.filter((field) => (
+        field.key !== 'batchAttendance'
+        && field.key !== 'batchSize'
+        && labelKey(field.label) !== 'batchsize'
+        && !studentCountKeys.has(field.key)
+        && !['presentstudent', 'absentstudent', 'onleavestudent', 'dropoutstudent'].includes(labelKey(field.label))
+      ));
+      const batchSizeField = { key: 'batchSize', label: 'Batch size', type: 'number', required: false, locked: true, portalKey: 'batchsize' };
       const batchIdIndex = fields.findIndex((field) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(field.label)));
-      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, batchSizeField);
-      else fields.push(batchSizeField);
+      const countFields = [batchSizeField, ...studentCountFields];
+      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, ...countFields);
+      else fields.push(...countFields);
       return fields;
     })()
     : [];
@@ -599,75 +652,116 @@ const knownFieldValue = (field, context) => {
   return (
     <section className="dtr-wrap">
       <style>{`
-        .dtr-wrap { display: flex; flex-direction: column; gap: 12px; }
-        .dtr-tabs { display: flex; width: fit-content; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+        .dtr-wrap { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 100%; min-width: 0; container: dtr / inline-size; }
+        .dtr-wrap, .dtr-wrap *, .dtr-modal, .dtr-modal *, .dtr-preview, .dtr-preview * { box-sizing: border-box; }
+        .dtr-tabs { display: flex; width: fit-content; max-width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
         .dtr-tabs button { border: 0; background: #fff; color: #64748b; padding: 10px 22px; font-weight: 700; cursor: pointer; }
         .dtr-tabs button.active { background: #fa5579; color: #fff; }
         .dtr-bar, .dtr-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+        .dtr-card { min-width: 0; max-width: 100%; }
         .dtr-bar { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px; flex-wrap: wrap; }
         .dtr-bar h2 { margin: 0; font-size: 16px; color: #0f172a; }
         .dtr-bar p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
         .dtr-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .dtr-search { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; min-width: 220px; font-size: 13px; }
+        .dtr-search { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; min-width: 0; width: min(280px, 100%); font-size: 13px; }
         .dtr-btn { border: 0; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .dtr-btn--primary { background: #fa5579; color: #fff; }
         .dtr-btn--ghost { background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
         .dtr-btn:disabled { opacity: 0.6; cursor: default; }
-        .dtr-table-wrap { overflow: auto; }
+        .dtr-table-wrap { overflow: auto; max-width: 100%; }
         .dtr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .dtr-table th, .dtr-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
         .dtr-table th { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: #f8fafc; }
         .dtr-table td.dtr-action, .dtr-table th.dtr-action { width: 90px; text-align: right; }
         .dtr-modal { position: fixed; inset: 0; z-index: 10050; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
-        .dtr-modal-card { width: min(1040px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); }
-        .dtr-modal-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; }
-        .dtr-modal-head h3 { margin: 0; font-size: 16px; }
-        .dtr-modal-head p { margin: 2px 0 0; color: #64748b; font-size: 12px; }
-        .dtr-modal-close { border: 0; background: transparent; font-size: 26px; line-height: 1; cursor: pointer; color: #334155; }
+        .dtr-modal-card { width: min(1040px, 100%); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); }
+        .dtr-modal-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; z-index: 1; }
+        .dtr-modal-head h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+        .dtr-modal-head p { margin: 2px 0 0; color: #64748b; font-size: 12px; overflow-wrap: anywhere; }
+        .dtr-modal-close { border: 0; background: transparent; font-size: 26px; line-height: 1; cursor: pointer; color: #334155; flex: 0 0 auto; }
         .dtr-modal-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
         .dtr-meta, .dtr-answers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-        .dtr-meta div, .dtr-answer { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px; }
+        .dtr-meta div, .dtr-answer { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px; min-width: 0; }
         .dtr-answer-wide { grid-column: 1 / -1; }
         .dtr-meta span, .dtr-answer span { display: block; color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
-        .dtr-meta strong, .dtr-answer p { display: block; margin: 2px 0 0; color: #0f172a; font-size: 13px; white-space: pre-wrap; }
+        .dtr-meta strong, .dtr-answer p { display: block; margin: 2px 0 0; color: #0f172a; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
         .dtr-gallery { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-        .dtr-thumb { width: 180px; height: 140px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; }
-        .dtr-file-link { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fff; color: #0f172a; font-size: 12px; font-weight: 700; text-decoration: none; }
+        .dtr-thumb { width: min(180px, 100%); height: 140px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; }
+        .dtr-file-link { display: inline-flex; align-items: center; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fff; color: #0f172a; font-size: 12px; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
         .dtr-preview { position: fixed; inset: 0; z-index: 10060; background: rgba(15, 23, 42, 0.88); display: flex; flex-direction: column; }
-        .dtr-preview-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; }
+        .dtr-preview-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; flex-wrap: wrap; }
+        .dtr-preview-bar strong { overflow-wrap: anywhere; min-width: 0; }
+        .dtr-preview-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
         .dtr-preview-bar button, .dtr-preview-bar a { border: 0; border-radius: 8px; background: #fff; color: #0f172a; padding: 6px 10px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .dtr-preview-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 12px; }
-        .dtr-preview-stage img, .dtr-preview-stage video { max-width: 100%; max-height: 78vh; background: #fff; }
-        .dtr-preview-stage iframe { width: min(900px, 100%); height: 78vh; background: #fff; border: 0; }
-        .dtr-cell-file { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
-        .dtr-topic { white-space: normal; min-width: 180px; max-width: 280px; }
-        .dtr-form { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
-        .dtr-pick { display: grid; grid-template-columns: 220px minmax(240px, 420px); gap: 12px; }
-        .dtr-details { border-top: 1px solid #e2e8f0; padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
-        .dtr-submit { display: flex; justify-content: flex-end; gap: 8px; }
+        .dtr-preview-stage img, .dtr-preview-stage video { max-width: 100%; max-height: 78vh; max-height: 78dvh; background: #fff; }
+        .dtr-preview-stage iframe { width: min(900px, 100%); height: min(78vh, 78dvh); background: #fff; border: 0; }
+        .dtr-cell-file { display: flex; flex-direction: column; gap: 4px; font-size: 11px; min-width: 0; max-width: 100%; }
+        .dtr-cell-file input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; }
+        .dtr-topic { white-space: normal; min-width: 0; max-width: 280px; }
+        .dtr-form { display: flex; flex-direction: column; gap: 14px; padding: 14px; min-width: 0; }
+        .dtr-pick { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 420px); gap: 12px; }
+        .dtr-details { border-top: 1px solid #e2e8f0; padding-top: 14px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+        .dtr-submit { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
         .dtr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .dtr-span-2 { grid-column: span 2; }
         .dtr-span-3 { grid-column: span 3; }
-        .dtr-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; }
-        .dtr-field input, .dtr-field select, .dtr-field textarea { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 500; background: #fff; }
+        .dtr-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #334155; min-width: 0; }
+        .dtr-field input, .dtr-field select, .dtr-field textarea { width: 100%; max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 500; background: #fff; }
         .dtr-radios { display: flex; flex-wrap: wrap; gap: 8px 16px; min-height: 36px; align-items: center; }
         .dtr-radio { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #334155; }
         .dtr-radio input { width: auto; min-height: 0; }
         .dtr-field textarea { min-height: 74px; resize: vertical; }
-        .dtr-readonly { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-weight: 600; color: #0f172a; min-height: 36px; }
+        .dtr-readonly { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-weight: 600; color: #0f172a; min-height: 36px; overflow-wrap: anywhere; }
+        .dtr-field.is-invalid { color: #be123c; }
+        .dtr-field.is-invalid input { border-color: #e11d48; background: #fff1f2; color: #be123c; }
         .dtr-section { border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
         .dtr-section h3 { margin: 0; font-size: 14px; color: #0f172a; }
         .dtr-slot { border: 1px dashed #cbd5e1; border-radius: 10px; padding: 10px; background: #f8fafc; }
         .dtr-slot small { display: block; color: #64748b; font-weight: 500; margin-top: 2px; }
         .dtr-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-        .dtr-file { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; padding: 4px 8px; font-size: 12px; font-weight: 600; }
+        .dtr-file { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; padding: 4px 8px; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
         .dtr-file button { border: 0; background: transparent; color: #be123c; cursor: pointer; font-weight: 800; }
         .dtr-empty { padding: 28px 14px; text-align: center; color: #64748b; }
         .dtr-yes { color: #047857; font-weight: 800; }
         .dtr-no { color: #b45309; font-weight: 800; }
-        @media (max-width: 900px) {
-          .dtr-pick, .dtr-grid, .dtr-span-2, .dtr-span-3, .dtr-meta, .dtr-answers { grid-template-columns: 1fr; }
+        @container dtr (max-width: 860px) {
+          .dtr-grid, .dtr-meta, .dtr-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .dtr-span-2 { grid-column: span 2; }
+          .dtr-span-3 { grid-column: 1 / -1; }
+          .dtr-pick { grid-template-columns: 1fr 1fr; }
+        }
+        @container dtr (max-width: 720px) {
+          .dtr-table thead { display: none; }
+          .dtr-table, .dtr-table tbody, .dtr-table tr, .dtr-table td { display: block; width: 100%; }
+          .dtr-table tr { border-bottom: 8px solid #f8fafc; }
+          .dtr-table td { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 1px solid #f1f5f9; text-align: right; overflow-wrap: anywhere; }
+          .dtr-table td::before { content: attr(data-label); color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; text-align: left; flex: 0 0 42%; }
+          .dtr-table td.dtr-action { width: auto; justify-content: flex-end; }
+          .dtr-table td.dtr-action::before { display: none; }
+        }
+        @container dtr (max-width: 560px) {
+          .dtr-pick, .dtr-grid { grid-template-columns: 1fr; }
           .dtr-span-2, .dtr-span-3 { grid-column: auto; }
+          .dtr-tabs { width: 100%; }
+          .dtr-tabs button { flex: 1; padding: 10px 8px; }
+          .dtr-bar { align-items: stretch; padding: 12px; }
+          .dtr-actions, .dtr-search { width: 100%; }
+          .dtr-form { padding: 12px; }
+          .dtr-submit { flex-direction: column-reverse; }
+          .dtr-submit .dtr-btn { width: 100%; }
+        }
+        @media (max-width: 900px) {
+          .dtr-meta, .dtr-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 640px) {
+          .dtr-modal { padding: 8px; align-items: stretch; }
+          .dtr-modal-card { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); border-radius: 12px; }
+          .dtr-meta, .dtr-answers { grid-template-columns: 1fr; }
+          .dtr-preview-bar { align-items: stretch; }
+          .dtr-preview-tools { width: 100%; }
+          .dtr-preview-tools button, .dtr-preview-tools a { flex: 1 1 auto; text-align: center; }
+          .dtr-preview-stage { padding: 8px; }
         }
       `}</style>
 
@@ -724,15 +818,18 @@ const knownFieldValue = (field, context) => {
             {detailFields.length > 0 && (
               <div className="dtr-details">
                 <div className="dtr-grid">
-                  {detailFields.map((field) => (
-                    <div
-                      key={field.key}
-                      className={`dtr-field${field.type === 'textarea' || field.type === 'file' || field.type === 'radio' || field.type === 'yesno' ? ' dtr-span-3' : ''}`}
-                    >
-                      <span>{field.label}{field.required ? ' *' : ''}</span>
-                      {renderCell(field)}
-                    </div>
-                  ))}
+                  {detailFields.map((field) => {
+                    const invalid = Boolean(studentCountMessage()) && studentCountKeys.has(field.key);
+                    return (
+                      <div
+                        key={field.key}
+                        className={`dtr-field${field.type === 'textarea' || field.type === 'file' || field.type === 'radio' || field.type === 'yesno' ? ' dtr-span-3' : ''}${invalid ? ' is-invalid' : ''}`}
+                      >
+                        <span>{field.label}{field.required ? ' *' : ''}</span>
+                        {renderCell(field)}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="dtr-submit">
                   <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
@@ -765,13 +862,13 @@ const knownFieldValue = (field, context) => {
                 <tbody>
                   {visibleReports.map((report) => (
                     <tr key={report.id}>
-                      <td>{formatReportDate(report.reportDate)}</td>
-                      <td>{report.trainerName || '-'}</td>
-                      <td>{report.verticalName || '-'}</td>
-                      <td>{report.projectName || '-'}</td>
-                      <td>{report.courseName || report.jobRole || '-'}</td>
-                      <td>{report.batchCode || '-'}</td>
-                      <td className="dtr-action">
+                      <td data-label="Date">{formatReportDate(report.reportDate)}</td>
+                      <td data-label="Trainer">{report.trainerName || '-'}</td>
+                      <td data-label="Department">{report.verticalName || '-'}</td>
+                      <td data-label="Project">{report.projectName || '-'}</td>
+                      <td data-label="Course">{report.courseName || report.jobRole || '-'}</td>
+                      <td data-label="Batch">{report.batchCode || '-'}</td>
+                      <td className="dtr-action" data-label="Action">
                         <button type="button" className="dtr-btn dtr-btn--ghost" onClick={() => setViewingReport(report)}>View</button>
                       </td>
                     </tr>
@@ -802,6 +899,10 @@ const knownFieldValue = (field, context) => {
                   ['Course', viewingReport.courseName || viewingReport.jobRole],
                   ['Batch', viewingReport.batchCode],
                   ['Batch size', viewingReport.batchSize ?? ''],
+                  ['Present student', (viewingReport.answers || []).find((answer) => answer.key === 'presentStudent')?.value || ''],
+                  ['Absent student', (viewingReport.answers || []).find((answer) => answer.key === 'absentStudent')?.value || ''],
+                  ['On leave student', (viewingReport.answers || []).find((answer) => answer.key === 'onLeaveStudent')?.value || ''],
+                  ['Dropout student', (viewingReport.answers || []).find((answer) => answer.key === 'dropoutStudent')?.value || ''],
                   ['Location', viewingReport.location],
                 ].map(([label, value]) => (
                   <div key={label}>
@@ -811,7 +912,7 @@ const knownFieldValue = (field, context) => {
                 ))}
               </div>
               <div className="dtr-answers">
-              {(viewingReport.answers || []).map((answer) => {
+              {(viewingReport.answers || []).filter((answer) => !studentCountKeys.has(answer.key)).map((answer) => {
                 const wide = answer.type === 'file' || answer.type === 'textarea' || String(answer.value || '').length > 80 || (answer.files || []).length > 0;
                 return (
                 <div className={`dtr-answer${wide ? ' dtr-answer-wide' : ''}`} key={answer.key}>
@@ -854,7 +955,7 @@ const knownFieldValue = (field, context) => {
         <div className="dtr-preview" onClick={() => setPreview(null)}>
           <div className="dtr-preview-bar" onClick={(event) => event.stopPropagation()}>
             <strong>{preview.fileName || 'File'}</strong>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="dtr-preview-tools">
               {mediaKind(preview) === 'image' && (
                 <>
                   <button type="button" onClick={() => setPreviewZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}>Zoom in</button>

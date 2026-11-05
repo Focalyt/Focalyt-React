@@ -28,7 +28,13 @@ const DailyReportPage = () => {
   };
 
   return (
-    <div style={{ padding: 16 }}>
+    <div className="dtr-page">
+      <style>{`
+        .dtr-page { padding: 16px; max-width: 100%; min-width: 0; }
+        @media (max-width: 640px) {
+          .dtr-page { padding: 8px 0 16px; }
+        }
+      `}</style>
       <DailyTrainerReport
         backendUrl={backendUrl}
         token={token}

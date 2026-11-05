@@ -1948,7 +1948,7 @@ const CRMDashboard = () => {
       return;
     }
     if (aiCallSource === 'untouch-new-lead' && !aiCallLeadSource) {
-      toast.info('Pick Data Lead or Digital Lead first');
+      toast.info('Pick a lead source first');
       return;
     }
     if (!numValue || numValue < 1) {
@@ -1965,11 +1965,12 @@ const CRMDashboard = () => {
       return;
     }
 
-    const sourceLabel = aiCallLeadSource === 'data-lead'
-      ? 'Data Lead'
-      : aiCallLeadSource === 'digital-lead'
-        ? 'Digital Lead'
-        : aiCallLabel;
+    const sourceLabel = (sources || []).find((source) => String(source._id) === String(aiCallLeadSource))?.name
+      || (aiCallLeadSource === 'data-lead'
+        ? 'Data Lead'
+        : aiCallLeadSource === 'digital-lead'
+          ? 'Digital Lead'
+          : aiCallLabel);
     const confirmed = window.confirm(
       `Send ${idsToSend.length || numValue} ${sourceLabel} lead(s) to AI call?`
     );
@@ -2011,7 +2012,7 @@ const CRMDashboard = () => {
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
+  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, sources, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -3251,6 +3252,24 @@ const CRMDashboard = () => {
       })),
     [sources]
   );
+
+  const aiCallSourceOptions = useMemo(() => {
+    const rank = (name) => {
+      const value = String(name || '').trim();
+      if (/^data\s*leads?$/i.test(value)) return 0;
+      if (/^digital\s*lead$/i.test(value)) return 1;
+      return 2;
+    };
+    const rows = (sources || [])
+      .filter((source) => source && source._id && source.status !== false && !/^meta\s*job\s*leads?$/i.test(String(source.name || '').trim()))
+      .map((source) => ({ id: String(source._id), label: source.name || 'Untitled' }))
+      .sort((a, b) => rank(a.label) - rank(b.label) || a.label.localeCompare(b.label));
+    if (rows.length) return rows;
+    return [
+      { id: 'data-lead', label: 'Data Lead' },
+      { id: 'digital-lead', label: 'Digital Lead' },
+    ];
+  }, [sources]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -18218,10 +18237,7 @@ useEffect(() => {
                                     <div className="ai-call-date-modal__source">
                                       <span>Send to VoiceX</span>
                                       <div className="ai-call-date-modal__presets ai-call-date-modal__presets--source">
-                                        {[
-                                          { id: 'data-lead', label: 'Data Lead' },
-                                          { id: 'digital-lead', label: 'Digital Lead' },
-                                        ].map((option) => (
+                                        {aiCallSourceOptions.map((option) => (
                                           <button
                                             key={option.id}
                                             type="button"
