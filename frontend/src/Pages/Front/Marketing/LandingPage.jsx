@@ -4,7 +4,7 @@ import moment from "moment";
 import { Check, Clock, Heart, Play, Search } from "lucide-react";
 import FrontLayout from "../../../Component/Layouts/Front";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
-import { usePublicApply } from "../../../Component/PublicApplyModal/PublicApplyModal";
+import { buildJobApplyTarget, usePublicApply } from "../../../Component/PublicApplyModal/PublicApplyModal";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
@@ -64,7 +64,124 @@ function mapCourse(course, bucketUrl) {
   };
 }
 
+function jobLocation(job) {
+  const city = job?.city?.name || (typeof job?.city === "string" ? job.city : "");
+  const state = job?.state?.name || (typeof job?.state === "string" ? job.state : "");
+  return [city, state].filter(Boolean).join(", ") || "NA";
+}
+
+function jobSectorId(job) {
+  const industry = job?._industry;
+  if (!industry) return "";
+  if (typeof industry === "string") return industry;
+  return industry._id ? String(industry._id) : "";
+}
+
+function formatJobExperience(job) {
+  if ((job?.experience === 0 && job?.experienceMonths === 0) || (job?.experience === 0 && !job?.experienceMonths)) {
+    return "Fresher";
+  }
+  const parts = [];
+  if (job?.experience > 0) parts.push(`${job.experience} ${job.experience === 1 ? "Year" : "Years"}`);
+  if (job?.experienceMonths > 0) {
+    parts.push(`${job.experienceMonths} ${job.experienceMonths === 1 ? "Month" : "Months"}`);
+  }
+  return parts.join(" ") || "N/A";
+}
+
+function formatJobSalary(job) {
+  if (job?.isFixed && job?.amount) return `₹ ${formatFee(job.amount)}`;
+  if (!job?.isFixed && (job?.min || job?.max)) {
+    return `₹ ${formatFee(job.min) || "—"} - ${formatFee(job.max) || "—"}`;
+  }
+  return "";
+}
+
+function resolveJobImage(bucketUrl, job) {
+  const candidates = [job?.jobVideoThumbnail, job?.thumbnail, job?._company?.logo];
+  for (const value of candidates) {
+    if (!value) continue;
+    const resolved = resolveMediaUrl(bucketUrl, value);
+    if (resolved) return resolved;
+    if (/^https?:\/\//i.test(String(value))) return String(value);
+  }
+  return THUMB_FALLBACK;
+}
+
+function mapJob(job, bucketUrl) {
+  const location = jobLocation(job);
+  const company = job?.displayCompanyName || job?._company?.name || "";
+  const experience = formatJobExperience(job);
+  const lastDate = job?.validity
+    ? moment(job.validity).utcOffset("+05:30").format("MMM DD, YYYY")
+    : "";
+  const salary = formatJobSalary(job);
+  const qualification = job?._qualification?.name || "";
+  const perks = [];
+  if (qualification) perks.push({ type: "gift", text: `Eligibility: ${qualification}` });
+  if (experience && experience !== "N/A") perks.push({ type: "clock", text: `Experience: ${experience}` });
+  if (job?.work) perks.push({ type: "dot", text: `Mode: ${job.work}` });
+  if (lastDate) perks.push({ type: "heritage", text: `Last date to apply: ${lastDate}` });
+
+  return {
+    kind: "job",
+    source: job,
+    bucketUrl,
+    id: job?._id,
+    name: job?.title || job?.name || "Job",
+    image: resolveJobImage(bucketUrl, job),
+    imageFallback: THUMB_FALLBACK,
+    videoUrl: (() => {
+      if (!job?.jobVideo) return "";
+      const video = String(job.jobVideo);
+      if (/^https?:\/\//i.test(video)) return video;
+      return resolveMediaUrl(bucketUrl, video) || video;
+    })(),
+    mediaCount: "View details",
+    location,
+    distance: company || "Focalyt",
+    tag: job?.courseType === "coursejob" ? "Course + Jobs" : "Job",
+    perks,
+    ratingLabel: salary ? "Salary" : "Open",
+    ratingCount: company,
+    isFree: false,
+    price: salary || "—",
+    extraFee: "",
+    duration: experience,
+    description: String(job?.shareDescription || job?.description || job?.jobDescription || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  };
+}
+
+function listingDetails(item) {
+  return {
+    perks: item.perks,
+    tag: item.tag,
+    price: item.price,
+    isFree: item.isFree,
+    extraFee: item.extraFee,
+    duration: item.duration,
+    description: item.description,
+    ratingLabel: item.ratingLabel,
+    ratingCount: item.ratingCount,
+  };
+}
+
 function applyPayload(course, openTab) {
+  if (course.kind === "job") {
+    return {
+      ...buildJobApplyTarget(course.source, course.bucketUrl),
+      openTab,
+      image: course.image,
+      location: course.location,
+      extra: course.distance,
+      badge: course.tag || "Job",
+      details: listingDetails(course),
+    };
+  }
+
   return {
     openTab,
     kind: "course",
@@ -75,17 +192,7 @@ function applyPayload(course, openTab) {
     extra: course.distance,
     badge: course.isFree ? "Free Course" : "Paid Course",
     applyPath: `/candidate/course/${course.id}?apply=1`,
-    details: {
-      perks: course.perks,
-      tag: course.tag,
-      price: course.price,
-      isFree: course.isFree,
-      extraFee: course.extraFee,
-      duration: course.duration,
-      description: course.description,
-      ratingLabel: course.ratingLabel,
-      ratingCount: course.ratingCount,
-    },
+    details: listingDetails(course),
   };
 }
 
@@ -169,7 +276,8 @@ function CourseCard({ course, featured }) {
   );
 }
 
-const LandingPage = () => {
+const LandingPage = ({ mode = "courses" }) => {
+  const isJobs = mode === "jobs";
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -179,6 +287,9 @@ const LandingPage = () => {
   const [error, setError] = useState("");
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const noun = isJobs ? "jobs" : "courses";
+  const nounTitle = isJobs ? "Jobs" : "Courses";
+  const typeOptions = isJobs ? ["all", "fresher", "experienced"] : ["all", "paid", "free"];
 
   useEffect(() => {
     const root = document.documentElement;
@@ -191,19 +302,37 @@ const LandingPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError("");
       try {
-        const response = await axios.get(`${backendUrl}/courses`);
-        setCourses(response.data.courses ?? []);
-        setUniqueSectors(response.data.uniqueSectors ?? []);
+        if (isJobs) {
+          const response = await axios.get(`${backendUrl}/joblisting`);
+          setCourses(response.data.recentJobs ?? []);
+          setUniqueSectors(response.data.uniqueSectors ?? []);
+        } else {
+          const response = await axios.get(`${backendUrl}/courses`);
+          setCourses(response.data.courses ?? []);
+          setUniqueSectors(response.data.uniqueSectors ?? []);
+        }
       } catch (err) {
-        console.error("Error fetching course data:", err);
-        setError("Failed to load courses.");
+        console.error(`Error fetching ${noun} data:`, err);
+        setCourses([]);
+        setError(`Failed to load ${noun}.`);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [backendUrl]);
+  }, [backendUrl, isJobs, noun]);
+
+  const matchesSector = (item, sectorId) => {
+    if (isJobs) return jobSectorId(item) === sectorId;
+    return (
+      item.sectors &&
+      Array.isArray(item.sectors) &&
+      item.sectors.some((s) => s && s.toString() === sectorId)
+    );
+  };
 
   const getFilteredCourses = () => {
     if (!Array.isArray(courses)) return [];
@@ -211,25 +340,37 @@ const LandingPage = () => {
 
     if (activeFilter !== "all") {
       const sectorId = activeFilter.replace("id_", "");
-      filtered = filtered.filter(
-        (course) =>
-          course.sectors &&
-          Array.isArray(course.sectors) &&
-          course.sectors.some((s) => s && s.toString() === sectorId)
-      );
+      filtered = filtered.filter((item) => matchesSector(item, sectorId));
     }
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
-      filtered = filtered.filter((course) => {
-        const nameMatch = course.name?.toLowerCase().includes(term);
-        const qualificationMatch = course.qualification?.toLowerCase().includes(term);
-        const durationMatch = course.duration?.toLowerCase().includes(term);
-        const cityMatch = course.city?.toLowerCase().includes(term);
-        const stateMatch = course.state?.toLowerCase().includes(term);
-        const modeMatch = course.trainingMode?.toLowerCase().includes(term);
-        const typeMatch = course.courseType?.toLowerCase().includes(term);
-        const sectorMatch = course.sectorNames?.some((name) =>
+      filtered = filtered.filter((item) => {
+        if (isJobs) {
+          const city = item.city?.name || (typeof item.city === "string" ? item.city : "");
+          const state = item.state?.name || (typeof item.state === "string" ? item.state : "");
+          const fields = [
+            item.title,
+            item.name,
+            item.displayCompanyName,
+            item._company?.name,
+            city,
+            state,
+            item._qualification?.name,
+            item.work,
+            item._industry?.name,
+          ];
+          return fields.some((value) => String(value || "").toLowerCase().includes(term));
+        }
+
+        const nameMatch = item.name?.toLowerCase().includes(term);
+        const qualificationMatch = item.qualification?.toLowerCase().includes(term);
+        const durationMatch = item.duration?.toLowerCase().includes(term);
+        const cityMatch = item.city?.toLowerCase().includes(term);
+        const stateMatch = item.state?.toLowerCase().includes(term);
+        const modeMatch = item.trainingMode?.toLowerCase().includes(term);
+        const typeMatch = item.courseType?.toLowerCase().includes(term);
+        const sectorMatch = item.sectorNames?.some((name) =>
           name.toLowerCase().includes(term)
         );
         return (
@@ -246,28 +387,38 @@ const LandingPage = () => {
     }
 
     if (feeFilter !== "all") {
-      filtered = filtered.filter(
-        (course) => course.courseFeeType?.toLowerCase() === feeFilter
-      );
+      if (isJobs) {
+        filtered = filtered.filter((job) => {
+          const experience = formatJobExperience(job);
+          if (feeFilter === "fresher") return experience === "Fresher";
+          return experience !== "Fresher" && experience !== "N/A";
+        });
+      } else {
+        filtered = filtered.filter(
+          (course) => course.courseFeeType?.toLowerCase() === feeFilter
+        );
+      }
     }
 
-    filtered.sort((a, b) => {
-      const seqA = Number.isFinite(Number(a.sequence)) ? Number(a.sequence) : 50;
-      const seqB = Number.isFinite(Number(b.sequence)) ? Number(b.sequence) : 50;
-      return seqA - seqB;
-    });
+    if (!isJobs) {
+      filtered.sort((a, b) => {
+        const seqA = Number.isFinite(Number(a.sequence)) ? Number(a.sequence) : 50;
+        const seqB = Number.isFinite(Number(b.sequence)) ? Number(b.sequence) : 50;
+        return seqA - seqB;
+      });
+    }
 
     return filtered;
   };
 
   const filteredCourses = getFilteredCourses();
-  const cards = filteredCourses.map((course) => mapCourse(course, bucketUrl));
+  const cards = filteredCourses.map((item) => (isJobs ? mapJob(item, bucketUrl) : mapCourse(item, bucketUrl)));
   const featured = cards[0];
   const similar = cards.slice(1);
   const selectedSectorName =
     activeFilter === "all"
       ? "All"
-      : uniqueSectors.find((s) => `id_${s._id}` === activeFilter)?.name || "All";
+      : (Array.isArray(uniqueSectors) ? uniqueSectors : []).find((s) => `id_${s._id}` === activeFilter)?.name || "All";
 
   return (
     <FrontLayout>
@@ -284,7 +435,7 @@ const LandingPage = () => {
                   <input
                     type="text"
                     className="courses-search__input"
-                    placeholder="Search courses..."
+                    placeholder={`Search ${noun}...`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -302,10 +453,8 @@ const LandingPage = () => {
                 >
                   All <span className="filter-chip__count">{courses.length}</span>
                 </button>
-                {uniqueSectors.map((sector) => {
-                  const count = courses.filter((c) =>
-                    c.sectors?.some((s) => s && s.toString() === sector._id.toString())
-                  ).length;
+                {(Array.isArray(uniqueSectors) ? uniqueSectors : []).map((sector) => {
+                  const count = courses.filter((item) => matchesSector(item, String(sector._id))).length;
                   return (
                     <button
                       key={sector._id}
@@ -320,8 +469,8 @@ const LandingPage = () => {
               </div>
 
               <div className="courses-filters__fee">
-                <span className="courses-filters__fee-label">Course Type:</span>
-                {["all", "paid", "free"].map((fee) => (
+                <span className="courses-filters__fee-label">{isJobs ? "Experience:" : "Course Type:"}</span>
+                {typeOptions.map((fee) => (
                   <button
                     key={fee}
                     type="button"
@@ -334,11 +483,11 @@ const LandingPage = () => {
               </div>
             </div>
 
-            {loading ? <p className="htl-status">Loading courses…</p> : null}
+            {loading ? <p className="htl-status">Loading {noun}…</p> : null}
             {!loading && error ? <p className="htl-status">{error}</p> : null}
             {!loading && !error && !cards.length ? (
               <div className="htl-empty">
-                <h3>No courses found</h3>
+                <h3>No {noun} found</h3>
                 <p>Try adjusting your search or filters.</p>
               </div>
             ) : null}
@@ -347,7 +496,7 @@ const LandingPage = () => {
 
             {similar.length ? (
               <>
-                <h2 className="htl-similar">Similar Courses around {featured?.name}</h2>
+                <h2 className="htl-similar">Similar {nounTitle} around {featured?.name}</h2>
                 {similar.map((course) => (
                   <CourseCard key={course.id} course={course} />
                 ))}

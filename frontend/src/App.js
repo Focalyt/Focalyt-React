@@ -263,6 +263,7 @@ const Layout = () => {
         <Route exact path="/contact" element={<Contact />} />
         <Route exact path="/marketing" element={<Marketing />} />
         <Route exact path="/landing" element={<LandingPage />} />
+        <Route exact path="/jobs" element={<LandingPage mode="jobs" />} />
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/cmp/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
