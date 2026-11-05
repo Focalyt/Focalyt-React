@@ -16488,7 +16488,7 @@ useEffect(() => {
         </div>
       </div>
       <div className="b2b-dash-section mt-3">
-        <label className="b2b-dash-section__label" htmlFor="b2bMilestoneProject">Project</label>
+        <label className="b2b-dash-section__label" htmlFor="b2bMilestoneProject">Milestones</label>
         <div className="b2b-milestone-row d-flex flex-nowrap gap-2 align-items-center pt-1">
           <select
             id="b2bMilestoneProject"

@@ -1,54 +1,30 @@
-<div class="main-menu menu-fixed menu-light menu-accordion menu-shadow" data-scroll-to-active="true">
-  <div class="navbar-header">
-    <ul class="nav navbar-nav flex-row">
-      <li class="nav-item mr-auto"><a class="navbar-brand">
-          <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard"><img class="img-fluid logocs" src="<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png">
-          </a></li>
-      <li class="nav-item nav-toggle"><a class="nav-link modern-nav-toggle pr-0" data-toggle="collapse"><i
-            class="feather icon-x d-block d-xl-none font-medium-4 primary toggle-icon"></i><i
-            class="toggle-icon feather icon-disc font-medium-4 d-none d-xl-block collapse-toggle-icon primary"
-            data-ticon="icon-disc"></i></a></li>
-    </ul>
-  </div>
-  <div class="shadow-bottom"></div>
-  <div class="main-menu-content border border-left-0 border-right-0 border-bottom-0">
-    <ul class="navigation navigation-main" id="main-menu-navigation" data-menu="menu-navigation">
-      <li class=" nav-item <% if(menu==='dashboard') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard"><i class="feather icon-airplay"></i><span
-            class="menu-title" data-i18n="Dashboard">Dashboard</span></a>
-      </li>
-      </li>
-      <li class="nav-item <% if(menu==='myProfile') {%>active<%}%>" ><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/myProfile"><i class="feather icon-user"></i><span class="menu-title"
-            data-i18n="Todo">Your Profile</span></a>
-      </li>
-            <li class="nav-item <% if(menu ==='Notifications') {%>active<%}%>">
-                <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/notifications">
-                    <i class="fa fa-bell"></i>
-                    <span class="menu-title" data-i18n="Todo">Notifications</span>
-                </a>
-            </li>
-      <!-- <li class="nav-item <% if(menu==='search-candidates') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/search-candidates"><i class="feather  icon-user"></i><span
-            class="menu-title" data-i18n="Todo"> Search Candidates </span></a>
-      </li> -->
-      <li class="nav-item <% if(menu==='jobList'|| menu === 'view-jd' || menu === 'addjobs' || menu ==='edit-jd') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs"><i class="feather icon-file-text"></i><span class="menu-title"
-            data-i18n="Todo">Job Details</span></a>
-      </li>
-      <li class="nav-item <% if(menu==='list-candidates') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates"><i class="feather icon-list"></i><span class="menu-title"
-            data-i18n="Todo">List Candidates</span></a>
-      </li>
-      <li class="nav-item <% if(menu==='interested-candidates') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/interested-candidates"><i class="feather icon-list"></i><span class="menu-title"
-            data-i18n="Todo">Interested Candidates</span></a>
-      </li>
-      <li class="nav-item <% if(menu==='nearbyCandidates') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/nearbyCandidates"><i class="feather icon-map-pin"></i><span class="menu-title"
-            data-i18n="Todo">Candidates Near Me</span></a>
-      </li>
-      <li class="nav-item <% if(menu==='shortlisted-candidates') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/shortlisted"><i class="feather icon-award"></i><span class="menu-title"
-            data-i18n="Todo">Shortlisted Candidates</span></a>
-      </li>
-      <li class="nav-item <% if(menu==='ongoing-candidates') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/onGoingHiring"><i class="feather icon-star"></i><span class="menu-title"
-            data-i18n="Todo">On Going Hiring</span></a>
-      </li>
-      <!-- <li class="nav-item <% if(menu==='miPieCoins') {%>active<%}%>"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/Coins"><i
-            class="feather icon-circle"></i><span class="menu-title" data-i18n="Todo">Coins</span></a>
-      </li> -->
-  </div>
-</div>
+<aside class="recruiter-sidebar" id="recruiter-sidebar" aria-label="Company workspace">
+  <a class="recruiter-brand" href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">
+    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png" alt="Focalyt">
+    <small>RECRUITER</small>
+  </a>
+  <div class="recruiter-nav-label">TALENT ACQUISITION</div>
+  <nav aria-label="Company navigation">
+    <% const recruiterLinks = [
+      ['dashboard', '/dashboard', 'airplay', 'Dashboard'],
+      ['list-candidates', '/list-candidates', 'search', 'Search Candidates'],
+      ['jobs', '/list/jobs', 'file-text', 'Jobs & Responses'],
+      ['interested-candidates', '/interested-candidates', 'heart', 'Interested Candidates'],
+      ['nearbyCandidates', '/nearbyCandidates', 'map-pin', 'Candidates Near Me'],
+      ['shortlisted-candidates', '/candidate/shortlisted', 'award', 'Shortlisted Candidates'],
+      ['ongoing-candidates', '/onGoingHiring', 'briefcase', 'On Going Hiring'],
+      ['status', '/status', 'flag', 'Status'],
+      ['milestone', '/milestone', 'check-circle', 'Milestones'],
+      ['Notifications', '/notifications', 'bell', 'Notifications'],
+      ['myProfile', '/myProfile', 'user', 'Your Profile']
+    ]; %>
+    <% recruiterLinks.forEach(function(link) {
+      const active = link[0] === 'jobs' ? ['jobList', 'view-jd', 'addjobs', 'edit-jd'].includes(menu) : link[0] === menu;
+    %>
+      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company<%= link[1] %>" class="<%= active ? 'active' : '' %>" <% if(active) { %>aria-current="page"<% } %>>
+        <i class="feather icon-<%= link[2] %>" aria-hidden="true"></i><span><%= link[3] %></span>
+      </a>
+    <% }); %>
+  </nav>
+  <div class="recruiter-sidefoot"><strong>Your hiring workspace</strong><br>Find talent, review applications and move your hiring forward.</div>
+</aside>

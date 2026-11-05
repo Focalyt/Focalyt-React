@@ -15,6 +15,7 @@ import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/
 import useWebsocket from '../../../../utils/websocket';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
+import HiringInterviewPanel from './HiringInterviewPanel';
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
@@ -330,6 +331,8 @@ const mapHrLeadToB2cProfile = (lead) => {
   return {
     _id: lead?._id,
     isHrJobLead: true,
+    companyId: lead?.companyId || null,
+    corporateHiringStatus: lead?.corporateHiringStatus || null,
     source: lead?.source || '',
     _candidate: {
       _id: lead?.candidate,
@@ -19833,6 +19836,7 @@ useEffect(() => {
 
                             {/* Lead Card (same design as B2B) */}
                             <div className={`lead-card${showPopup === profileIndex ? ' lead-card--actions-open' : ''}${approvalEditProfileId === profile._id ? ' lead-card--approval-open' : ''}`}>
+                              <div className="lead-job-toolbar">
                               {group.leads.length > 0 && (
                                 <div className="lead-project-tabs" role="tablist" aria-label="Jobs for this candidate">
                                   {group.leads.map((courseLead) => {
@@ -19874,6 +19878,23 @@ useEffect(() => {
                                   )}
                                 </div>
                               )}
+                              {profile.isHrJobLead && (
+                                <HiringInterviewPanel
+                                  key={profile._id}
+                                  profile={profile}
+                                  backendUrl={backendUrl}
+                                  token={token}
+                                  onSaved={(hiring, companyId) => {
+                                    setAllProfiles(previous => previous.map(row => (
+                                      row.isHrJobLead
+                                      && String(row._candidate?._id) === String(profile._candidate?._id)
+                                      && String(row.companyId) === String(companyId)
+                                        ? { ...row, corporateHiringStatus: hiring } : row
+                                    )));
+                                  }}
+                                />
+                              )}
+                              </div>
                               {isMobile ? (
                                 <div className="lead-header lead-header-v2">
                                   {/* Floating labeled actions (mobile) */}
@@ -32473,7 +32494,58 @@ max-width: 600px;
           overflow: hidden;
         }
 
-        .lead-card > .lead-project-tabs + .lead-header.lead-header-v2 {
+        .lead-job-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px 16px;
+          padding: 8px 12px;
+          background: linear-gradient(180deg, #fff9fb 0%, #fff 100%);
+        }
+
+        .lead-job-toolbar > .lead-project-tabs {
+          flex: 1 1 160px;
+          min-width: 0;
+          padding: 0;
+          background: transparent;
+        }
+
+        .lead-job-toolbar > .hr-hiring-panel {
+          flex: 0 1 auto;
+          width: auto;
+          max-width: 100%;
+          margin: 0 0 0 auto;
+          padding: 0;
+          gap: 8px;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          font-size: 12px;
+        }
+
+        .lead-job-toolbar .hr-hiring-panel__manage {
+          margin-left: 0;
+          padding: 5px 10px;
+          font-size: 12px;
+        }
+
+        .lead-job-toolbar .hr-hiring-panel__stage {
+          padding: 4px 9px;
+        }
+
+        @media (max-width: 600px) {
+          .lead-job-toolbar > .hr-hiring-panel {
+            flex-basis: 100%;
+            margin-left: 0;
+          }
+
+          .lead-job-toolbar .hr-hiring-panel__heading,
+          .lead-job-toolbar .hr-hiring-panel__date {
+            flex-basis: auto;
+          }
+        }
+
+        .lead-card > .lead-job-toolbar + .lead-header.lead-header-v2 {
           margin-top: 8px;
         }
 

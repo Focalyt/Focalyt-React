@@ -1,0 +1,143 @@
+<style>
+/* Matches the College HR lead-strip-v3 card geometry and panel treatment. */
+.company-student-list { display: grid; gap: 12px; padding: 12px; }
+.company-student-card { --student-card-radius: 16px; background: #fff; border-radius: var(--student-card-radius); box-shadow: 0 10px 30px #0f172a1a, 0 2px 8px #0f172a0f; border: 1px solid #cbd5e1; overflow: hidden; position: relative; transition: box-shadow .25s ease, border-color .25s ease; }
+.company-student-card:hover { border-color: #94a3b8; box-shadow: 0 14px 36px #0f172a24, 0 4px 12px #0f172a14; }
+.company-student-company-header { display: flex; align-items: center; min-height: 46px; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; background: linear-gradient(180deg,#fff9fb 0%,#fff 100%); }
+.company-student-company-badge { display: inline-block; max-width: 100%; padding: 5px 14px; border-radius: 999px; background: #fa5579; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.company-student-strip { display: flex; align-items: stretch; gap: 8px; padding: 8px; background: #e8edf3; border: 1px solid #d7dee8; border-radius: 14px; flex-wrap: nowrap; overflow-x: auto; }
+.company-student-profile { flex: 0 1 clamp(260px,20vw,340px); min-width: 250px; display: flex; flex-direction: column; gap: 5px; background: white; border: 1px solid #d7dee8; border-top: 3px solid #2563eb; border-radius: 14px; padding: 8px 8px 6px; color: #0f172a; box-shadow: 0 4px 16px #0f172a14; }
+.company-student-profile-head { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 6px; margin-bottom: 4px; }
+.company-student-avatar { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: #eff6ff; color: #2563eb; border-radius: 8px; font-weight: 800; }
+.company-student-name { font-size: 17px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+body:has(.recruiter-sidebar) .company-student-name a { color: #0f172a; }
+.company-student-contact { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 6px; line-height: 1.25; min-height: 27px; }
+.company-student-contact > i { width: 14px; color: #2563eb; flex-shrink: 0; }
+.company-student-contact > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.company-student-whatsapp { margin-left: auto; flex-shrink: 0; }
+.company-student-meta { display: flex; gap: 8px; align-items: baseline; font-size: 10px; color: #64748b; padding: 1px 4px; }
+.company-student-meta strong { color: #334155; overflow-wrap: anywhere; }
+.company-student-pair { display: flex; flex-direction: column; gap: 6px; min-width: 170px; flex: 1 0 170px; }
+.company-student-panel { position: relative; flex: 1 1 160px; min-width: 130px; background: white; border: 1px solid #d7dee8; border-radius: 12px; padding: 10px 10px 8px; box-shadow: 0 4px 14px #0f172a14; display: flex; flex-direction: column; gap: 6px; }
+body:has(.recruiter-sidebar) .company-student-panel h3 { margin: 0 0 3px; font-size: 11px; font-weight: 800; color: #334155; display: flex; gap: 6px; align-items: center; }
+.company-student-panel h3 i { color: #2563eb; }
+.company-student-performance { border-top: 3px solid #3b82f6; flex: 3 1 0; min-width: 0; }
+.company-student-performance h3 .company-student-icon { margin-left: auto; width: 22px; height: 22px; flex-shrink: 0; }
+.company-student-kv { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; }
+.company-student-kv > span { color: #64748b; }
+.company-student-kv > strong, .company-student-kv-pill { color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 3px 6px; text-align: right; overflow-wrap: anywhere; font-size: 10px; font-weight: 700; }
+.company-student-kv-pill { cursor: pointer; }
+.company-student-status { flex: 1 1 0; border-top: 3px solid #f59e0b; min-width: 0; padding: 5px 6px 4px; gap: 3px; }
+.company-student-status h3 .company-student-icon { margin-left: auto; width: 22px; height: 22px; flex-shrink: 0; }
+.company-student-status-pill { align-self: flex-start; border-radius: 999px; padding: 3px 10px; font-size: 10px; font-weight: 800; line-height: 1.3; background: #ffedd5; color: #c2410c; text-transform: capitalize; }
+button.company-student-status-pill { border: 0; cursor: pointer; }
+.company-student-application { border-top: 3px solid #64748b; flex: 1 1 clamp(170px,15vw,210px); min-width: 150px; }
+.company-student-job { font-size: 13px; color: #0f172a; overflow-wrap: anywhere; }
+.company-student-company { font-size: 10px; color: #64748b; overflow-wrap: anywhere; }
+.company-student-date { margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 7px; display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: #64748b; }
+.company-student-date strong { color: #334155; }
+.company-student-applied { align-self: flex-start; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 2px 8px; font-size: 9px; font-weight: 800; }
+.company-student-actions { border-top: 3px solid #06b6d4; flex: 1 1 140px; min-width: 130px; overflow: visible; }
+.company-student-head-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.company-student-actions h3 .company-student-chevron { margin-left: 0; }
+.company-student-more { position: relative; display: inline-flex; }
+.company-student-more-menu { position: fixed; z-index: 30; min-width: 168px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 24px #0f172a24; padding: 6px; display: grid; }
+.company-student-more-menu[hidden] { display: none !important; }
+.company-student-more-menu a, .company-student-more-menu button { display: flex; align-items: center; width: 100%; border: 0; background: transparent; text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #243452; cursor: pointer; text-decoration: none; }
+.company-student-more-menu a:hover, .company-student-more-menu button:hover { background: #eff6ff; }
+.company-student-action-icons { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.company-student-action-icons:empty { display: none; }
+body:has(.recruiter-sidebar) .company-student-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 8px; background: white; color: #2563eb; padding: 0; font-size: 12px; cursor: pointer; }
+body:has(.recruiter-sidebar) .company-student-profile-button { display: flex; align-items: center; justify-content: center; gap: 6px; background: #2563eb; color: white; border: 1px solid #2563eb; border-radius: 6px; padding: 6px 8px; font-size: 10px; font-weight: 700; margin-top: auto; }
+.company-student-unmask { border: 0; background: transparent; color: #2563eb; padding: 0; font-size: 11px; font-weight: 700; cursor: pointer; }
+.company-student-name-button { border: 0; padding: 0; text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.company-student-chevron { margin-left: auto; flex-shrink: 0; }
+.company-student-details { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; }
+.company-student-details[hidden], .company-student-details [hidden] { display: none !important; }
+.company-student-details-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; flex-wrap: wrap; }
+.company-student-tabs { display: flex; gap: 16px; }
+.company-student-tab { background: transparent; border: 0; border-bottom: 3px solid transparent; padding: 10px 4px; color: #64748b; font-size: 12px; font-weight: 700; cursor: pointer; }
+.company-student-tab[aria-selected="true"] { color: #2563eb; border-bottom-color: #2563eb; }
+.company-student-full-profile { font-size: 11px; }
+.company-student-detail-profile { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.company-student-detail-profile--lead { display: block; }
+.company-lead-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 4px 10px; }
+.company-lead-cell { min-width: 0; padding: 8px 10px; }
+.company-lead-label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+.company-lead-value { font-size: 13px; font-weight: 700; color: #111827; overflow-wrap: anywhere; }
+.company-student-detail-field { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: grid; gap: 5px; font-size: 12px; overflow-wrap: anywhere; }
+.company-student-detail-field span { color: #64748b; font-size: 11px; }
+.company-student-summary { grid-column: 1/-1; color: #334155; white-space: pre-wrap; overflow-wrap: anywhere; }
+.company-student-document-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); gap: 12px; }
+.company-student-document { display: flex; flex-direction: column; gap: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; font-size: 12px; overflow-wrap: anywhere; }
+.company-student-document-type { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; text-align: center; font-weight: 800; }
+.company-student-document-group, .company-student-document-status { font-size: 11px; color: #64748b; }
+.company-student-doc-message { grid-column: 1/-1; background: white; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 20px; color: #64748b; margin: 0; font-size: 12px; }
+.company-student-load-status { color: #64748b; font-size: 12px; }
+.company-student-load-status:not(:empty) { margin: 12px 0; }
+.company-student-retry { border: 1px solid #bfdbfe; border-radius: 6px; padding: 5px 10px; margin-left: 10px; color: #2563eb; background: white; cursor: pointer; }
+.company-document-viewer { width: min(1000px,94vw); max-height: 90vh; border: 0; border-radius: 14px; padding: 0; box-shadow: 0 20px 80px #0f172a50; }
+.company-document-viewer::backdrop { background: #0f172a99; }
+.company-document-viewer-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
+.company-document-viewer-body { height: 65vh; overflow: auto; background: #f1f5f9; display: flex; justify-content: center; align-items: center; }
+.company-document-viewer-body img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.company-document-viewer-body iframe { width: 100%; height: 100%; border: 0; }
+.company-document-viewer > .company-student-profile-button { margin: 12px !important; }
+.company-followup-panel { min-width: 170px; flex: 1 0 170px; border-top: 3px solid #3b82f6; }
+.company-followup-panel[data-followup-type="Visit"] { border-top-color: #64748b; }
+.company-followup-panel h3 .company-student-icon { margin-left: auto; width: 22px; height: 22px; flex-shrink: 0; }
+.company-followup-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin: 5px 0; }
+.company-followup-stat { display: flex; flex-direction: column; align-items: center; gap: 5px; background: #3b82f6; color: white; border-radius: 6px; padding: 7px 3px; }
+.company-followup-stat span { width: 100%; text-align: center; font-size: 9px; white-space: nowrap; padding-bottom: 4px; border-bottom: 1px solid #ffffff55; }
+.company-followup-job { font-size: 9px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.company-followup-job[hidden] { display: none; }
+.company-followup-stat strong { font-size: 17px; line-height: 1.2; }
+.company-followup-stat--planned { background: #2563eb; }
+.company-followup-stat--missed { background: #1d4ed8; }
+.company-followup-panel[data-followup-type="Visit"] .company-followup-stat { background: #4b5563; }
+.company-followup-panel[data-followup-type="Visit"] .company-followup-stat--planned { background: #374151; }
+.company-followup-panel[data-followup-type="Visit"] .company-followup-stat--missed { background: #232a34; }
+.company-followup-next { display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: #64748b; margin-top: auto; }
+.company-followup-next strong { color: #334155; font-size: 10px; line-height: 1.5; }
+.company-followup-link { border: 0; background: transparent; color: #2563eb; padding: 4px 0 0; font-size: 10px; text-align: left; cursor: pointer; font-weight: 600; }
+.company-followup-panel--empty { background: #ff4646; border-color: #ff4646 !important; }
+body:has(.recruiter-sidebar) .company-followup-panel--empty h3,
+.company-followup-panel--empty h3 > i,
+.company-followup-panel--empty .company-followup-link { color: white; }
+.company-followup-panel--empty .company-followup-next,
+.company-followup-panel--empty .company-followup-next strong { color: #631b1b; }
+.company-followup-dialog { border: 0; border-radius: 14px; padding: 0; width: min(720px,94vw); max-height: 88vh; box-shadow: 0 20px 80px #0f172a50; }
+.company-followup-dialog::backdrop { background: #0f172a99; }
+.company-followup-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
+.company-followup-dialog-header h2 { margin: 0; font-size: 18px; }
+.company-followup-dialog-content { padding: 20px 24px; }
+.company-followup-message { color: #64748b; font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+.company-followup-form { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.company-status-form { grid-template-columns: 1fr 1fr; }
+.company-followup-form label { display: flex; flex-direction: column; gap: 7px; }
+.company-followup-full { grid-column: 1/-1; }
+.company-followup-submit,.company-followup-done { border: 1px solid #2563eb; background: #2563eb; color: white; border-radius: 7px; padding: 9px 12px; font-size: 12px; cursor: pointer; }
+.company-followup-submit:disabled,.company-followup-done:disabled { opacity: .55; cursor: default; }
+.company-followup-history { border-top: 1px solid #e2e8f0; margin-top: 20px; padding-top: 20px; }
+.company-followup-history h3 { font-size: 14px; margin: 0 0 15px; }
+.company-followup-history-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 0; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+.company-followup-history-row > div { min-width: 0; }
+.company-followup-history-row p { color: #64748b; margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.company-followup-history-status { display: inline-block; border-radius: 20px; background: #edf3ff; color: #2563eb; font-size: 10px; padding: 4px 8px; margin-left: 8px; text-transform: capitalize; }
+@media(max-width:768px) {
+  .company-student-list { padding: 8px; }
+  .company-student-strip { flex-wrap: wrap; overflow-x: visible; }
+  .company-student-profile { flex: 1 1 100%; min-width: 0; }
+  .company-student-pair { flex: 1 1 100%; min-width: 0; }
+  .company-student-panel { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .company-student-pair .company-student-panel { flex: 1 1 auto; }
+  .company-student-name { font-size: 16px; }
+  .company-student-detail-profile { grid-template-columns: 1fr; }
+  .company-lead-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .company-followup-panel { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .company-followup-stat span { font-size: 8px; letter-spacing: 0; }
+  .company-followup-form { grid-template-columns: 1fr; }
+  .company-status-form { grid-template-columns: 1fr 1fr; }
+  .company-followup-dialog-content,.company-followup-dialog-header { padding: 18px; }
+}
+</style>

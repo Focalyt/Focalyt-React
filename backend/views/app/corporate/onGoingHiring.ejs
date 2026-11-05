@@ -66,38 +66,17 @@
                     </div>
                     <div class="card-content">
                       <div class="table-responsive mt-1">
-                        <table class="table table-hover-animation mb-0 table-hover">
-                          <thead>
-                            <tr>
-                              <th>CANDIDATES</th>
-                              <th>Qualification</th>
-                              <th>Hiring Stage</th>
-                              <th>Experience</th>
-                              <th>ACTIONS</th>
-                            </tr>
-                          </thead>
-                          <tbody id="table-body" class="text-capitalize">
-                            <% if(ongoingCandidates?.length > 0){ %>
-                                <% ongoingCandidates.forEach((ongoing)=> { %>
-                                  <tr>
-                                    <td>
-                                      <%= ongoing.candidate[0]?.name %>
-                                    </td>
-                                    <td><%= (qualifications?.filter(q => ongoing.candidate[0]?.highestQualification == q._id ))[0]?.name %></td>
-                                    <td><%= ongoing?.status ? ongoing?.status : 'NA' %></td>
-                                    <td><%= !ongoing.candidate[0]?.isExperienced ? 'Fresher' : ongoing.candidate[0]?.totalExperience ? ongoing.candidate?.totalExperience  + ' Years': 'NA' %></td>
-                                    <td class="actions " id="socail-iconw" >
-                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/<%=ongoing.candidate[0]?._id%>?src=onGoing"><i
-                                        class="fa-regular fa-user fa-lg"></i></a>
-                                        <a href="https://wa.me/91<%= ongoing?.candidate[0]?.whatsapp %>" target="_blank"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/whatsappicon.png" class="mx-1" style="width: 1.5rem;"></a> 
-                                        <a href="tel:<%= ongoing?.candidate[0]?.mobile %>"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/telephone.png" style="width: 1.5rem;"> </a>     
-                                    </td>
-                                  </tr>
-                                <% }) } else {%>
-                                    <tr><td colspan="5" class="text-center">No Result Found</td></tr>
-                                <%}%>        
-                          </tbody>
-                        </table>
+                        <div class="company-student-list" id="table-body">
+                          <% if(ongoingCandidates?.length) { ongoingCandidates.forEach(function(ongoing) { const student = ongoing.candidate?.[0] || {}; %>
+                            <%- include('./partials/student-card', {studentCard: {
+                              student: student, contactVisible: true, profileRoute: 'candidate/', profileQuery: '?src=onGoing',
+                              recordId: ongoing._id,
+                              qualification: qualifications.find(function(q) { return String(q._id) === String(student.highestQualification); })?.name,
+                              stage: ongoing.status || 'In progress', contextTitle: 'Ongoing hiring',
+                              jobTitle: ongoing.job?.title || 'Hiring in progress'
+                            }}) %>
+                          <% }); } else { %><div class="recruiter-empty">No matching candidates</div><% } %>
+                        </div>
                       </div>
                     </div>
                   </div>
