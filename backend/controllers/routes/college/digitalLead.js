@@ -84,36 +84,79 @@ async function markLeadsQueuedForAiCall(leadIds) {
 }
 
 let dataLeadSourceIdsCache = null;
+let metaJobLeadSourceIdsCache = null;
+let digitalLeadSourceIdsCache = null;
+const LEGACY_DIGITAL_LEAD_SOURCE_ID = '68c16764eeda1e3f36a329d9';
+
+async function sourceIdsByName(regex, cacheBox) {
+    if (cacheBox.ids) return cacheBox.ids;
+    const docs = await Source.find({ name: { $regex: regex } }).select('_id').lean();
+    const ids = docs.map((doc) => String(doc._id));
+    if (ids.length) cacheBox.ids = ids;
+    return ids;
+}
+
+function toObjectIds(ids) {
+    return (ids || [])
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+}
 
 async function getDataLeadSourceIds() {
-    if (dataLeadSourceIdsCache) return dataLeadSourceIdsCache;
-    const docs = await Source.find({ name: { $regex: /^data\s*leads?$/i } }).select('_id').lean();
-    const ids = docs.map((doc) => String(doc._id));
-    if (ids.length) dataLeadSourceIdsCache = ids;
+    if (!dataLeadSourceIdsCache) dataLeadSourceIdsCache = {};
+    return sourceIdsByName(/^data\s*leads?$/i, dataLeadSourceIdsCache);
+}
+
+async function getMetaJobLeadSourceIds() {
+    if (!metaJobLeadSourceIdsCache) metaJobLeadSourceIdsCache = {};
+    return sourceIdsByName(/^meta\s*job\s*leads?$/i, metaJobLeadSourceIdsCache);
+}
+
+async function getDigitalLeadSourceIds() {
+    if (!digitalLeadSourceIdsCache) digitalLeadSourceIdsCache = {};
+    const ids = await sourceIdsByName(/^digital\s*lead$/i, digitalLeadSourceIdsCache);
+    if (!ids.includes(LEGACY_DIGITAL_LEAD_SOURCE_ID)) ids.push(LEGACY_DIGITAL_LEAD_SOURCE_ID);
     return ids;
 }
 
 function parseLeadSourceFilter(raw) {
-    const value = String(raw || '').trim().toLowerCase();
-    if (['data', 'data-lead', 'data-leads'].includes(value)) return 'data-lead';
-    if (['digital', 'digital-lead', 'other', 'except-data'].includes(value)) return 'digital-lead';
+    const value = String(raw || '').trim();
+    const lower = value.toLowerCase();
+    if (['data', 'data-lead', 'data-leads'].includes(lower)) return 'data-lead';
+    if (['digital', 'digital-lead'].includes(lower)) return 'digital-lead';
+    if (/^[a-fA-F0-9]{24}$/.test(value)) return value;
     return '';
 }
 
 async function applyLeadSourceMatch(match, leadSourceFilter) {
     if (!leadSourceFilter) return;
-    const ids = (await getDataLeadSourceIds())
-        .filter((id) => mongoose.Types.ObjectId.isValid(id))
-        .map((id) => new mongoose.Types.ObjectId(id));
     if (leadSourceFilter === 'data-lead') {
-        match.registeredBy = { $in: ids };
+        match.registeredBy = { $in: toObjectIds(await getDataLeadSourceIds()) };
         return;
     }
-    if (leadSourceFilter === 'digital-lead' && ids.length) {
-        match.registeredBy = { $nin: ids };
+    if (leadSourceFilter === 'digital-lead') {
+        match.registeredBy = { $in: toObjectIds(await getDigitalLeadSourceIds()) };
+        return;
     }
+    if (!mongoose.Types.ObjectId.isValid(leadSourceFilter)) return;
+
+    const selectedId = String(leadSourceFilter);
+    if ((await getMetaJobLeadSourceIds()).includes(selectedId)) {
+        match.registeredBy = { $in: [] };
+        return;
+    }
+    if ((await getDataLeadSourceIds()).includes(selectedId)) {
+        match.registeredBy = { $in: toObjectIds(await getDataLeadSourceIds()) };
+        return;
+    }
+    if ((await getDigitalLeadSourceIds()).includes(selectedId)) {
+        match.registeredBy = { $in: toObjectIds(await getDigitalLeadSourceIds()) };
+        return;
+    }
+    match.registeredBy = new mongoose.Types.ObjectId(selectedId);
 }
 
+// Data Leads use the data campaign. Every other source, including sources added later, uses the digital campaign.
 async function resolveVoiceCampaignId(applied) {
     const registeredBy = String(applied?.registeredBy?._id || applied?.registeredBy || '');
     const isDataLead = Boolean(registeredBy) && (await getDataLeadSourceIds()).includes(registeredBy);
@@ -1837,9 +1880,11 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
         let leads = [];
         if (selectedLeadIds.length) {
             const byId = new Map(pool.map((row) => [String(row.lead_id), row]));
+            // A chosen source (Data Lead / Digital Lead) only calls leads in that pool.
             leads = selectedLeadIds
                 .slice(0, maxSend)
-                .map((id) => byId.get(id) || { lead_id: id });
+                .map((id) => byId.get(id) || (leadSourceFilter ? null : { lead_id: id }))
+                .filter(Boolean);
         } else {
             leads = pool.slice(0, maxSend);
         }
