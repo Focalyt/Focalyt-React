@@ -35,6 +35,7 @@ const blankDraft = () => ({
   courseIds: [],
   batchIds: [],
   trainerIds: [],
+  topicIds: [],
   fields: [emptyField()],
 });
 
@@ -56,6 +57,7 @@ const DtrSettings = () => {
   const [centers, setCenters] = useState([]);
   const [courses, setCourses] = useState([]);
   const [allBatches, setAllBatches] = useState([]);
+  const [aclpTopics, setAclpTopics] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [draft, setDraft] = useState(blankDraft);
   const [loading, setLoading] = useState(true);
@@ -72,13 +74,14 @@ const DtrSettings = () => {
     let cancelled = false;
     const load = async () => {
       try {
-        const [verticalRes, projectRes, centerRes, courseRes, batchRes, templateRes] = await Promise.all([
+        const [verticalRes, projectRes, centerRes, courseRes, batchRes, templateRes, sessionRes] = await Promise.all([
           axios.get(`${backendUrl}/college/getVerticals`, { headers }),
           axios.get(`${backendUrl}/college/list_all_projects`, { headers }),
           axios.get(`${backendUrl}/college/list_all_centers`, { headers }),
           axios.get(`${backendUrl}/college/all_courses`, { headers }),
           axios.get(`${backendUrl}/college/get_batches`, { headers }),
           axios.get(`${backendUrl}/college/trainer/daily-report-settings`, { headers }),
+          axios.get(`${backendUrl}/college/session-plans`, { headers }),
         ]);
         if (cancelled) return;
         setDepartments((verticalRes.data?.data || []).map((item) => ({ id: idOf(item._id), name: item.name })));
@@ -119,6 +122,27 @@ const DtrSettings = () => {
             trainers,
           };
         }));
+        const topicMap = new Map();
+        (sessionRes.data?.data || []).forEach((plan) => {
+          const courseId = idOf(plan.course);
+          const batchId = idOf(plan.batch);
+          const fromItems = (plan.subSessionItems || [])
+            .map((item) => String(item.name || item.topic || '').trim())
+            .filter(Boolean);
+          const names = fromItems.length
+            ? fromItems
+            : String(plan.topicCovered || '').split(',').map((item) => item.trim()).filter(Boolean);
+          names.forEach((name) => {
+            const id = `${courseId}::${name.toLowerCase()}`;
+            const existing = topicMap.get(id);
+            if (existing) {
+              if (batchId && !existing.batchIds.includes(batchId)) existing.batchIds.push(batchId);
+              return;
+            }
+            topicMap.set(id, { id, name, courseId, batchIds: batchId ? [batchId] : [] });
+          });
+        });
+        setAclpTopics([...topicMap.values()]);
         setTemplates(templateRes.data?.data?.templates || []);
       } catch (error) {
         if (!cancelled) setMessage(error.response?.data?.message || 'Unable to load DTR settings');
@@ -132,19 +156,24 @@ const DtrSettings = () => {
 
   const projectsFor = (departmentIds) => projects.filter((project) => departmentIds.includes(project.departmentId));
   const centersFor = (projectIds) => centers.filter((center) => center.projectIds.some((id) => projectIds.includes(id)));
-  const coursesFor = (departmentIds, projectIds, centerIds) => courses.filter((course) => {
-    if (departmentIds.length && course.departmentId && !departmentIds.includes(course.departmentId)) return false;
-    if (projectIds.length && course.projectId && !projectIds.includes(course.projectId)) return false;
-    if (centerIds.length && course.centerIds.length && !course.centerIds.some((id) => centerIds.includes(id))) return false;
-    return true;
-  });
+  const coursesFor = (departmentIds, projectIds) => {
+    if (!departmentIds.length || !projectIds.length) return [];
+    return courses.filter((course) => (
+      departmentIds.includes(course.departmentId) && projectIds.includes(course.projectId)
+    ));
+  };
   const batchesFor = (courseIds, centerIds) => allBatches.filter((batch) => (
     courseIds.includes(batch.courseId) && (!centerIds.length || centerIds.includes(batch.centerId))
   ));
+  const topicsFor = (courseIds, batchIds) => aclpTopics.filter((topic) => {
+    if (!courseIds.includes(topic.courseId)) return false;
+    if (!batchIds.length) return true;
+    return !topic.batchIds.length || topic.batchIds.some((id) => batchIds.includes(id));
+  });
 
   const visibleProjects = projectsFor(draft.departmentIds);
   const visibleCenters = centersFor(draft.projectIds);
-  const visibleCourses = coursesFor(draft.departmentIds, draft.projectIds, draft.centerIds);
+  const visibleCourses = coursesFor(draft.departmentIds, draft.projectIds);
   const visibleBatches = batchesFor(draft.courseIds, draft.centerIds);
 
   useEffect(() => {
@@ -175,7 +204,7 @@ const DtrSettings = () => {
   const departmentLabel = pickLabel('', 'No departments', departments, draft.departmentIds, 'Select departments');
   const projectLabel = pickLabel(!draft.departmentIds.length && 'Select departments first', 'No projects', visibleProjects, draft.projectIds, 'Select projects');
   const centerLabel = pickLabel(!draft.projectIds.length && 'Select projects first', 'No centers', visibleCenters, draft.centerIds, 'Select centers');
-  const courseLabel = pickLabel(!draft.centerIds.length && 'Select centers first', 'No courses', visibleCourses, draft.courseIds, 'Select courses');
+  const courseLabel = pickLabel((!draft.departmentIds.length && 'Select departments first') || (!draft.projectIds.length && 'Select projects first'), 'No courses for this department and project', visibleCourses, draft.courseIds, 'Select courses');
   const batchLabel = pickLabel(!draft.courseIds.length && 'Select courses first', 'No batches', visibleBatches, draft.batchIds, 'Select batches');
   const trainerLabel = pickLabel(!draft.batchIds.length && 'Select batches first', 'No trainer on these batches', trainerChoices, draft.trainerIds, 'Select trainers');
 
@@ -186,44 +215,49 @@ const DtrSettings = () => {
     const projectIds = keepIds(draft.projectIds, nextProjects);
     const nextCenters = centersFor(projectIds);
     const centerIds = keepIds(draft.centerIds, nextCenters);
-    const nextCourses = coursesFor(departmentIds, projectIds, centerIds);
+    const nextCourses = coursesFor(departmentIds, projectIds);
     const courseIds = keepIds(draft.courseIds, nextCourses);
     const nextBatches = batchesFor(courseIds, centerIds);
     const batchIds = keepIds(draft.batchIds, nextBatches);
     const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
-    setDraft({ ...draft, departmentIds, projectIds, centerIds, courseIds, batchIds, trainerIds });
+    const topicIds = keepIds(draft.topicIds, topicsFor(courseIds, batchIds));
+    setDraft({ ...draft, departmentIds, projectIds, centerIds, courseIds, batchIds, trainerIds, topicIds });
   };
 
   const chooseProjects = (projectIds) => {
     const nextCenters = centersFor(projectIds);
     const centerIds = keepIds(draft.centerIds, nextCenters);
-    const nextCourses = coursesFor(draft.departmentIds, projectIds, centerIds);
+    const nextCourses = coursesFor(draft.departmentIds, projectIds);
     const courseIds = keepIds(draft.courseIds, nextCourses);
     const nextBatches = batchesFor(courseIds, centerIds);
     const batchIds = keepIds(draft.batchIds, nextBatches);
     const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
-    setDraft({ ...draft, projectIds, centerIds, courseIds, batchIds, trainerIds });
+    const topicIds = keepIds(draft.topicIds, topicsFor(courseIds, batchIds));
+    setDraft({ ...draft, projectIds, centerIds, courseIds, batchIds, trainerIds, topicIds });
   };
 
   const chooseCenters = (centerIds) => {
-    const nextCourses = coursesFor(draft.departmentIds, draft.projectIds, centerIds);
+    const nextCourses = coursesFor(draft.departmentIds, draft.projectIds);
     const courseIds = keepIds(draft.courseIds, nextCourses);
     const nextBatches = batchesFor(courseIds, centerIds);
     const batchIds = keepIds(draft.batchIds, nextBatches);
     const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
-    setDraft({ ...draft, centerIds, courseIds, batchIds, trainerIds });
+    const topicIds = keepIds(draft.topicIds, topicsFor(courseIds, batchIds));
+    setDraft({ ...draft, centerIds, courseIds, batchIds, trainerIds, topicIds });
   };
 
   const chooseCourses = (courseIds) => {
     const nextBatches = batchesFor(courseIds, draft.centerIds);
     const batchIds = keepIds(draft.batchIds, nextBatches);
     const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
-    setDraft({ ...draft, courseIds, batchIds, trainerIds });
+    const topicIds = keepIds(draft.topicIds, topicsFor(courseIds, batchIds));
+    setDraft({ ...draft, courseIds, batchIds, trainerIds, topicIds });
   };
 
   const chooseBatches = (batchIds) => {
     const trainerIds = keepIds(draft.trainerIds, trainersFor(batchIds));
-    setDraft({ ...draft, batchIds, trainerIds });
+    const topicIds = keepIds(draft.topicIds, topicsFor(draft.courseIds, batchIds));
+    setDraft({ ...draft, batchIds, trainerIds, topicIds });
   };
 
   const openTemplate = (template) => {
@@ -239,6 +273,7 @@ const DtrSettings = () => {
       courseIds: savedIds(template.courseIds, template.courseId),
       batchIds: template.batchIds || [],
       trainerIds: template.trainerIds || [],
+      topicIds: template.topicIds || [],
       fields: (template.fields || []).filter((field) => field.key !== 'batchAttendance').map((field) => {
         const options = Array.isArray(field.options) ? field.options.filter(Boolean) : [];
         const type = field.type === 'yesno' ? 'radio' : field.type;
@@ -308,6 +343,7 @@ const DtrSettings = () => {
       courseIds: draft.courseIds,
       batchIds: draft.batchIds,
       trainerIds: draft.trainerIds,
+      topicIds: draft.topicIds,
       fields: draft.fields.filter((field) => field.key !== 'batchAttendance').map((field) => ({
         key: field.key,
         label: field.label,
@@ -422,7 +458,7 @@ const DtrSettings = () => {
                 ['department', 'Department', departmentLabel, departments, draft.departmentIds, chooseDepartments, false],
                 ['project', 'Project', projectLabel, visibleProjects, draft.projectIds, chooseProjects, !draft.departmentIds.length],
                 ['center', 'Center', centerLabel, visibleCenters, draft.centerIds, chooseCenters, !draft.projectIds.length],
-                ['course', 'Course', courseLabel, visibleCourses, draft.courseIds, chooseCourses, !draft.centerIds.length],
+                ['course', 'Course', courseLabel, visibleCourses, draft.courseIds, chooseCourses, !draft.departmentIds.length || !draft.projectIds.length],
                 ['batch', 'Batches', batchLabel, visibleBatches, draft.batchIds, chooseBatches, !draft.courseIds.length],
                 ['trainer', 'Trainers', trainerLabel, trainerChoices, draft.trainerIds, (trainerIds) => setDraft({ ...draft, trainerIds }), !draft.batchIds.length],
               ].map(([key, label, summary, options, selectedIds, onChange, disabled]) => (

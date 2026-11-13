@@ -38,6 +38,8 @@ const dailyReportSettingSchema = new Schema({
   batchNames: { type: [String], default: [] },
   trainers: { type: [ObjectId], ref: 'User', default: [] },
   trainerNames: { type: [String], default: [] },
+  topicIds: { type: [String], default: [] },
+  topicNames: { type: [String], default: [] },
   fields: { type: [fieldSchema], default: [] },
 }, { timestamps: true });
 

@@ -325,7 +325,7 @@ function isB2cQuickSearch(name) {
 	return Boolean(name && String(name).trim());
 }
 
-/** Dept/project/course/center/batch/name selection widens Admin from own leads to all leads. */
+/** Dept/project/course/center/batch/name selection widens any user from own leads to matching leads. */
 function hasB2cUserSelectedWideningFilter({
 	projectsArray,
 	verticalsArray,
@@ -388,11 +388,11 @@ async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options
 	}
 
 	const isAdmin = user?.permissions?.permission_type === 'Admin';
-	// Admin default: own/associated leads. All leads only if they picked a widening filter.
+	// Default is own/associated leads. A dept, project, course, center, or batch filter shows every matching lead.
+	if (options.userSelectedWideningFilter) {
+		return [];
+	}
 	if (isAdmin) {
-		if (options.userSelectedWideningFilter) {
-			return [];
-		}
 		return user?._id ? [user._id] : [];
 	}
 
@@ -2642,7 +2642,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		}));
 
 		// Person Owner/Counsellor filters use dedicated ownership match.
-		// Admin with no filter: own/co-owned only. Widening filters (or quick search): all leads.
+		// No filter: own/co-owned only. Dept, project, course, center, batch, or quick search: every matching lead.
 		let teamMembers = hasPersonFilter
 			? []
 			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
@@ -8207,7 +8207,7 @@ router.get('/list_all_projects', [isCollege], async (req, res) => {
 // POST /api/centers/add
 router.post('/add_canter', [isCollege], async (req, res) => {
 	try {
-		let { name, location, status, project } = req.body;
+		let { name, location, status, project, hostelName } = req.body;
 		const user = req.user; // agar aap authentication middleware laga rahe hain
 		const collegeId = req.user.college._id;
 
@@ -8240,6 +8240,7 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 		const newCenter = new Center({
 			name,
 			address: location,
+			hostelName: typeof hostelName === 'string' ? hostelName.trim() : '',
 			status: status,
 			project: projectArray,
 			createdBy: user ? user._id : null,

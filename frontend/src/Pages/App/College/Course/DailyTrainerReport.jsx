@@ -73,6 +73,10 @@ const studentCountFields = [
   { key: 'dropoutStudent', label: 'Dropout student', type: 'number', required: false },
 ];
 const studentCountKeys = new Set(studentCountFields.map((field) => field.key));
+const topicFieldKey = 'topicName';
+const batchIdLabels = new Set(['batchid', 'batch', 'batchno', 'batchcode']);
+const splitTopics = (value) => String(value || '').split('\n').map((item) => item.trim()).filter(Boolean);
+const joinTopics = (list) => list.join('\n');
 
 const knownFieldValue = (field, context) => {
   if (!field || field.type === 'file') return '';
@@ -139,6 +143,10 @@ const knownFieldValue = (field, context) => {
   const [touchedAnswers, setTouchedAnswers] = useState({});
   const [answerFiles, setAnswerFiles] = useState({});
   const [savedAnswerFiles, setSavedAnswerFiles] = useState({});
+  const [topicOptions, setTopicOptions] = useState([]);
+  const [topicsReady, setTopicsReady] = useState(false);
+  const [topicMenuOpen, setTopicMenuOpen] = useState(false);
+  const topicMenuRef = useRef(null);
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
 
@@ -286,6 +294,36 @@ const knownFieldValue = (field, context) => {
     return () => { cancelled = true; };
   }, [backendUrl, form.batchId, selectedBatch?.batchSize, token]);
 
+  useEffect(() => {
+    if (!token || !form.batchId) {
+      setTopicOptions([]);
+      setTopicsReady(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setTopicsReady(false);
+    axios.get(`${backendUrl}/college/trainer/batch-topics/${form.batchId}`, {
+      headers: { 'x-auth': token },
+    }).then((response) => {
+      if (cancelled) return;
+      setTopicOptions(Array.isArray(response.data?.data) ? response.data.data.filter(Boolean) : []);
+    }).catch(() => {
+      if (!cancelled) setTopicOptions([]);
+    }).finally(() => {
+      if (!cancelled) setTopicsReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [backendUrl, form.batchId, token]);
+
+  useEffect(() => {
+    if (!topicMenuOpen) return undefined;
+    const close = (event) => {
+      if (!topicMenuRef.current?.contains(event.target)) setTopicMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [topicMenuOpen]);
+
   const liveBatchSize = (() => {
     const fetched = String(batchSize || '').trim();
     if (fetched) return fetched;
@@ -378,10 +416,12 @@ const knownFieldValue = (field, context) => {
     setTouchedAnswers({});
     setAnswerFiles({});
     setSavedAnswerFiles({});
+    setTopicMenuOpen(false);
   };
 
   const openReport = (report) => {
     setEditingId(report.id);
+    setTopicMenuOpen(false);
     setReadOnly(Boolean(userId) && String(report.trainerId || '') !== String(userId));
     setSavedContext({
       trainerName: report.trainerName || '',
@@ -411,6 +451,7 @@ const knownFieldValue = (field, context) => {
       nextAnswers[answer.key] = answer.value || '';
       nextFiles[answer.key] = answer.files || [];
     });
+    if (!nextAnswers[topicFieldKey] && report.topic) nextAnswers[topicFieldKey] = report.topic;
     setAnswers(nextAnswers);
     setTouchedAnswers({});
     setAnswerFiles({});
@@ -462,6 +503,10 @@ const knownFieldValue = (field, context) => {
     studentCountFields.forEach((field) => {
       answersToSave[field.key] = filledAnswer(field);
     });
+    const templateHasTopic = (formTemplate.fields || []).some((field) => field.key === topicFieldKey || labelKey(field.label) === 'topicname');
+    if (!templateHasTopic) {
+      answersToSave[topicFieldKey] = filledAnswer({ key: topicFieldKey, label: 'Topic name', type: 'select', options: topicOptions });
+    }
     data.append('answers', JSON.stringify(answersToSave));
     data.append('removeFileIds', JSON.stringify(removedIds));
     Object.entries(answerFiles).forEach(([key, files]) => {
@@ -552,10 +597,22 @@ const knownFieldValue = (field, context) => {
         && !['presentstudent', 'absentstudent', 'onleavestudent', 'dropoutstudent'].includes(labelKey(field.label))
       ));
       const batchSizeField = { key: 'batchSize', label: 'Batch size', type: 'number', required: false, locked: true, portalKey: 'batchsize' };
-      const batchIdIndex = fields.findIndex((field) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(field.label)));
+      const batchIdIndex = fields.findIndex((field) => batchIdLabels.has(labelKey(field.label)));
+      const savedTopics = splitTopics(answers[topicFieldKey]);
+      const topicChoices = savedTopics.filter((name) => !topicOptions.includes(name)).concat(topicOptions);
+      const hasTopicField = fields.some((field) => field.key === topicFieldKey || labelKey(field.label) === 'topicname');
+      const topicField = hasTopicField ? null : {
+        key: topicFieldKey,
+        label: 'Topic name',
+        type: 'select',
+        required: false,
+        options: topicChoices,
+        portalKey: 'topic',
+      };
       const countFields = [batchSizeField, ...studentCountFields];
-      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, ...countFields);
-      else fields.push(...countFields);
+      const inserted = topicField ? [topicField, ...countFields] : countFields;
+      if (batchIdIndex >= 0) fields.splice(batchIdIndex + 1, 0, ...inserted);
+      else fields.push(...inserted);
       return fields;
     })()
     : [];
@@ -604,7 +661,7 @@ const knownFieldValue = (field, context) => {
         </div>
       );
     }
-    if (locked && field.type !== 'textarea') return <div className="dtr-readonly">{value || '-'}</div>;
+    if (locked && field.type !== 'textarea' && field.key !== topicFieldKey) return <div className="dtr-readonly">{value || '-'}</div>;
     if (field.type === 'textarea') {
       return <textarea value={value} disabled={locked} placeholder={field.placeholder || ''} onChange={(event) => writeAnswer(event.target.value)} />;
     }
@@ -630,6 +687,45 @@ const knownFieldValue = (field, context) => {
     }
     if (field.type === 'select') {
       const options = field.options || [];
+      if (field.key === topicFieldKey) {
+        const selected = splitTopics(value);
+        const summary = !options.length
+          ? (topicsReady ? 'No sessions assigned' : 'Loading topics')
+          : (selected.length ? selected.join(', ') : 'Select');
+        if (locked) return <div className="dtr-readonly">{selected.join(', ') || '-'}</div>;
+        return (
+          <div className="dtr-topic-multi" ref={topicMenuRef}>
+            <button
+              type="button"
+              className="dtr-topic-btn"
+              disabled={!options.length}
+              onClick={() => setTopicMenuOpen((open) => !open)}
+            >
+              <span>{summary}</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            {topicMenuOpen && options.length > 0 && (
+              <div className="dtr-topic-menu">
+                {options.map((option) => (
+                  <label key={option}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(option)}
+                      onChange={() => {
+                        const next = selected.includes(option)
+                          ? selected.filter((item) => item !== option)
+                          : selected.concat(option);
+                        writeAnswer(joinTopics(next));
+                      }}
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
       return (
         <select value={value} disabled={locked} onChange={(event) => writeAnswer(event.target.value)}>
           <option value="">Select</option>
@@ -699,6 +795,14 @@ const knownFieldValue = (field, context) => {
         .dtr-cell-file { display: flex; flex-direction: column; gap: 4px; font-size: 11px; min-width: 0; max-width: 100%; }
         .dtr-cell-file input[type="file"] { width: 100%; max-width: 100%; font-size: 13px; }
         .dtr-topic { white-space: normal; min-width: 0; max-width: 280px; }
+        .dtr-topic-multi { position: relative; }
+        .dtr-topic-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 500; background: #fff; color: #0f172a; cursor: pointer; text-align: left; }
+        .dtr-topic-btn span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dtr-topic-btn:disabled { background: #f8fafc; color: #64748b; cursor: default; }
+        .dtr-topic-menu { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: auto; min-width: 100%; width: max-content; max-width: 320px; max-height: 220px; overflow: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12); padding: 6px; }
+        .dtr-field .dtr-topic-menu label { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; padding: 6px 8px; font-size: 13px; font-weight: 500; color: #334155; cursor: pointer; text-align: left; }
+        .dtr-field .dtr-topic-menu input { width: 16px; min-width: 16px; height: 16px; margin: 0; padding: 0; flex: 0 0 16px; }
+        .dtr-field .dtr-topic-menu span { flex: 1; min-width: 0; text-align: left; line-height: 1.3; white-space: nowrap; }
         .dtr-form { display: flex; flex-direction: column; gap: 14px; padding: 14px; min-width: 0; }
         .dtr-pick { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 420px); gap: 12px; }
         .dtr-details { border-top: 1px solid #e2e8f0; padding-top: 14px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -795,7 +899,12 @@ const knownFieldValue = (field, context) => {
                 <input type="date" value={form.reportDate} disabled={readOnly} onChange={(event) => onField('reportDate', event.target.value)} />
               </label>
               <label className="dtr-field">Batch
-                <select value={form.batchId} disabled={readOnly} onChange={(event) => onField('batchId', event.target.value)}>
+                <select value={form.batchId} disabled={readOnly} onChange={(event) => {
+                  onField('batchId', event.target.value);
+                  setTopicMenuOpen(false);
+                  setAnswers((prev) => ({ ...prev, [topicFieldKey]: '' }));
+                  setTouchedAnswers((prev) => ({ ...prev, [topicFieldKey]: false }));
+                }}>
                   <option value="">Select batch</option>
                   {batchChoices.map((choice) => (
                     <option key={choice.id} value={choice.id}>{choice.batchCode}{choice.jobRole ? ` · ${choice.jobRole}` : ''}</option>
@@ -898,6 +1007,7 @@ const knownFieldValue = (field, context) => {
                   ['Project', viewingReport.projectName],
                   ['Course', viewingReport.courseName || viewingReport.jobRole],
                   ['Batch', viewingReport.batchCode],
+                  ['Topic name', splitTopics((viewingReport.answers || []).find((answer) => answer.key === topicFieldKey)?.value || viewingReport.topic).join(', ')],
                   ['Batch size', viewingReport.batchSize ?? ''],
                   ['Present student', (viewingReport.answers || []).find((answer) => answer.key === 'presentStudent')?.value || ''],
                   ['Absent student', (viewingReport.answers || []).find((answer) => answer.key === 'absentStudent')?.value || ''],
@@ -912,7 +1022,7 @@ const knownFieldValue = (field, context) => {
                 ))}
               </div>
               <div className="dtr-answers">
-              {(viewingReport.answers || []).filter((answer) => !studentCountKeys.has(answer.key)).map((answer) => {
+              {(viewingReport.answers || []).filter((answer) => !studentCountKeys.has(answer.key) && answer.key !== topicFieldKey).map((answer) => {
                 const wide = answer.type === 'file' || answer.type === 'textarea' || String(answer.value || '').length > 80 || (answer.files || []).length > 0;
                 return (
                 <div className={`dtr-answer${wide ? ' dtr-answer-wide' : ''}`} key={answer.key}>

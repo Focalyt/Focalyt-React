@@ -33,6 +33,7 @@ const allowedDocumentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', '
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession, SessionPlan, SessionFeedback, SessionAttendance, DailyTrainerReport, DailyReportSetting, BatchSessionAssignment } = require("../../models");
+const { mapSessionToClient } = require('./sessionPlan');
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -790,6 +791,131 @@ router.post('/addSession', isCollege, async (req, res) => {
 			status: false,
 			message: error.message || 'Server error',
 		});
+	}
+});
+
+const toFilterObjectId = (value) => (
+	value && mongoose.Types.ObjectId.isValid(String(value))
+		? new mongoose.Types.ObjectId(String(value))
+		: null
+);
+
+// Sessions for the report-card filter. A session matches the selected course,
+// including course plans that are not stored on a batch. A selected batch also
+// includes plans saved on that batch and plans referred into it.
+router.get('/filter-sessions', isCollege, async (req, res) => {
+	try {
+		const collegeId = req.college?._id;
+		if (!collegeId) {
+			return res.status(403).json({ status: false, message: 'College not found' });
+		}
+
+		const departmentId = toFilterObjectId(req.query.department);
+		const projectId = toFilterObjectId(req.query.project);
+		const centerId = toFilterObjectId(req.query.center);
+		const courseId = toFilterObjectId(req.query.course);
+		const batchId = toFilterObjectId(req.query.batch);
+		if (!departmentId && !projectId && !centerId && !courseId && !batchId) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+
+		const batchDoc = batchId
+			? await Batch.findOne({ _id: batchId, college: collegeId }).select('name courseId centerId').lean()
+			: null;
+		if (batchId && !batchDoc) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+
+		const courseQuery = { college: collegeId, isDeleted: { $ne: true } };
+		const resolvedCourseId = courseId || batchDoc?.courseId || null;
+		if (resolvedCourseId) {
+			courseQuery._id = resolvedCourseId;
+		} else {
+			if (departmentId) courseQuery.vertical = departmentId;
+			if (projectId) courseQuery.project = projectId;
+			if (centerId) courseQuery.center = centerId;
+		}
+
+		const courses = await Courses.find(courseQuery).select('_id name vertical project').lean();
+		const courseIds = courses.map((course) => course._id);
+		if (!courseIds.length) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+
+		const planQuery = {
+			college: collegeId,
+			isDeleted: false,
+			course: { $in: courseIds },
+		};
+		const assignmentBySession = new Map();
+		const rememberAssignment = (row) => {
+			const key = String(row?.session || '');
+			if (!key || assignmentBySession.has(key)) return;
+			assignmentBySession.set(key, row);
+		};
+		if (batchDoc) {
+			const assigned = await BatchSessionAssignment.find({ batch: batchDoc._id })
+				.select('session trainer')
+				.populate('trainer', 'name')
+				.lean();
+			assigned.forEach(rememberAssignment);
+			const assignedIds = assigned.map((row) => row.session).filter(Boolean);
+			planQuery.$or = [
+				{ batch: batchDoc._id },
+				{ batch: null },
+				{ batch: { $exists: false } },
+				...(assignedIds.length ? [{ _id: { $in: assignedIds } }] : []),
+			];
+		} else if (centerId) {
+			const centerBatches = await Batch.find({
+				college: collegeId,
+				centerId,
+				courseId: { $in: courseIds },
+			}).select('_id').lean();
+			const centerBatchIds = centerBatches.map((batch) => batch._id);
+			const assigned = centerBatchIds.length
+				? await BatchSessionAssignment.find({ batch: { $in: centerBatchIds } })
+					.select('session trainer')
+					.populate('trainer', 'name')
+					.lean()
+				: [];
+			assigned.forEach(rememberAssignment);
+			const assignedIds = assigned.map((row) => row.session).filter(Boolean);
+			planQuery.$or = [
+				{ batch: { $in: centerBatchIds } },
+				{ batch: null },
+				{ batch: { $exists: false } },
+				...(assignedIds.length ? [{ _id: { $in: assignedIds } }] : []),
+			];
+		}
+
+		const plans = await SessionPlan.find(planQuery).sort({ sessionNumber: 1, createdAt: 1 }).lean();
+		const coursesById = new Map(courses.map((course) => [String(course._id), course]));
+		const data = plans.map((plan) => {
+			const course = coursesById.get(String(plan.course)) || {};
+			const mapped = mapSessionToClient(plan);
+			const assignment = assignmentBySession.get(String(plan._id));
+			const trainerName = assignment?.trainer?.name || mapped.fieldTrainerName || '';
+			return {
+				...mapped,
+				department: course.vertical ? String(course.vertical) : mapped.department,
+				project: course.project ? String(course.project) : mapped.project,
+				course: course._id ? String(course._id) : mapped.course,
+				courseName: course.name || mapped.courseName,
+				courseTrade: course.name || mapped.courseTrade,
+				batch: batchDoc ? String(batchDoc._id) : mapped.batch,
+				batchCode: batchDoc?.name || mapped.batchCode,
+				center: batchDoc?.centerId ? String(batchDoc.centerId) : (centerId ? String(centerId) : mapped.center),
+				trainerName,
+				fieldTrainerName: trainerName,
+				fieldTrainerId: assignment?.trainer?._id ? String(assignment.trainer._id) : mapped.fieldTrainerId,
+			};
+		});
+
+		return res.status(200).json({ status: true, data });
+	} catch (error) {
+		console.error('GET /college/trainer/filter-sessions', error);
+		return res.status(500).json({ status: false, message: error.message || 'Failed to load sessions' });
 	}
 });
 
@@ -1919,6 +2045,8 @@ const mapTemplate = (doc) => {
 		batchNames: Array.isArray(doc.batchNames) ? doc.batchNames : [],
 		trainerIds: (doc.trainers || []).map((id) => String(id)),
 		trainerNames: Array.isArray(doc.trainerNames) ? doc.trainerNames : [],
+		topicIds: Array.isArray(doc.topicIds) ? doc.topicIds.map(String) : [],
+		topicNames: Array.isArray(doc.topicNames) ? doc.topicNames : [],
 		fields: (doc.fields || []).map(mapTemplateField).filter((field) => field.key !== 'batchAttendance'),
 	};
 };
@@ -2081,6 +2209,42 @@ const templateIncludesCourse = (template, courseId) => templateIncludesId(templa
 
 const templateIncludesCenter = (template, centerId) => templateIncludesId(template?.centers, template?.center, centerId);
 
+const topicNamesOnPlan = (plan) => {
+	const items = (plan.subSessionItems || [])
+		.map((item) => String(item?.name || item?.topic || '').trim())
+		.filter(Boolean);
+	if (items.length) return items;
+	return String(plan.topicCovered || '').split(',').map((item) => item.trim()).filter(Boolean);
+};
+
+const loadTemplateTopics = async (collegeId, courseIds, batchIds, topicIds) => {
+	const ids = [...new Set((Array.isArray(topicIds) ? topicIds : []).map((id) => String(id || '').trim()).filter(Boolean))];
+	const plans = await SessionPlan.find({
+		college: collegeId,
+		isDeleted: false,
+		course: { $in: courseIds },
+	}).select('course batch subSessionItems topicCovered').lean();
+	const selectedBatches = new Set((batchIds || []).map((id) => String(id)));
+	const allowed = new Map();
+	plans.forEach((plan) => {
+		const batchId = plan.batch ? String(plan.batch) : '';
+		if (selectedBatches.size && batchId && !selectedBatches.has(batchId)) return;
+		const courseId = String(plan.course || '');
+		topicNamesOnPlan(plan).forEach((name) => {
+			const id = `${courseId}::${name.toLowerCase()}`;
+			if (!allowed.has(id)) allowed.set(id, name);
+		});
+	});
+	if (!ids.length) return { topicIds: [], topicNames: [] };
+	if (ids.some((id) => !allowed.has(id))) {
+		throw reportHttpError(400, 'Select topic names from ACLP for the chosen courses');
+	}
+	return {
+		topicIds: ids,
+		topicNames: ids.map((id) => allowed.get(id)),
+	};
+};
+
 const loadTemplateTrainers = async (batchIds, trainerIds) => {
 	const ids = [...new Set((Array.isArray(trainerIds) ? trainerIds : []).map(String).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
 	if (!ids.length) throw reportHttpError(400, 'Select at least one trainer');
@@ -2175,6 +2339,20 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 		}
 		answers.push({ key: field.key, label: field.label, type: 'number', value, files: [] });
 	});
+	const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+	const hasTopicField = (template.fields || []).some((field) => field.key === 'topicName' || labelKey(field.label) === 'topicname');
+	if (!hasTopicField && !answers.some((answer) => answer.key === 'topicName')) {
+		const topicAnswer = {
+			key: 'topicName',
+			label: 'Topic name',
+			type: 'select',
+			value: String(values.topicName ?? '').trim(),
+			files: [],
+		};
+		const batchIndex = answers.findIndex((answer) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(answer.label)));
+		if (batchIndex >= 0) answers.splice(batchIndex + 1, 0, topicAnswer);
+		else answers.push(topicAnswer);
+	}
 	return answers;
 };
 
@@ -2208,6 +2386,7 @@ const applyPortalSnapshot = (target, template, answers) => {
 	if (portal.inTime) target.inTime = portal.inTime;
 	if (portal.outTime) target.outTime = portal.outTime;
 	if (portal.topic) target.topic = portal.topic;
+	if (valueByKey.get('topicName')) target.topic = valueByKey.get('topicName');
 	if (portal.softSkill) target.softSkillTopic = portal.softSkill;
 	['batchSize', 'totalPresent', 'totalAbsent'].forEach((key) => {
 		if (portal[key] === undefined || portal[key] === '') return;
@@ -2239,6 +2418,7 @@ router.post('/daily-report-settings', authorizeTrainingAccess, async (req, res) 
 		const scope = await loadTemplateScope(req.college._id, req.body || {});
 		const batchScope = await loadTemplateBatches(req.college._id, scope.courses, scope.centers, req.body?.batchIds);
 		const trainerScope = await loadTemplateTrainers(batchScope.batches, req.body?.trainerIds);
+		const topicScope = await loadTemplateTopics(req.college._id, scope.courses, batchScope.batches, req.body?.topicIds);
 		const fields = normalizeTemplateFields(req.body?.fields);
 		const saved = await DailyReportSetting.create({
 			college: req.college._id,
@@ -2247,6 +2427,7 @@ router.post('/daily-report-settings', authorizeTrainingAccess, async (req, res) 
 			...scope,
 			...batchScope,
 			...trainerScope,
+			...topicScope,
 			fields,
 		});
 		return res.status(200).json({ status: true, message: 'DTR created', data: mapTemplate(saved) });
@@ -2269,17 +2450,59 @@ router.put('/daily-report-settings/:id', authorizeTrainingAccess, async (req, re
 		const scope = await loadTemplateScope(req.college._id, req.body || {});
 		const batchScope = await loadTemplateBatches(req.college._id, scope.courses, scope.centers, req.body?.batchIds);
 		const trainerScope = await loadTemplateTrainers(batchScope.batches, req.body?.trainerIds);
+		const topicScope = await loadTemplateTopics(req.college._id, scope.courses, batchScope.batches, req.body?.topicIds);
 		template.name = String(req.body?.name || template.name).trim();
 		template.enabled = req.body?.enabled !== false;
-		Object.assign(template, scope, batchScope, trainerScope);
+		Object.assign(template, scope, batchScope, trainerScope, topicScope);
 		template.fields = normalizeTemplateFields(req.body?.fields);
-		['fields', 'verticals', 'verticalNames', 'projects', 'projectNames', 'centers', 'centerNames', 'courses', 'courseNames', 'batches', 'batchNames', 'trainers', 'trainerNames'].forEach((key) => {
+		['fields', 'verticals', 'verticalNames', 'projects', 'projectNames', 'centers', 'centerNames', 'courses', 'courseNames', 'batches', 'batchNames', 'trainers', 'trainerNames', 'topicIds', 'topicNames'].forEach((key) => {
 			template.markModified(key);
 		});
 		await template.save();
 		return res.status(200).json({ status: true, message: 'DTR saved', data: mapTemplate(template) });
 	} catch (error) {
 		console.error('Error updating DTR:', error);
+		return res.status(error.status || 500).json({ status: false, message: error.message || 'Server error' });
+	}
+});
+
+router.get('/batch-topics/:batchId', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const context = await loadReportBatchContext(req, req.params.batchId);
+		if (!context.course) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+		const assignments = await BatchSessionAssignment.find({
+			course: context.course,
+			batch: context.batch,
+			$or: [
+				{ trainer: { $ne: null } },
+				{ seniorTrainer: { $ne: null } },
+			],
+		}).select('session').lean();
+		const assignedIds = assignments.map((row) => row.session).filter(Boolean);
+		const plans = await SessionPlan.find({
+			college: req.college._id,
+			isDeleted: false,
+			course: context.course,
+			$or: [
+				{ _id: { $in: assignedIds } },
+				{ fieldTrainer: { $ne: null } },
+				{ seniorTrainer: { $ne: null } },
+			],
+		}).select('title sessionNumber topicCovered').sort({ sessionNumber: 1, createdAt: 1 }).lean();
+		const names = new Map();
+		plans.forEach((plan) => {
+			const title = String(plan.title || plan.topicCovered || '').trim();
+			if (!title) return;
+			const number = String(plan.sessionNumber || '').trim();
+			const name = number ? `${number} · ${title}` : title;
+			const key = name.toLowerCase();
+			if (!names.has(key)) names.set(key, name);
+		});
+		return res.status(200).json({ status: true, data: [...names.values()] });
+	} catch (error) {
+		console.error('Error fetching batch topics:', error);
 		return res.status(error.status || 500).json({ status: false, message: error.message || 'Server error' });
 	}
 });
