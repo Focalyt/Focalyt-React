@@ -546,7 +546,7 @@ function JobDetails() {
                                                         <div className="feature-widget-7__icon-wrapper my-auto">
                                                             <h5 className="fw-normal">
                                                                 <img
-                                                                    src="/Assets/public_assets/images/purple/English_level.png"
+                                                                    src="/Assets/public_assets/images/purple/rs.png"
                                                                     className="img-fluid"
                                                                     draggable="false"
                                                                     alt="Payout"

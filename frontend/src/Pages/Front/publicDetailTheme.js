@@ -491,6 +491,12 @@ body:has(.foc-public-detail) .header {
   justify-content: center;
   gap: 6px;
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 .similar-live .course-learn-more .learnn { color: #fff !important; font-size: 13px; font-weight: 600; }
 .similar-live .course-learn-more__icon { width: 18px; height: auto; display: block; }
