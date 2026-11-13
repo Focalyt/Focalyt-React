@@ -7557,6 +7557,8 @@ console.log('API Response:', response.data);
       .map((milestone) => ({
         ...milestone,
         count: Number(milestone.leadCount) || 0,
+        activeCount: Number(milestone.activeCount) || 0,
+        dropoutCount: Number(milestone.dropoutCount) || 0,
       }));
   }, [leadMilestones, milestoneProjectId]);
 
@@ -8063,6 +8065,7 @@ console.log('API Response:', response.data);
         response.data.data?._milestone || profile._milestone,
         response.data.data?.milestoneHistory || []
       );
+      fetchLeadMilestones();
     } catch (error) {
       console.error('Error marking milestone dropout:', error);
       setLeadMilestoneError(error.response?.data?.message || 'Failed to mark dropout');
@@ -16589,9 +16592,9 @@ useEffect(() => {
                   <button
                     key={milestone._id || index}
                     type="button"
-                    className="b2b-perf-chip"
+                    className="b2b-perf-chip b2b-milestone-chip"
                     style={{
-                      padding: '6px 14px',
+                      padding: '6px 10px',
                       fontSize: '12px',
                       fontWeight: 600,
                       borderRadius: '999px',
@@ -16601,8 +16604,19 @@ useEffect(() => {
                       border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
                     }}
                     onClick={() => handleMilestoneChipClick(milestone)}
+                    title={`${milestone.activeCount ?? 0} still in this milestone, ${milestone.dropoutCount ?? 0} dropped out`}
                   >
-                    {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                    <span className="b2b-milestone-chip__side" title="Not dropped out from this milestone">
+                      <span className="b2b-milestone-chip__sign" aria-hidden="true">+</span>
+                      <span className="b2b-milestone-chip__count">{milestone.activeCount ?? 0}</span>
+                    </span>
+                    <span className="b2b-milestone-chip__label">
+                      {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                    </span>
+                    <span className="b2b-milestone-chip__side" title="Dropped out from this milestone">
+                      <span className="b2b-milestone-chip__sign" aria-hidden="true">−</span>
+                      <span className="b2b-milestone-chip__count">{milestone.dropoutCount ?? 0}</span>
+                    </span>
                   </button>
                 );
               })}
@@ -17127,6 +17141,40 @@ useEffect(() => {
             min-width: 0;
             flex-wrap: nowrap;
             overflow-x: auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip {
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__side {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            min-width: 16px;
+            flex: 0 0 auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__sign {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__count {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__label {
+            flex: 1 1 auto;
+            text-align: center;
           }
           .b2b-crm-dashboard .b2b-dash-stat-card {
             border-radius: 8px;

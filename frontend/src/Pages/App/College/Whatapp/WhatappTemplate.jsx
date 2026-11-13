@@ -1481,19 +1481,52 @@ const WhatsAppTemplate = () => {
 
 
 
-      // Fetch templates directly from Facebook Graph API
-      const response = await axios.get(
-        `${backendUrl}/college/whatsapp/templates`,
-        {
-          headers: { 'x-auth': token }
-        }
-      );
-      console.log('Templates fetched successfully from Facebook:', response.data.data);
+      const headers = { 'x-auth': token };
+      const [templatesResult, messagesResult] = await Promise.allSettled([
+        axios.get(`${backendUrl}/college/whatsapp/templates`, { headers }),
+        axios.get(`${backendUrl}/college/whatsapp/template-messages`, { headers })
+      ]);
 
+      const messageRows = messagesResult.status === 'fulfilled' && Array.isArray(messagesResult.value.data?.data)
+        ? messagesResult.value.data.data
+        : [];
+      const messageById = new Map(messageRows.map((row) => [String(row.templateId), row]));
 
-      if (response.data && response.data.data) {
-        setTemplates(response.data.data);
+      const list = templatesResult.status === 'fulfilled' && Array.isArray(templatesResult.value.data?.data)
+        ? templatesResult.value.data.data
+        : [];
+
+      if (!list.length && !messageRows.length) {
+        throw (templatesResult.status === 'rejected' ? templatesResult.reason : messagesResult.reason);
       }
+
+      const withMessages = (list.length ? list : messageRows).map((template) => {
+        const source = template?.template || template;
+        const match = messageById.get(String(source?.id || source?.templateId || ''));
+        const messageBody = match?.messageBody || source?.messageBody || '';
+        const templateId = match?.templateId || source?.templateId || (source?.id ? String(source.id) : '');
+        if (template?.template) {
+          return {
+            ...template,
+            templateId,
+            messageBody,
+            template: { ...template.template, templateId, messageBody }
+          };
+        }
+        return {
+          ...template,
+          id: template.id || templateId,
+          name: template.name || match?.templateName || '',
+          status: template.status || match?.status || '',
+          category: template.category || match?.category || '',
+          templateId,
+          messageBody,
+          components: template.components || (messageBody ? [{ type: 'BODY', text: messageBody }] : [])
+        };
+      });
+
+      console.log('Template IDs and message bodies:', messageRows);
+      setTemplates(withMessages);
 
     } catch (error) {
 
@@ -1572,9 +1605,12 @@ const WhatsAppTemplate = () => {
 
   const filteredTemplates = templates.filter(template => {
     const templateData = template.template || template;
+    const query = searchTerm.toLowerCase();
     const matchesSearch =
-      templateData.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      templateData.subject?.toLowerCase().includes(searchTerm.toLowerCase());
+      templateData.name?.toLowerCase().includes(query) ||
+      templateData.subject?.toLowerCase().includes(query) ||
+      templateData.messageBody?.toLowerCase().includes(query) ||
+      String(templateData.templateId || templateData.id || '').toLowerCase().includes(query);
     const matchesDepartment = !departmentFilter
       || getTemplateDepartmentKey(templateData) === String(departmentFilter);
     if (isAdminUser) {
@@ -3439,6 +3475,10 @@ const WhatsAppTemplate = () => {
 
                       <small className="text-muted">{(template?.template || template)?.category || ""}</small>
 
+                      <small className="text-muted d-block" style={{ fontSize: '11px' }}>
+                        ID: {(template?.template || template)?.templateId || (template?.template || template)?.id || '—'}
+                      </small>
+
                     </div>
 
                   </td>
@@ -3453,9 +3493,14 @@ const WhatsAppTemplate = () => {
 
                     {/* {template?.template?.components[0]?.text || ""} */}
 
-                    <div className="text-truncate">
+                    <div
+                      className="text-truncate"
+                      title={(template?.template || template)?.messageBody || (template?.template || template)?.components?.find(comp => comp.type === 'BODY')?.text || ''}
+                    >
 
-                      {(template?.template || template)?.components?.find(comp => comp.type === 'BODY')?.text ||
+                      {(template?.template || template)?.messageBody ||
+
+                        (template?.template || template)?.components?.find(comp => comp.type === 'BODY')?.text ||
 
                         (template?.template || template)?.components?.[0]?.text ||
 

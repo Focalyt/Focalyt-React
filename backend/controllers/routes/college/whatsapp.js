@@ -46,33 +46,91 @@ const upload = multer({
 	}
 });
 
+let metaTemplatesCache = { expiresAt: 0, data: null };
+
+const clearMetaTemplatesCache = () => {
+	metaTemplatesCache = { expiresAt: 0, data: null };
+};
+
+const extractTemplateMessageBody = (template) => {
+	let components = template?.components;
+	if (typeof components === 'string') {
+		try {
+			components = JSON.parse(components);
+		} catch (_) {
+			components = [];
+		}
+	}
+	components = Array.isArray(components) ? components : [];
+	const body = components.find((component) => String(component?.type || '').toUpperCase() === 'BODY');
+	if (typeof body?.text === 'string' && body.text.trim()) {
+		return body.text;
+	}
+
+	const carousel = components.find((component) => String(component?.type || '').toUpperCase() === 'CAROUSEL');
+	if (!carousel?.cards?.length) return '';
+
+	return carousel.cards
+		.map((card, index) => {
+			const cardBody = (card.components || []).find((component) => String(component?.type || '').toUpperCase() === 'BODY');
+			return cardBody?.text ? `Card ${index + 1}: ${cardBody.text}` : '';
+		})
+		.filter(Boolean)
+		.join('\n');
+};
+
+const fetchAllMetaTemplates = async () => {
+	const now = Date.now();
+	if (metaTemplatesCache.data && metaTemplatesCache.expiresAt > now) {
+		return metaTemplatesCache.data;
+	}
+
+	const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+	const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+	if (!businessAccountId || !accessToken) {
+		const error = new Error('WhatsApp Business Account ID or Access Token not configured in environment variables.');
+		error.statusCode = 500;
+		throw error;
+	}
+
+	const fields = 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes';
+	let nextUrl = `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`;
+	let params = { fields, limit: 100 };
+	const templates = [];
+
+	while (nextUrl) {
+		const response = await axios.get(nextUrl, {
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+				'Content-Type': 'application/json'
+			},
+			...(params ? { params } : {})
+		});
+		templates.push(...(response.data?.data || []));
+		nextUrl = response.data?.paging?.next || null;
+		params = null;
+	}
+
+	metaTemplatesCache = { data: templates, expiresAt: Date.now() + 15000 };
+	return templates;
+};
+
+const sendWhatsAppRouteError = (res, err, fallbackMessage) => {
+	console.error(fallbackMessage, err?.response?.data || err);
+	const status = err.statusCode || err.response?.status || 500;
+	const message = err.statusCode
+		? err.message
+		: (err.response?.data?.error?.message || 'Server error');
+	res.status(status >= 400 && status < 600 ? status : 500).json({ success: false, message });
+};
+
 
 
 router.get('/templates', [isCollege], async (req, res) => {
-	try {    
-      // Get environment variables for Facebook API
-      const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-      if (!businessAccountId || !accessToken) {
-        res.status(500).json({ success: false, message: 'WhatsApp Business Account ID or Access Token not configured in environment variables.' });
-        return;
-      }
-		
-    const response = await axios.get(
-      `https://graph.facebook.com/v18.0/${businessAccountId}/message_templates`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        params: {
-          fields: 'id,name,status,category,language,components,quality_score,rejected_reason,code_expiration_minutes'
-        }
-      }
-    );
+	try {
+		const templates = await fetchAllMetaTemplates();
 		
 		console.log('=== Fetched Templates ===');
-		const templates = response.data.data || [];
 		
 		// Get college ID for database lookup
 		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
@@ -80,6 +138,9 @@ router.get('/templates', [isCollege], async (req, res) => {
 		// Fetch database media URLs for each template
 		const templatesWithMedia = await Promise.all(templates.map(async (template) => {
 			try {
+				template.templateId = template.id ? String(template.id) : '';
+				template.messageBody = extractTemplateMessageBody(template);
+
 				if (collegeId && WhatsAppTemplate) {
 					// Find template in database
 					const dbTemplate = await WhatsAppTemplate.findOne({
@@ -108,6 +169,9 @@ router.get('/templates', [isCollege], async (req, res) => {
 						}
 						if (template.language && dbTemplate.language !== template.language) {
 							syncUpdate.language = template.language;
+						}
+						if (template.messageBody && dbTemplate.messageBody !== template.messageBody) {
+							syncUpdate.messageBody = template.messageBody;
 						}
 						if (metaStatus === 'REJECTED' && template.rejected_reason) {
 							syncUpdate.rejectionReason = template.rejected_reason;
@@ -223,8 +287,29 @@ router.get('/templates', [isCollege], async (req, res) => {
 			data
 		});
 	} catch (err) {
-		console.error('Error fetching whatsapp templates:', err);
-		res.status(500).json({ success: false, message: 'Server error' });
+		sendWhatsAppRouteError(res, err, 'Error fetching whatsapp templates:');
+	}
+});
+
+router.get('/template-messages', [isCollege], async (req, res) => {
+	try {
+		const templates = await fetchAllMetaTemplates();
+		const data = templates.map((template) => ({
+			templateId: template.id ? String(template.id) : '',
+			templateName: template.name || '',
+			language: template.language || '',
+			status: template.status || '',
+			category: template.category || '',
+			messageBody: extractTemplateMessageBody(template)
+		}));
+
+		res.json({
+			success: true,
+			message: 'Template IDs and message bodies fetched successfully',
+			data
+		});
+	} catch (err) {
+		sendWhatsAppRouteError(res, err, 'Error fetching template messages:');
 	}
 });
 
@@ -928,6 +1013,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					collegeId: collegeId,
 					templateId: response.data?.id,
 					templateName: name,
+					messageBody: extractTemplateMessageBody({ components }),
 					language: language,
 					category: category,
 					status: response.data?.status || 'PENDING',
@@ -960,6 +1046,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 		// Continue even if DB save fails - template is already created
 	}
 
+		clearMetaTemplatesCache();
 		res.json({
 			success: true,
 			message: 'Template created successfully',
@@ -1076,6 +1163,7 @@ router.delete('/delete-template/:name', isCollege, async (req, res) => {
 			// Continue even if DB delete fails
 		}
 
+		clearMetaTemplatesCache();
 		res.json({
 			success: true,
 			message: 'Template deleted successfully',
@@ -1109,6 +1197,7 @@ router.delete('/delete-template/:name', isCollege, async (req, res) => {
 				console.error('Error deleting from database:', dbError.message);
 			}
 			
+			clearMetaTemplatesCache();
 			return res.json({
 				success: true,
 				message: 'Template deleted successfully (was already not present in Facebook)',
