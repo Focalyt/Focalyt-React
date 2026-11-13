@@ -52,6 +52,7 @@ const B2BProject = require("../../../models/b2b/b2bProject");
 const B2BDepartment = require("../../../models/b2b/b2bDepartment");
 const LeadCategory = require("../../../models/b2b/leadCategory");
 const LeadRanking = require("../../../models/b2b/leadRanking");
+const CourseSectors = require("../../../models/courseSectors");
 const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
 const StatusB2b = require("../../../models/statusB2b");
@@ -744,7 +745,8 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				select: 'name'
 			}
 		})
-		.populate('_milestone', 'title description');
+		.populate('_milestone', 'title description')
+		.populate('sector', 'name status');
 
 	// AI client (optional): used for supervision report narrative
 	const getAnthropicClient = () => {
@@ -879,6 +881,8 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		const fieldLabels = {
 			leadCategory: 'Lead Category',
 			leadRanking: 'Lead Ranking',
+			sector: 'Sector',
+			tenderId: 'Tender Id',
 			b2bProject: 'B2B Project',
 			b2bDepartment: 'B2B Department',
 			typeOfB2B: 'Type of B2B',
@@ -3658,6 +3662,8 @@ router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
 		const crossSaleLead = new Lead({
 			leadCategory: leadCategory || source.leadCategory,
 			leadRanking: source.leadRanking || undefined,
+			sector: source.sector || undefined,
+			tenderId: source.tenderId || '',
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -3855,6 +3861,27 @@ router.get('/leads/:id/logs', isCollege, async (req, res) => {
 	}
 });
 
+router.get('/course-sectors', isCollege, async (req, res) => {
+	try {
+		const sectors = await CourseSectors.find({ status: true })
+			.select('name status')
+			.sort({ name: 1 });
+
+		return res.json({
+			status: true,
+			data: sectors,
+			message: 'Sectors retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting course sectors:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve sectors',
+			error: error.message
+		});
+	}
+});
+
 // Create new lead
 // Check if mobile already exists (college concern-person scope)
 router.get('/check-mobile-duplicate', isCollege, async (req, res) => {
@@ -3898,6 +3925,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		const {
 			leadCategory,
 			leadRanking,
+			sector,
+			tenderId,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -4084,6 +4113,22 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			leadRankingId = rankingDoc._id;
 		}
 
+		let sectorId = null;
+		const sectorRaw = sector != null ? String(sector).trim() : '';
+		if (sectorRaw) {
+			if (!mongoose.Types.ObjectId.isValid(sectorRaw)) {
+				return res.status(400).json({ status: false, message: 'Invalid sector' });
+			}
+			const sectorDoc = await CourseSectors.findById(sectorRaw);
+			if (!sectorDoc) {
+				return res.status(400).json({ status: false, message: 'Sector not found' });
+			}
+			if (sectorDoc.status === false) {
+				return res.status(400).json({ status: false, message: 'Selected sector is inactive' });
+			}
+			sectorId = sectorDoc._id;
+		}
+
 		const collegeIdForPipeline = req.user?.college?._id || college?._id;
 		const pipelineStatusScope = collegeIdForPipeline
 			? {
@@ -4175,6 +4220,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			b2bDepartment,
 			typeOfB2B,
 			businessName,
+			tenderId: tenderId != null ? String(tenderId).trim() : '',
 			address,
 			city,
 			state,
@@ -4209,6 +4255,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 
 		if (leadRankingId) {
 			leadData.leadRanking = leadRankingId;
+		}
+
+		if (sectorId) {
+			leadData.sector = sectorId;
 		}
 
 		const newLead = new Lead(leadData);
@@ -5222,6 +5272,8 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 		const {
 			leadCategory,
 			leadRanking,
+			sector,
+			tenderId,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -5310,6 +5362,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			leadCategory,
 			typeOfB2B,
 			businessName,
+			tenderId: tenderId != null ? String(tenderId).trim() : '',
 			address,
 			city,
 			state,
@@ -5384,6 +5437,25 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			}
 		}
 
+		if (sector !== undefined) {
+			const sectorRaw = sector != null ? String(sector).trim() : '';
+			if (!sectorRaw) {
+				updatePayload.sector = null;
+			} else {
+				if (!mongoose.Types.ObjectId.isValid(sectorRaw)) {
+					return res.status(400).json({ status: false, message: 'Invalid sector' });
+				}
+				const sectorDoc = await CourseSectors.findById(sectorRaw);
+				if (!sectorDoc) {
+					return res.status(400).json({ status: false, message: 'Sector not found' });
+				}
+				if (sectorDoc.status === false) {
+					return res.status(400).json({ status: false, message: 'Selected sector is inactive' });
+				}
+				updatePayload.sector = sectorDoc._id;
+			}
+		}
+
 		if (b2bProject !== undefined) {
 			if (!b2bProject || !mongoose.Types.ObjectId.isValid(b2bProject)) {
 				return res.status(400).json({ status: false, message: 'Invalid B2B project' });
@@ -5450,6 +5522,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 		).populate([
 			{ path: 'leadCategory', select: 'name' },
 			{ path: 'leadRanking', select: 'name isActive' },
+			{ path: 'sector', select: 'name status' },
 			{ path: 'b2bProject', select: 'name' },
 			{ path: 'b2bDepartment', select: 'name' },
 			{ path: 'typeOfB2B', select: 'name' },
@@ -6142,6 +6215,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'ranking': 'leadRanking',
 			'leadrank': 'leadRanking',
 			'rank': 'leadRanking',
+			'tenderid': 'tenderId',
 			
 			'business': 'businessName',
 			'companyname': 'businessName',
@@ -6220,7 +6294,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 						return;
 					}
 					
-					if (mappedKey === 'mobile' || mappedKey === 'whatsapp' || mappedKey === 'landlineNumber') {
+					if (mappedKey === 'mobile' || mappedKey === 'whatsapp' || mappedKey === 'landlineNumber' || mappedKey === 'tenderId') {
 						if (typeof value === 'number') {
 							
 							if (value >= 1e9 || value < -1e9) {
@@ -6270,8 +6344,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const bodyLeadOwner = req.body?.leadOwner ? String(req.body.leadOwner).trim() : '';
 		const bodyLeadCoOwner = req.body?.leadCoOwner ? String(req.body.leadCoOwner).trim() : '';
 		const bodyLeadRanking = req.body?.leadRanking ? String(req.body.leadRanking).trim() : '';
+		const bodySector = req.body?.sector ? String(req.body.sector).trim() : '';
 
 		let defaultLeadRankingDoc = null;
+		let defaultSectorDoc = null;
 
 		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
 			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
@@ -6303,6 +6379,27 @@ router.post('/leads/import', isCollege, async (req, res) => {
 				return res.status(400).json({
 					status: false,
 					message: 'Selected Lead Ranking is inactive. Please choose an active ranking.'
+				});
+			}
+		}
+		if (bodySector) {
+			if (!mongoose.Types.ObjectId.isValid(bodySector)) {
+				return res.status(400).json({
+					status: false,
+					message: 'Invalid Sector selected in the upload form. Please choose again.'
+				});
+			}
+			defaultSectorDoc = await CourseSectors.findById(bodySector);
+			if (!defaultSectorDoc) {
+				return res.status(400).json({
+					status: false,
+					message: 'Sector not found. Please choose again.'
+				});
+			}
+			if (defaultSectorDoc.status === false) {
+				return res.status(400).json({
+					status: false,
+					message: 'Selected Sector is inactive. Please choose an active sector.'
 				});
 			}
 		}
@@ -6384,6 +6481,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const useModalLeadOwner = Boolean(modalLeadOwnerId);
 		const useModalLeadCoOwner = Boolean(modalLeadCoOwnerId);
 		const useModalLeadRanking = Boolean(defaultLeadRankingDoc);
+		const useModalSector = Boolean(defaultSectorDoc);
 
 		leads = leads.filter((row) => {
 			if (!row || typeof row !== 'object') return false;
@@ -6685,12 +6783,17 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					email: row.email || '',
 					whatsapp: row.whatsapp ? row.whatsapp.replace(/\D/g, '') : '',
 					landlineNumber: row.landlineNumber || row.landline || '',
+					tenderId: row.tenderId != null ? String(row.tenderId).trim() : '',
 					remark: row.remark || row.remarks || '',
 					leadAddedBy: req.user._id
 				};
 
 				if (leadRankingId) {
 					leadData.leadRanking = leadRankingId;
+				}
+
+				if (useModalSector) {
+					leadData.sector = defaultSectorDoc._id;
 				}
 
 				if (rowPipelineStatusId) {

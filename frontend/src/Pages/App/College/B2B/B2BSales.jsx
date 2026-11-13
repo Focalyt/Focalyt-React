@@ -845,7 +845,8 @@ const B2BSales = () => {
     leadSubStatus: '',
     leadOwner: '',
     leadCoOwner: '',
-    leadRanking: ''
+    leadRanking: '',
+    sector: ''
   });
   const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
   const [bulkUploadSubStatuses, setBulkUploadSubStatuses] = useState([]);
@@ -870,6 +871,7 @@ const B2BSales = () => {
     b2bDepartment: '',
     typeOfB2B: '',
     businessName: '',
+    tenderId: '',
     businessAddress: '',
     concernPersonName: '',
     address: '',
@@ -887,6 +889,7 @@ const B2BSales = () => {
     leadStatus: '',
     leadSubStatus: '',
     leadRanking: '',
+    sector: '',
     remark: ''
   });
 
@@ -1035,6 +1038,8 @@ const B2BSales = () => {
   // Lead Ranking state
   const [leadRankings, setLeadRankings] = useState([]);
   const [leadRankingsLoading, setLeadRankingsLoading] = useState(false);
+  const [courseSectors, setCourseSectors] = useState([]);
+  const [courseSectorsLoading, setCourseSectorsLoading] = useState(false);
 
   // Google Maps API
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -1640,6 +1645,20 @@ const B2BSales = () => {
         }
       } finally {
         setLeadRankingsLoading(false);
+      }
+
+      try {
+        setCourseSectorsLoading(true);
+        const sectorsRes = await axios.get(`${backendUrl}/college/b2b/course-sectors`, {
+          headers: { 'x-auth': token }
+        });
+        if (sectorsRes.data.status) {
+          setCourseSectors(
+            (sectorsRes.data.data || []).filter((sector) => sector.status !== false)
+          );
+        }
+      } finally {
+        setCourseSectorsLoading(false);
       }
     } catch (err) {
       console.error('Failed to fetch B2B dropdown options:', err);
@@ -3493,6 +3512,7 @@ const B2BSales = () => {
 
       const rows = allLeads.map((lead) => ({
         'Business Name': lead.businessName || '',
+        'Tender Id': lead.tenderId || '',
         'Concern Person Name': lead.concernPersonName || '',
         Mobile: lead.mobile || '',
         Email: lead.email || '',
@@ -3509,6 +3529,7 @@ const B2BSales = () => {
         Performance: lead.status?.title || lead.status?.name || '',
         'Sub Status': getLeadSubStatusTitle(lead) || '',
         'Lead Ranking': lead.leadRanking?.name || '',
+        Sector: lead.sector?.name || '',
         Counsellor: lead.leadOwner?.name || '',
         'Co-owner': lead.leadCoOwner?.name || '',
         'Added By': lead.leadAddedBy?.name || '',
@@ -3992,6 +4013,7 @@ const B2BSales = () => {
       b2bDepartment: leadFormData.b2bDepartment,
       typeOfB2B: leadFormData.typeOfB2B,
       businessName: leadFormData.businessName,
+      tenderId: leadFormData.tenderId,
       address: leadFormData.address,
       city: leadFormData.city,
       state: leadFormData.state,
@@ -4017,6 +4039,11 @@ const B2BSales = () => {
       leadData.leadRanking = String(leadFormData.leadRanking).trim();
     } else if (editingLeadId) {
       leadData.leadRanking = null;
+    }
+    if (leadFormData.sector && String(leadFormData.sector).trim()) {
+      leadData.sector = String(leadFormData.sector).trim();
+    } else if (editingLeadId) {
+      leadData.sector = null;
     }
     if (selectedLocation) {
       leadData.coordinates = {
@@ -4096,6 +4123,7 @@ const B2BSales = () => {
           b2bDepartment: '',
           typeOfB2B: '',
           businessName: '',
+          tenderId: '',
           businessAddress: '',
           concernPersonName: '',
           address: '',
@@ -4111,6 +4139,7 @@ const B2BSales = () => {
           leadStatus: '',
           leadSubStatus: '',
           leadRanking: '',
+          sector: '',
           remark: ''
         });
         setFormErrors({});
@@ -4152,6 +4181,7 @@ const B2BSales = () => {
       b2bDepartment: lead.b2bDepartment?._id || lead.b2bDepartment || '',
       typeOfB2B: lead.typeOfB2B?._id || lead.typeOfB2B || '',
       businessName: lead.businessName || '',
+      tenderId: lead.tenderId || '',
       businessAddress: '',
       concernPersonName: lead.concernPersonName || '',
       address: lead.address || '',
@@ -4169,6 +4199,7 @@ const B2BSales = () => {
       leadStatus: '',
       leadSubStatus: '',
       leadRanking: lead.leadRanking?._id || lead.leadRanking || '',
+      sector: lead.sector?._id || lead.sector || '',
       remark: lead.remark || ''
     });
     if (coords?.[0] != null && coords?.[1] != null) {
@@ -4193,6 +4224,7 @@ const B2BSales = () => {
       b2bDepartment: '',
       typeOfB2B: '',
       businessName: '',
+      tenderId: '',
       businessAddress: '',
       concernPersonName: '',
       address: '',
@@ -4208,6 +4240,7 @@ const B2BSales = () => {
       leadStatus: '',
       leadSubStatus: '',
       leadRanking: '',
+      sector: '',
       remark: ''
     });
     setFormErrors({});
@@ -4228,6 +4261,7 @@ const B2BSales = () => {
       b2bDepartment: '',
       typeOfB2B: '',
       businessName: '',
+      tenderId: '',
       businessAddress: '',
       concernPersonName: '',
       address: '',
@@ -4245,6 +4279,7 @@ const B2BSales = () => {
       leadStatus: '',
       leadSubStatus: '',
       leadRanking: '',
+      sector: '',
       remark: ''
     });
     setFormErrors({});
@@ -4399,6 +4434,7 @@ const B2BSales = () => {
       leadOwner: uid,
       leadCoOwner: '',
       leadRanking: '',
+      sector: '',
     });
     setBulkUploadFormErrors({});
     setBulkUploadSubStatuses([]);
@@ -4413,10 +4449,10 @@ const B2BSales = () => {
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Sample remark'],
-      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Another remark'],
-      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Technology company']
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Tender Id', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'TND-1001', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'TND-1002', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'TND-1003', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Technology company']
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -4508,6 +4544,9 @@ const B2BSales = () => {
     }
     if (bulkUploadFormData.leadRanking) {
       formData.append('leadRanking', bulkUploadFormData.leadRanking);
+    }
+    if (bulkUploadFormData.sector) {
+      formData.append('sector', bulkUploadFormData.sector);
     }
 
     try {
@@ -10874,6 +10913,21 @@ const renderWhatsAppPanel = () => {
                                   </div>
                                 </div>
                                 <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Tender Id</div>
+                                  <div className="lead-meta-v2__value" title={lead.tenderId || 'NA'}>
+                                    {String(lead?.tenderId || '').trim() || 'NA'}
+                                  </div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Sector</div>
+                                  <div
+                                    className="lead-meta-v2__value text-capitalize"
+                                    title={lead.sector?.name || 'NA'}
+                                  >
+                                    {String(lead?.sector?.name || '').trim() || 'NA'}
+                                  </div>
+                                </div>
+                                <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Lead Source</div>
                                   <div className="d-flex align-items-center gap-2">
                                     <div className="lead-meta-v2__value text-capitalize" title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
@@ -11865,6 +11919,21 @@ const renderWhatsAppPanel = () => {
                       )}
                     </div>
 
+                    <div className="col-12">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-file-signature text-primary me-1"></i>
+                        Tender Id
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="tenderId"
+                        value={leadFormData.tenderId || ''}
+                        onChange={handleLeadInputChange}
+                        placeholder="Enter tender id"
+                      />
+                    </div>
+
                     {/* Business Name */}
                     <div className="col-12">
                       <label className="form-label fw-bold">
@@ -12224,6 +12293,30 @@ const renderWhatsAppPanel = () => {
                     </>
                     )}
 
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-industry text-primary me-1"></i>
+                        Sector
+                      </label>
+                      <select
+                        className="form-select"
+                        name="sector"
+                        value={leadFormData.sector || ''}
+                        onChange={handleLeadInputChange}
+                        disabled={courseSectorsLoading}
+                        style={{ textTransform: 'capitalize' }}
+                      >
+                        <option value="">
+                          {courseSectorsLoading ? 'Loading sectors...' : 'Select Sector'}
+                        </option>
+                        {courseSectors.map((sector) => (
+                          <option key={sector._id} value={sector._id}>
+                            {sector.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     {/* Remark */}
                     <div className="col-12">
                       <div className="d-flex align-items-center justify-content-between">
@@ -12323,11 +12416,12 @@ const renderWhatsAppPanel = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, Counsellor, and Co-owner below.</li>
+                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, Counsellor, Co-owner, Lead Ranking, and Sector below.</li>
                     <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
                     <li><strong>Required in Excel:</strong> Business Name, Concern Person Name, Mobile.</li>
+                    <li><strong>Optional in Excel:</strong> Tender Id. Put a different id on each row. Leave the cell blank if that lead has none.</li>
                     <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
-                    <li>Counsellor and Co-owner are optional; if selected, all imported leads are assigned accordingly.</li>
+                    <li>Counsellor, Co-owner, Lead Ranking, and Sector are optional; if selected, all imported leads are assigned accordingly.</li>
                   </ul>
                 </div>
 
@@ -12571,6 +12665,29 @@ const renderWhatsAppPanel = () => {
                       {leadRankings.map((ranking) => (
                         <option key={ranking._id} value={ranking._id}>
                           {ranking.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-industry text-primary me-1"></i>
+                      Sector
+                    </label>
+                    <select
+                      className="form-select"
+                      name="sector"
+                      value={bulkUploadFormData.sector || ''}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || courseSectorsLoading}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      <option value="">
+                        {courseSectorsLoading ? 'Loading sectors...' : 'Select Sector'}
+                      </option>
+                      {courseSectors.map((sector) => (
+                        <option key={sector._id} value={sector._id}>
+                          {sector.name}
                         </option>
                       ))}
                     </select>
