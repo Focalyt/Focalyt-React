@@ -8,7 +8,9 @@ import OurApproachSection from "./OurApproachSection";
 import IndustryAutomationSection from "./IndustryAutomationSection";
 import { EventCard } from "../Event/Event";
 import { CourseCard } from "../Courses/Course";
+import CourseDetailsModal from "../Courses/CourseDetailsModal";
 import { JobCard } from "../Jobs/Jobs";
+import JobDetailsModal from "../Jobs/JobDetailsModal";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
 import axios from "axios";
 import moment from "moment";
@@ -2298,6 +2300,12 @@ const STYLES = `
   justify-content: center;
   gap: 6px;
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 #future-courses .course-learn-more .learnn {
   color: #fff;
@@ -2545,6 +2553,12 @@ const STYLES = `
   justify-content: center;
   gap: 6px;
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 #future-jobs .course-learn-more .learnn {
   color: #fff;
@@ -5904,6 +5918,8 @@ const HOME_HASH_SCROLL_OFFSET = 130;
 export default function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const linkedJobId = new URLSearchParams(location.search).get("job");
+  const linkedCourseId = new URLSearchParams(location.search).get("course");
   const [activeArea, setActiveArea] = useState("skills");
   const currentArea = CORE_AREAS.find((a) => a.key === activeArea);
   const [hoveredAreaItemIdx, setHoveredAreaItemIdx] = useState(null);
@@ -7171,6 +7187,13 @@ export default function HomePage() {
                         onPlayVideo={setVideoSrc}
                         onShare={handleCourseShare}
                         onRequestCallback={handleCourseRequestCallback}
+                        onLearnMore={(selectedCourse) => {
+                          navigate({
+                            pathname: "/",
+                            search: `?course=${selectedCourse._id}`,
+                            hash: "#future-courses",
+                          });
+                        }}
                       />
                     ))}
                   </div>
@@ -7196,6 +7219,14 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+          {linkedCourseId ? (
+            <CourseDetailsModal
+              courseId={linkedCourseId}
+              previewCourse={courses.find((item) => String(item._id) === String(linkedCourseId)) || null}
+              bucketUrl={bucketUrl}
+              onClose={() => navigate({ pathname: "/", search: "", hash: "#future-courses" }, { replace: true })}
+            />
+          ) : null}
         </section>
 
 
@@ -7229,6 +7260,13 @@ export default function HomePage() {
                         bucketUrl={bucketUrl}
                         onPlayVideo={setVideoSrc}
                         onShare={handleShareJob}
+                        onLearnMore={(selectedJob) => {
+                          navigate({
+                            pathname: "/",
+                            search: `?job=${selectedJob._id}`,
+                            hash: "#future-jobs",
+                          });
+                        }}
                       />
                     ))}
                   </div>
@@ -7259,6 +7297,14 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
+          {linkedJobId ? (
+            <JobDetailsModal
+              jobId={linkedJobId}
+              previewJob={jobs.find((item) => String(item._id) === String(linkedJobId)) || null}
+              bucketUrl={bucketUrl}
+              onClose={() => navigate({ pathname: "/", search: "", hash: "#future-jobs" }, { replace: true })}
+            />
+          ) : null}
         </section>
 
         <OurApproachSection />

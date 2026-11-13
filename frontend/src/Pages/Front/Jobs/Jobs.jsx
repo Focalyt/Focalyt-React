@@ -8,8 +8,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 import CompanyPartners from '../CompanyPartners/CompanyPartners';
 import ChatbotWidget from '../../../Component/ChatbotWidget/ChatbotWidget';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
+import JobDetailsModal from './JobDetailsModal';
 import { buildJobApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.jpg";
@@ -37,8 +38,9 @@ function resolveJobVideoUrl(bucketUrl, job) {
   return resolveMediaUrl(bucketUrl, job.jobVideo) || v;
 }
 
-export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare }) {
+export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare, onLearnMore }) {
   const { openApply } = usePublicApply();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const loc = job?.city ? `(${job.city.name}, ${job.state?.name || "NA"})` : "NA";
   const lastDate = job?.validity
     ? moment(job.validity).utcOffset("+05:30").format("DD MMM YYYY")
@@ -125,17 +127,31 @@ export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare }) {
       </div>
 
       <div className="course_card_footer">
-        <Link to={`/jobdetailsmore/${job._id}`} className="course-learn-more">
+        <button
+          type="button"
+          className="course-learn-more"
+          onClick={() => (onLearnMore ? onLearnMore(job) : setDetailsOpen(true))}
+        >
           <span className="learnn">Learn More</span>
           <img src="/Assets/public_assets/images/link.png" alt="" className="course-learn-more__icon" />
-        </Link>
+        </button>
       </div>
+      {detailsOpen ? (
+        <JobDetailsModal
+          jobId={job._id}
+          previewJob={job}
+          bucketUrl={bucketUrl}
+          onClose={() => setDetailsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
 function Jobs() {
   const { openApply } = usePublicApply();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedJobId = searchParams.get("job");
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -1797,7 +1813,18 @@ Provide analysis in clear format.`;
           </div>
         </div>
 
-
+        {linkedJobId ? (
+          <JobDetailsModal
+            jobId={linkedJobId}
+            previewJob={courses.find((item) => String(item._id) === String(linkedJobId)) || null}
+            bucketUrl={bucketUrl}
+            onClose={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("job");
+              setSearchParams(next, { replace: true });
+            }}
+          />
+        ) : null}
 
         {/* Callback Modal */}
         <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
@@ -2202,7 +2229,7 @@ Provide analysis in clear format.`;
 .foc-courses-page .btn.cta-callnow:hover, .foc-courses-page .btn.cta-callnow.btn-bg-color:hover { background: var(--home-card-cta-hover); border-color: var(--home-card-cta-hover); color: #fff; }
 .foc-courses-page .course-callback-btn { margin-top: 6px; padding: 8px 10px; }
 .foc-courses-page .course_card_footer { background: var(--home-card-cta); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-top: 0; text-align: center; padding: 8px 10px; }
-.foc-courses-page .course-learn-more { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.foc-courses-page .course-learn-more { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: inherit; }
 .foc-courses-page .course-learn-more .learnn { color: #fff; font-size: 13px; font-weight: 600; padding: 4px 0; }
 .foc-courses-page .course-learn-more__icon { width: 18px; height: auto; display: block; }
 .foc-courses-page .courses-empty { text-align: center; padding: 48px 16px; color: var(--muted); }
