@@ -2630,6 +2630,8 @@ router.post('/daily-reports', authorizeTrainingAccess, async (req, res) => {
 				projectName: context.projectName || (template.projectNames || [])[0] || template.projectName || '',
 			});
 			applyPortalSnapshot(report, template, answers);
+			report.inTime = String(req.body.inTime || '').trim();
+			report.outTime = String(req.body.outTime || '').trim();
 			await report.save();
 			return res.status(200).json({
 				status: true,
@@ -2750,6 +2752,8 @@ router.put('/daily-reports/:id', authorizeTrainingAccess, async (req, res) => {
 				trainerName: req.user.name || report.trainerName,
 			});
 			applyPortalSnapshot(report, template, report.answers);
+			report.inTime = String(req.body.inTime || '').trim();
+			report.outTime = String(req.body.outTime || '').trim();
 			report.markModified('answers');
 			await report.save();
 			return res.status(200).json({

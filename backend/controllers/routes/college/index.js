@@ -3986,7 +3986,8 @@ function aiCompareRequested(filters = {}) {
 		|| Boolean(filters.aiCallToDate)
 		|| filters.statusDiff === 'true'
 		|| filters.statusDiff === 'false'
-		|| filters.statusNear === 'true';
+		|| filters.statusNear === 'true'
+		|| filters.statusNear === 'false';
 }
 
 function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
@@ -4051,13 +4052,23 @@ function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
 			],
 		},
 	};
-	const narrowed = filters.statusNear === 'true'
-		? nearlyMatch
-		: filters.statusDiff === 'true'
-			? changedMatch
-			: filters.statusDiff === 'false'
-				? sameMatch
-				: null;
+	const notNearlyMatch = {
+		$expr: {
+			$or: [
+				{ $eq: ['$_cmpAi', '$_cmpHuman'] },
+				{ $not: { $in: ['$_cmpAi', ['hot', 'warm', 'won']] } },
+				{ $not: { $in: ['$_cmpHuman', ['hot', 'warm', 'won']] } },
+			],
+		},
+	};
+	const compareClauses = [];
+	if (filters.statusDiff === 'false') compareClauses.push(sameMatch);
+	else if (filters.statusDiff === 'true') compareClauses.push(changedMatch);
+	if (filters.statusNear === 'true') compareClauses.push(nearlyMatch);
+	else if (filters.statusNear === 'false') compareClauses.push(notNearlyMatch);
+	const narrowed = compareClauses.length > 1
+		? { $and: compareClauses }
+		: (compareClauses[0] || null);
 
 	if (forCount) {
 		pipeline.push({

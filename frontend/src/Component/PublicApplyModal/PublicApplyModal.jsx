@@ -19,6 +19,9 @@ import { trackMetaConversion } from "../../utils/conversionTrakingRoutes";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
+// OTP is paused on the public Apply Now form. Set this to true to live Send OTP, Verify, and Resend again.
+const OTP_ENABLED = false;
+
 function PerkMark({ type }) {
   if (type === "gift") return <Check size={14} strokeWidth={2.6} />;
   if (type === "clock") return <Clock size={14} strokeWidth={2.2} />;
@@ -251,7 +254,8 @@ function PublicApplyModal() {
     };
   }, [target, resetForm]);
 
-  const showProfileFields = Boolean(target) && otpVerified && isNewUser;
+  const otpPassed = !OTP_ENABLED || otpVerified;
+  const showProfileFields = Boolean(target) && otpPassed && isNewUser;
 
   useEffect(() => {
     if (!target) return undefined;
@@ -568,7 +572,12 @@ function PublicApplyModal() {
     setSuccess("");
 
     if (applied) return;
-    if (!otpVerified) {
+    if (!validateMobile()) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    // OTP check is skipped while OTP_ENABLED is false.
+    if (OTP_ENABLED && !otpVerified) {
       setError("Please verify the OTP before submitting.");
       return;
     }
@@ -844,7 +853,7 @@ function PublicApplyModal() {
         <form className="pam-form" onSubmit={handleSubmit}>
           <label className="pam-line">
             <span>Mobile Number <i>*</i></span>
-            <div className={`pam-mobile${otpSent ? " is-full" : ""}`}>
+            <div className={`pam-mobile${OTP_ENABLED && !otpSent ? "" : " is-full"}`}>
               <Field icon={Phone}>
                 <span className="pam-cc">+91</span>
                 <input
@@ -853,11 +862,12 @@ function PublicApplyModal() {
                   maxLength={10}
                   placeholder="Enter mobile number"
                   value={mobile}
-                  disabled={otpSent}
+                  disabled={OTP_ENABLED && otpSent}
                   onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 />
               </Field>
-              {!otpSent ? (
+              {/* OTP paused. Set OTP_ENABLED to true to show Send OTP again. */}
+              {OTP_ENABLED && !otpSent ? (
                 <button type="button" className="pam-otp-btn" onClick={handleSendOtp} disabled={sendingOtp}>
                   {sendingOtp ? "Sending..." : "Send OTP"}
                 </button>
@@ -865,7 +875,7 @@ function PublicApplyModal() {
             </div>
           </label>
 
-          {otpSent ? (
+          {OTP_ENABLED && otpSent ? (
             <label className="pam-line">
               <span>Enter OTP <i>*</i></span>
               <div className={`pam-mobile${otpVerified ? " is-full" : ""}`}>
@@ -894,13 +904,13 @@ function PublicApplyModal() {
             </label>
           ) : null}
 
-          {otpSent && !otpVerified ? (
+          {OTP_ENABLED && otpSent && !otpVerified ? (
             <button type="button" className="pam-resend-btn" onClick={handleResendOtp} disabled={sendingOtp}>
               {sendingOtp ? "Sending..." : "Resend OTP"}
             </button>
           ) : null}
 
-          {otpVerified && isNewUser ? (
+          {otpPassed && isNewUser ? (
           <>
           <label className="pam-line">
             <span>Full Name <i>*</i></span>
@@ -981,7 +991,7 @@ function PublicApplyModal() {
           </>
           ) : null}
 
-          {otpVerified && target.kind === "job" ? (
+          {otpPassed && target.kind === "job" ? (
             <div className="pam-job-rules">
               {rulesLoading ? <p className="pam-rules-note">Checking this job's requirements...</p> : null}
               {Array.isArray(jobRules?.docs) && jobRules.docs.length ? (
@@ -1006,7 +1016,7 @@ function PublicApplyModal() {
             </div>
           ) : null}
 
-          {otpVerified && isNewUser ? (
+          {otpPassed && isNewUser ? (
           <>
           <label className="pam-check">
             <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
@@ -1020,7 +1030,7 @@ function PublicApplyModal() {
           </>
           ) : null}
 
-          {otpVerified && !isNewUser ? (
+          {otpPassed && !isNewUser ? (
             <button type="submit" className="pam-submit" disabled={submitting || applied}>
               {applied ? "Application submitted" : submitting ? "Submitting..." : "Submit Application"}
               <span aria-hidden="true">→</span>

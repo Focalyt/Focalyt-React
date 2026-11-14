@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 
 const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -7,8 +7,8 @@ const PAGE_SIZE = 20;
 const FILTERS = [
   { id: 'ai-called', label: 'AI called', countKey: 'aiCalled' },
   { id: 'changed', label: 'Status changed', countKey: 'changed' },
-  { id: 'same', label: 'Status matched', countKey: 'same' },
-  { id: 'nearly', label: 'Nearly match', countKey: 'nearly' },
+  { id: 'same', label: 'Status matched', countKey: 'same', percent: true },
+  { id: 'nearly', label: 'Nearly match', countKey: 'nearly', percent: true },
   { id: 'all', label: 'All leads', countKey: null },
 ];
 
@@ -183,6 +183,57 @@ const MultiSelectCheckbox = ({ title, options, selectedValues, onChange, icon, i
   );
 };
 
+/* ---------- yes / no column filter ---------- */
+const YesNoColumnHeader = ({ label, value, open, onToggle, onChange }) => {
+  const buttonRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuStyle({ top: rect.bottom + 4, left: rect.left });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
+
+  return (
+    <th className={`ah-yn ${open ? 'is-open' : ''} ${value ? 'has-value' : ''}`}>
+      <button ref={buttonRef} type="button" className="ah-yn__btn" onClick={onToggle} aria-expanded={open}>
+        <span>{label}</span>
+        {value ? <em>{value}</em> : null}
+        <i className={`fas fa-chevron-${open ? 'up' : 'down'}`} />
+      </button>
+      {open && (
+        <div className="ah-yn__menu" style={menuStyle} role="menu">
+          {[
+            { id: '', label: 'All' },
+            { id: 'yes', label: 'Yes' },
+            { id: 'no', label: 'No' },
+          ].map((option) => (
+            <button
+              key={option.id || 'all'}
+              type="button"
+              role="menuitem"
+              className={value === option.id ? 'is-active' : ''}
+              onClick={() => onChange(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </th>
+  );
+};
+
 /* ---------- page ---------- */
 const Lead = () => {
   const userData = useMemo(() => {
@@ -216,6 +267,9 @@ const Lead = () => {
   const [openFilter, setOpenFilter] = useState('');
   const [showDateRange, setShowDateRange] = useState(false);
   const [remarkModal, setRemarkModal] = useState(null);
+  const [matchFilter, setMatchFilter] = useState('');
+  const [nearFilter, setNearFilter] = useState('');
+  const [openColFilter, setOpenColFilter] = useState('');
 
   const fetchLeads = useCallback(async () => {
     if (!token) {
@@ -232,9 +286,13 @@ const Lead = () => {
         ...(search && { name: search }),
       };
       if (activeFilter !== 'all') params.aiCalled = 'true';
-      if (activeFilter === 'changed') params.statusDiff = 'true';
-      if (activeFilter === 'same') params.statusDiff = 'false';
-      if (activeFilter === 'nearly') params.statusNear = 'true';
+      if (matchFilter === 'yes') params.statusDiff = 'false';
+      else if (matchFilter === 'no') params.statusDiff = 'true';
+      else if (activeFilter === 'changed') params.statusDiff = 'true';
+      else if (activeFilter === 'same') params.statusDiff = 'false';
+      if (nearFilter === 'yes') params.statusNear = 'true';
+      else if (nearFilter === 'no') params.statusNear = 'false';
+      else if (activeFilter === 'nearly') params.statusNear = 'true';
       if (fromDate) {
         const iso = new Date(`${fromDate}T00:00:00`).toISOString();
         if (activeFilter === 'all') params.createdFromDate = iso;
@@ -273,7 +331,7 @@ const Lead = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, page, search, activeFilter, fromDate, toDate, courseIds, counselorIds, leadSourceIds]);
+  }, [token, page, search, activeFilter, fromDate, toDate, courseIds, counselorIds, leadSourceIds, matchFilter, nearFilter]);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
@@ -307,9 +365,10 @@ const Lead = () => {
     const onDown = (event) => {
       if (!event.target.closest('.ah-ms')) setOpenFilter('');
       if (!event.target.closest('.ah-range')) setShowDateRange(false);
+      if (!event.target.closest('.ah-yn')) setOpenColFilter('');
     };
     const onKey = (event) => {
-      if (event.key === 'Escape') { setOpenFilter(''); setShowDateRange(false); setRemarkModal(null); }
+      if (event.key === 'Escape') { setOpenFilter(''); setShowDateRange(false); setRemarkModal(null); setOpenColFilter(''); }
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -356,7 +415,20 @@ const Lead = () => {
     setSearch(searchInput.trim());
   };
 
-  const changeFilter = (id) => { setActiveFilter(id); setPage(1); };
+  const changeFilter = (id) => {
+    setActiveFilter(id);
+    setMatchFilter('');
+    setNearFilter('');
+    setOpenColFilter('');
+    setPage(1);
+  };
+
+  const applyColumnFilter = (kind, value) => {
+    if (kind === 'match') setMatchFilter(value);
+    else setNearFilter(value);
+    setOpenColFilter('');
+    setPage(1);
+  };
 
   const applyDatePreset = (presetId) => {
     if (datePreset === presetId) {
@@ -381,16 +453,24 @@ const Lead = () => {
   };
 
   const hasActiveFilters = Boolean(
-    fromDate || toDate || courseIds.length || counselorIds.length || leadSourceIds.length || search
+    fromDate || toDate || courseIds.length || counselorIds.length || leadSourceIds.length || search || matchFilter || nearFilter
   );
 
   const clearAll = () => {
     clearDates();
     setCourseIds([]); setCounselorIds([]); setLeadSourceIds([]);
-    setSearchInput(''); setSearch(''); setPage(1);
+    setSearchInput(''); setSearch('');
+    setMatchFilter(''); setNearFilter(''); setOpenColFilter('');
+    setPage(1);
   };
 
   const countFor = (f) => (f.countKey ? compareCounts[f.countKey] : null);
+
+  const percentOfAiCalled = (count) => {
+    const total = Number(compareCounts.aiCalled) || 0;
+    if (!total) return 0;
+    return Math.round((Number(count) / total) * 100);
+  };
 
   const tip = (value) => {
     const text = String(value || '').trim();
@@ -509,15 +589,20 @@ const Lead = () => {
       <nav className="ah-tabs" aria-label="Lead view">
         {FILTERS.map((f) => {
           const count = countFor(f);
+          const percent = f.percent ? percentOfAiCalled(count) : null;
           return (
             <button
               key={f.id}
               type="button"
               className={`ah-tab ah-tab--${f.id} ${activeFilter === f.id ? 'is-active' : ''}`}
               onClick={() => changeFilter(f.id)}
+              title={percent === null ? undefined : `${count} of ${compareCounts.aiCalled} AI called (${percent}%)`}
             >
               <span className="ah-tab__label">{f.label}</span>
-              <strong>{count === null ? (activeFilter === 'all' ? totalCount : '') : count}</strong>
+              <strong>
+                {count === null ? (activeFilter === 'all' ? totalCount : '') : count}
+                {percent !== null && <span className="ah-tab__pct">{percent}%</span>}
+              </strong>
             </button>
           );
         })}
@@ -539,12 +624,6 @@ const Lead = () => {
           <strong>Couldn't load leads</strong>
           <p>{error}</p>
           <button type="button" className="ah-btn" onClick={fetchLeads}>Try again</button>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="ah-empty">
-          <strong>No leads match these filters</strong>
-          <p>Clear a filter or widen the date range to see more leads.</p>
-          {hasActiveFilters && <button type="button" className="ah-btn" onClick={clearAll}>Clear all filters</button>}
         </div>
       ) : (
         <div className="ah-table-wrap">
@@ -575,12 +654,34 @@ const Lead = () => {
                 <th>AI remarks</th>
                 <th>Human status</th>
                 <th>Human remarks</th>
-                <th>Status matched</th>
-                <th>Nearly match</th>
+                <YesNoColumnHeader
+                  label="Status matched"
+                  value={matchFilter}
+                  open={openColFilter === 'match'}
+                  onToggle={() => setOpenColFilter((current) => (current === 'match' ? '' : 'match'))}
+                  onChange={(value) => applyColumnFilter('match', value)}
+                />
+                <YesNoColumnHeader
+                  label="Nearly match"
+                  value={nearFilter}
+                  open={openColFilter === 'near'}
+                  onToggle={() => setOpenColFilter((current) => (current === 'near' ? '' : 'near'))}
+                  onChange={(value) => applyColumnFilter('near', value)}
+                />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="ah-empty-cell">
+                    <div className="ah-empty ah-empty--row">
+                      <strong>No leads match these filters</strong>
+                      <p>Clear a filter or widen the date range to see more leads.</p>
+                      {hasActiveFilters && <button type="button" className="ah-btn" onClick={clearAll}>Clear all filters</button>}
+                    </div>
+                  </td>
+                </tr>
+              ) : rows.map((row) => {
                 const when = formatDateTime(row.aiCallAt || row.createdAt);
                 const whenKind = row.aiCallAt ? 'AI call' : 'Created';
                 return (
@@ -712,7 +813,8 @@ const Lead = () => {
         .ah-tab { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; transition: border-color .15s, box-shadow .15s; }
         .ah-tab:hover { border-color: #cfd3de; }
         .ah-tab__label { color: var(--muted); font-weight: 600; font-size: 12px; }
-        .ah-tab strong { font-size: 16px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .ah-tab strong { display: inline-flex; align-items: baseline; gap: 6px; font-size: 16px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .ah-tab__pct { font-size: 12px; font-weight: 700; opacity: .85; }
         .ah-tab--ai-called strong { color: var(--ai); }
         .ah-tab--changed strong { color: var(--warn); }
         .ah-tab--same strong { color: var(--human); }
@@ -752,7 +854,8 @@ const Lead = () => {
         .ah-empty { background: var(--surface); border: 1px dashed #cfd3de; border-radius: 14px; padding: 48px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
         .ah-empty strong { font-size: 16px; }
         .ah-empty p { margin: 0 0 8px; color: var(--muted); }
-        .ah-empty--error strong { color: #b42318; }
+        .ah-empty--row { border: none; border-radius: 0; box-shadow: none; }
+        .ah-empty-cell { height: auto !important; max-height: none !important; overflow: visible; white-space: normal; }
 
         .ah-pager { display: flex; gap: 14px; align-items: center; justify-content: flex-end; margin-top: 18px; color: var(--muted); font-weight: 600; }
 
@@ -778,6 +881,17 @@ const Lead = () => {
         .ah-col-remark { width: 190px; min-width: 190px; }
         .ah-col-compare { width: 124px; min-width: 124px; }
         .ah-table th { position: sticky; top: 0; text-align: left; background: #fafbfd; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; padding: 0 10px; height: 36px; border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ah-table th.ah-yn { position: sticky; overflow: visible; }
+        .ah-yn.is-open { z-index: 8; }
+        .ah-yn.has-value { color: var(--brand-ink); }
+        .ah-yn__btn { display: flex; align-items: center; gap: 4px; width: 100%; height: 36px; margin: 0 -10px; padding: 0 10px; border: none; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; }
+        .ah-yn__btn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .ah-yn__btn em { flex: none; font-style: normal; font-size: 9px; letter-spacing: 0; text-transform: uppercase; color: var(--brand); }
+        .ah-yn__btn i { flex: none; font-size: 9px; color: #98a2b3; }
+        .ah-yn__menu { position: fixed; z-index: 40; min-width: 108px; padding: 4px; background: #fff; border: 1px solid #e8eaed; border-radius: 10px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14); display: flex; flex-direction: column; }
+        .ah-yn__menu button { border: none; background: transparent; text-align: left; padding: 7px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); }
+        .ah-yn__menu button:hover { background: var(--bg); }
+        .ah-yn__menu button.is-active { background: var(--brand-soft); color: var(--brand-ink); }
         .ah-table td { padding: 0 10px; height: 40px; min-height: 40px; max-height: 40px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--ink); background: var(--surface); font-size: 12px; overflow: hidden; white-space: nowrap; }
         .ah-table tbody tr:last-child td { border-bottom: none; }
         .ah-table tbody tr:hover td { background: #fafbfd; }

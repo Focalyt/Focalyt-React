@@ -48,6 +48,28 @@ const formatReportDate = (value) => {
   return `${day}/${month}/${year}`;
 };
 
+const minutesFromTime = (value) => {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+};
+
+const sessionDuration = (inTime, outTime) => {
+  const start = minutesFromTime(inTime);
+  const end = minutesFromTime(outTime);
+  if (start == null || end == null) return '';
+  const diff = end - start;
+  if (diff < 0) return 'Out time is before In time';
+  const hours = Math.floor(diff / 60);
+  const minutes = diff % 60;
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes}m`;
+};
+
 const mediaUrl = (file) => {
   const backend = String(process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '');
   const onLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
@@ -494,6 +516,8 @@ const knownFieldValue = (field, context) => {
     data.append('templateId', formTemplate.id);
     data.append('reportDate', form.reportDate);
     data.append('batchId', form.batchId);
+    data.append('inTime', form.inTime || '');
+    data.append('outTime', form.outTime || '');
     const answersToSave = {};
     (formTemplate.fields || []).forEach((field) => {
       if (field.type === 'file') return;
@@ -592,7 +616,12 @@ const knownFieldValue = (field, context) => {
       const fields = formTemplate.fields.filter((field) => (
         field.key !== 'batchAttendance'
         && field.key !== 'batchSize'
+        && field.key !== 'inTime'
+        && field.key !== 'outTime'
         && labelKey(field.label) !== 'batchsize'
+        && !['intime', 'outtime', 'totaltime'].includes(labelKey(field.label))
+        && field.portalKey !== 'inTime'
+        && field.portalKey !== 'outTime'
         && !studentCountKeys.has(field.key)
         && !['presentstudent', 'absentstudent', 'onleavestudent', 'dropoutstudent'].includes(labelKey(field.label))
       ));
@@ -939,6 +968,18 @@ const knownFieldValue = (field, context) => {
                       </div>
                     );
                   })}
+                  <label className="dtr-field">
+                    <span>In time</span>
+                    <input type="time" value={form.inTime} disabled={readOnly} onChange={(event) => onField('inTime', event.target.value)} />
+                  </label>
+                  <label className="dtr-field">
+                    <span>Out time</span>
+                    <input type="time" value={form.outTime} disabled={readOnly} onChange={(event) => onField('outTime', event.target.value)} />
+                  </label>
+                  <div className="dtr-field">
+                    <span>Total time</span>
+                    <div className="dtr-readonly">{sessionDuration(form.inTime, form.outTime) || '-'}</div>
+                  </div>
                 </div>
                 <div className="dtr-submit">
                   <button type="button" className="dtr-btn dtr-btn--ghost" onClick={openNew}>Clear row</button>
@@ -1013,6 +1054,9 @@ const knownFieldValue = (field, context) => {
                   ['Absent student', (viewingReport.answers || []).find((answer) => answer.key === 'absentStudent')?.value || ''],
                   ['On leave student', (viewingReport.answers || []).find((answer) => answer.key === 'onLeaveStudent')?.value || ''],
                   ['Dropout student', (viewingReport.answers || []).find((answer) => answer.key === 'dropoutStudent')?.value || ''],
+                  ['In time', viewingReport.inTime],
+                  ['Out time', viewingReport.outTime],
+                  ['Total time', sessionDuration(viewingReport.inTime, viewingReport.outTime)],
                   ['Location', viewingReport.location],
                 ].map(([label, value]) => (
                   <div key={label}>
@@ -1022,7 +1066,12 @@ const knownFieldValue = (field, context) => {
                 ))}
               </div>
               <div className="dtr-answers">
-              {(viewingReport.answers || []).filter((answer) => !studentCountKeys.has(answer.key) && answer.key !== topicFieldKey).map((answer) => {
+              {(viewingReport.answers || []).filter((answer) => (
+                !studentCountKeys.has(answer.key)
+                && answer.key !== topicFieldKey
+                && !['inTime', 'outTime', 'totalTime'].includes(answer.key)
+                && !['intime', 'outtime', 'totaltime'].includes(labelKey(answer.label))
+              )).map((answer) => {
                 const wide = answer.type === 'file' || answer.type === 'textarea' || String(answer.value || '').length > 80 || (answer.files || []).length > 0;
                 return (
                 <div className={`dtr-answer${wide ? ' dtr-answer-wide' : ''}`} key={answer.key}>
