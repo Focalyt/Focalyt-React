@@ -2927,7 +2927,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					_id: (doc._candidate && doc._candidate._id) ? doc._candidate._id : null,
 					mobile: (doc._candidate && doc._candidate.mobile) ? doc._candidate.mobile : 'N/A',
 					name: (doc._candidate && doc._candidate.name) ? doc._candidate.name : 'N/A',
-					email: (doc._candidate && doc._candidate.email) ? doc._candidate.email : 'N/A'
+					email: (doc._candidate && doc._candidate.email) ? doc._candidate.email : 'N/A',
+					source: (doc._candidate && doc._candidate.source) ? doc._candidate.source : ''
 				},
 				_course: doc._course ? {
 					_id: doc._course._id || null,
@@ -3037,6 +3038,12 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 						_id: doc.leadCoOwner2._id || doc.leadCoOwner2,
 						name: doc.leadCoOwner2.name || null,
 						email: doc.leadCoOwner2.email || null,
+					}
+					: null,
+				registeredBy: doc.registeredBy?.name
+					? {
+						_id: doc.registeredBy._id || null,
+						name: doc.registeredBy.name,
 					}
 					: null,
 			};
@@ -3185,13 +3192,31 @@ router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 
 		const rootId = getB2cCrossSaleRootId(source);
 		const groupLeads = await AppliedCourses.find(buildB2cCrossSaleGroupQuery(rootId))
-			.populate('_candidate', 'name mobile email')
+			.populate('_candidate', 'name mobile email source')
 			.populate('_course', 'name project vertical')
 			.populate('_center', 'name')
 			.populate('_leadStatus', 'title substatuses')
-			.populate('registeredBy', 'name email')
 			.sort({ createdAt: 1 })
 			.lean();
+
+		const registeredByIds = [...new Set(
+			groupLeads
+				.map((doc) => String(doc.registeredBy?._id || doc.registeredBy || ''))
+				.filter((id) => mongoose.Types.ObjectId.isValid(id))
+		)].map((id) => new mongoose.Types.ObjectId(id));
+		const [registeredByUsers, registeredBySources] = registeredByIds.length
+			? await Promise.all([
+				User.find({ _id: { $in: registeredByIds } }).select('name email').lean(),
+				Source.find({ _id: { $in: registeredByIds } }).select('name').lean(),
+			])
+			: [[], []];
+		const registeredByById = new Map();
+		registeredBySources.forEach((source) => {
+			registeredByById.set(String(source._id), { _id: source._id, name: source.name });
+		});
+		registeredByUsers.forEach((user) => {
+			registeredByById.set(String(user._id), { _id: user._id, name: user.name, email: user.email });
+		});
 
 		const processedLeads = groupLeads.map((doc) => {
 			let selectedSubstatus = null;
@@ -3200,8 +3225,10 @@ router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 					(sub) => String(sub._id) === String(doc._leadSubStatus),
 				);
 			}
+			const registeredById = String(doc.registeredBy?._id || doc.registeredBy || '');
 			return {
 				...doc,
+				registeredBy: registeredByById.get(registeredById) || null,
 				selectedSubstatus: selectedSubstatus
 					? {
 						_id: selectedSubstatus._id,
@@ -4260,7 +4287,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 							name: 1,
 							email: 1,
 							mobile: 1,
-							whatsapp: 1
+							whatsapp: 1,
+							source: 1
 						}
 					}
 				]
@@ -4349,7 +4377,37 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 				pipeline: [{ $project: { name: 1, email: 1 } }]
 			}
 		},
-		{ $unwind: { path: '$leadCoOwner2', preserveNullAndEmptyArrays: true } }
+		{ $unwind: { path: '$leadCoOwner2', preserveNullAndEmptyArrays: true } },
+
+		// Same resolution as appliedCandidatesDetails: user first, then lead source.
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'registeredBy',
+				foreignField: '_id',
+				as: 'registeredByUser',
+				pipeline: [{ $project: { name: 1 } }]
+			}
+		},
+		{
+			$lookup: {
+				from: 'sources',
+				localField: 'registeredBy',
+				foreignField: '_id',
+				as: 'registeredBySource',
+				pipeline: [{ $project: { name: 1 } }]
+			}
+		},
+		{
+			$addFields: {
+				registeredBy: {
+					$ifNull: [
+						{ $arrayElemAt: ['$registeredByUser', 0] },
+						{ $arrayElemAt: ['$registeredBySource', 0] }
+					]
+				}
+			}
+		}
 	);
 
 	pipeline.push({
@@ -4358,6 +4416,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 			_candidate: 1,
 			_course: 1,
 			_center: 1,
+			registeredBy: 1,
 			crossSaleRootId: 1,
 			parentAppliedCourseId: 1,
 			_leadStatus: 1,
