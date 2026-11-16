@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const uuid = require("uuid/v1");
 const { isCollege } = require("../../../helpers");
 const { bucketName, mimetypes } = require("../../../config");
@@ -15,6 +16,7 @@ const {
 	Qualification,
 	SubQualification,
 	HiringStatus,
+	AppliedJobs,
 } = require("../../models");
 
 const router = express.Router();
@@ -349,15 +351,28 @@ router.get("/list", async (req, res) => {
 		const hrIds = (college?._concernPerson || []).map((person) => person._id).filter(Boolean);
 		const filter = hrIds.length ? { hr: { $in: hrIds } } : { _id: null };
 
+		const scopeKeys = ["vertical", "project", "center"];
+		for (const key of scopeKeys) {
+			const value = req.query[key];
+			if (!value) continue;
+			if (!mongoose.Types.ObjectId.isValid(String(value))) {
+				return res.status(400).json({ success: false, message: `Invalid ${key}` });
+			}
+			filter[key] = value;
+		}
+		const scoped = scopeKeys.some((key) => req.query[key]);
+
+		let jobsQuery = Vacancy.find(filter)
+			.select("title experience _qualification createdAt status validity displayCompanyName noOfPosition vertical project center")
+			.populate({ path: "_qualification", select: "name" })
+			.sort({ createdAt: -1 });
+		if (!scoped) {
+			jobsQuery = jobsQuery.skip(perPage * (page - 1)).limit(perPage);
+		}
+
 		const [count, jd, shortlistedCandCount] = await Promise.all([
 			Vacancy.countDocuments(filter),
-			Vacancy.find(filter)
-				.select("title experience _qualification createdAt status validity displayCompanyName")
-				.populate({ path: "_qualification", select: "name" })
-				.sort({ createdAt: -1 })
-				.skip(perPage * (page - 1))
-				.limit(perPage)
-				.lean(),
+			jobsQuery.lean(),
 			HiringStatus.aggregate([
 				{ $match: { job: { $ne: null }, isDeleted: false } },
 				{ $group: { _id: { job: "$job" }, count: { $sum: 1 } } },
@@ -367,7 +382,7 @@ router.get("/list", async (req, res) => {
 		return res.json({
 			success: true,
 			jd,
-			totalPages: Math.ceil(count / perPage) || 1,
+			totalPages: scoped ? 1 : Math.ceil(count / perPage) || 1,
 			page,
 			shortlistedCandCount,
 			canAdd: Boolean(college),
@@ -381,6 +396,50 @@ router.get("/list", async (req, res) => {
 	} catch (error) {
 		console.error("Error listing college jobs:", error);
 		return res.status(500).json({ success: false, message: error.message || "Unable to load jobs" });
+	}
+});
+
+router.get("/:id/students", async (req, res) => {
+	try {
+		const { id } = req.params;
+		if (!mongoose.Types.ObjectId.isValid(String(id))) {
+			return res.status(400).json({ success: false, message: "Invalid job id" });
+		}
+
+		const job = await Vacancy.findById(id).select("title displayCompanyName hr").lean();
+		if (!job) {
+			return res.status(404).json({ success: false, message: "Job not found" });
+		}
+		if (!canManageJob(req, job)) {
+			return res.status(403).json({ success: false, message: "You cannot view students for this job" });
+		}
+
+		const applies = await AppliedJobs.find({ _job: id, isDeleted: { $ne: true } })
+			.populate({ path: "_candidate", select: "name mobile email" })
+			.sort({ createdAt: -1 })
+			.lean();
+
+		const students = applies
+			.filter((apply) => apply._candidate)
+			.map((apply) => ({
+				_id: apply._id,
+				candidateId: apply._candidate._id,
+				name: apply._candidate.name || "",
+				mobile: apply._candidate.mobile || "",
+				email: apply._candidate.email || "",
+				source: apply.source || "",
+				approvalStatus: apply.approval?.status || "PENDING",
+				appliedAt: apply.createdAt,
+			}));
+
+		return res.json({
+			success: true,
+			job: { _id: job._id, title: job.title || "", company: job.displayCompanyName || "" },
+			students,
+		});
+	} catch (error) {
+		console.error("Error listing job students:", error);
+		return res.status(500).json({ success: false, message: error.message || "Unable to load students" });
 	}
 });
 

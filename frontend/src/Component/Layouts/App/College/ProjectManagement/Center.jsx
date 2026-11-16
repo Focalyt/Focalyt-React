@@ -560,7 +560,7 @@ const updatedPermission = async () => {
 
                 </div> */}
 
-                {/hr|job|recruit/i.test(selectedVertical?.name || '') ? (
+                {/hr|job|recruit|placement/i.test(selectedVertical?.name || '') ? (
                   <Jobs selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />
                 ) : (
                   <Course selectedCenter={selectedCenterForCourses} onBackToCenters={handleBackToCenters} selectedProject={selectedProject} onBackToProjects={onBackToProjects} selectedVertical={selectedVertical} onBackToVerticals={onBackToVerticals} />

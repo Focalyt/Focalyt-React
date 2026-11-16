@@ -14,8 +14,6 @@ import {
   faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faWallet, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn, faUserTie, faVideo
 } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
-import { canShowInstituteClubLink, hasInstituteClubStaffRole } from '../../../../config/club/clubAuthSession';
-import { canShowClubPageLink, CLUB_NAV_PERMISSION } from '../../../../config/club/clubAssignablePermissions';
 import {
   faUser as farUser, faFile as farFile,
   faPaperPlane as farPaperPlane, faMap as farMap, faHand as farHand, faBookmark as farBookmark,
@@ -35,10 +33,6 @@ function CollegeLayout({ children }) {
   const isUser = JSON.parse(sessionStorage.getItem('user'))?.role === 2 ? true : false
   // const permissions = userData?.permissions
   const [permissions, setPermissions] = useState();
-  const showClubNav = (navKey, roleFlag) => {
-    if (roleFlag && !canShowInstituteClubLink(permissions, roleFlag)) return false;
-    return canShowClubPageLink(permissions, CLUB_NAV_PERMISSION[navKey]);
-  };
   const [user, setUser] = useState();
   const [collegeLogo, setCollegeLogo] = useState(null);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
@@ -1134,12 +1128,12 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('Sales B2C')}</span>
                       </Link>
                     </li>
-                    {/* <li className={`nav-item ${location.pathname === '/institute/lead' ? 'active' : ''}`}>
+                    <li className={`nav-item ${location.pathname === '/institute/lead' ? 'active' : ''}`}>
                       <Link to="/institute/lead" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faClipboardList} />
                         <span className="menu-title">AI vs Human</span>
                       </Link>
-                    </li> */}
+                    </li>
                     <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
                       <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
@@ -1519,7 +1513,7 @@ function CollegeLayout({ children }) {
               </li>
 
               {/* Club */}
-              {hasInstituteClubStaffRole(permissions) && (
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_club_admin) || permissions?.permission_type === 'Admin') && (
                 <li className={`nav-item has-sub dropdown-club ${openSubmenu.club ? 'open' : ''}`}>
                   <a href="#" onClick={(e) => { e.preventDefault(); toggleSubmenu('club'); }}>
                     <FontAwesomeIcon icon={faUsers} />
@@ -1542,103 +1536,79 @@ function CollegeLayout({ children }) {
                       opacity: openSubmenu.club ? 1 : 0
                     }}
                   >
-                    {showClubNav('dashboard') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/dashboard' ? 'active' : ''}`}>
                       <Link to="/institute/club/dashboard" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faChartLine} />
                         <span className="menu-title">Dashboard</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('clubs') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/clubs' ? 'active' : ''}`}>
                       <Link to="/institute/club/clubs" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUsers} />
                         <span className="menu-title">Clubs</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('members') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/members' ? 'active' : ''}`}>
                       <Link to="/institute/club/members" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
                         <span className="menu-title">Members & Requests</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('positions') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/positions' ? 'active' : ''}`}>
                       <Link to="/institute/club/positions" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserTie} />
                         <span className="menu-title">Positions</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('activities') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/activities' ? 'active' : ''}`}>
                       <Link to="/institute/club/activities" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faCalendarAlt} />
                         <span className="menu-title">Activities</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('registrations') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/registrations' ? 'active' : ''}`}>
                       <Link to="/institute/club/registrations" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faClipboardList} />
                         <span className="menu-title">Registrations</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('budgets') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/budgets' ? 'active' : ''}`}>
                       <Link to="/institute/club/budgets" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faWallet} />
                         <span className="menu-title">Budgets</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('results') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/results' ? 'active' : ''}`}>
                       <Link to="/institute/club/results" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faTasks} />
                         <span className="menu-title">Results</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('certificates') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/certificates' ? 'active' : ''}`}>
                       <Link to="/institute/club/certificates" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faGraduationCap} />
                         <span className="menu-title">Certificates</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('rewards') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/rewards' ? 'active' : ''}`}>
                       <Link to="/institute/club/rewards" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faTags} />
                         <span className="menu-title">Rewards</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('posts') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/posts' ? 'active' : ''}`}>
                       <Link to="/institute/club/posts" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBullhorn} />
                         <span className="menu-title">Community Posts</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('announcements') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/announcements' ? 'active' : ''}`}>
                       <Link to="/institute/club/announcements" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />
                         <span className="menu-title">Announcements</span>
                       </Link>
                     </li>
-                    )}
-                    {showClubNav('settings', 'can_be_club_admin') && (
+                    {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_club_admin) || permissions?.permission_type === 'Admin') && (
                     <li className={`nav-item ${location.pathname === '/institute/club/settings' ? 'active' : ''}`}>
                       <Link to="/institute/club/settings" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faCogs} />
