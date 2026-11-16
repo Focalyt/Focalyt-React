@@ -964,6 +964,94 @@ module.exports.loginAsClub = async (req, res) => {
   }
 };
 
+module.exports.clubRegister = async (req, res) => {
+  try {
+    const {
+      name,
+      email: rawEmail,
+      mobile: rawMobile,
+      password,
+      designation,
+      collegeId,
+    } = req.body;
+
+    const email = String(rawEmail || '').trim().toLowerCase();
+    const mobileDigits = String(rawMobile || '').replace(/\D/g, '').slice(-10);
+
+    if (!name || !email || !mobileDigits || !password) {
+      return res.status(400).json({
+        status: false,
+        error: 'Name, email, mobile and password are required',
+      });
+    }
+
+    if (!/^\d{10}$/.test(mobileDigits)) {
+      return res.status(400).json({ status: false, error: 'Invalid mobile number' });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ status: false, error: 'Invalid email' });
+    }
+
+    const existing = await User.findOne({
+      role: 5,
+      $or: [{ email }, { mobile: Number(mobileDigits) }],
+    });
+    if (existing) {
+      return res.status(400).json({
+        status: false,
+        error: 'Club user already exists with this email or mobile',
+      });
+    }
+
+    const user = new User({
+      name: String(name).trim(),
+      email,
+      mobile: Number(mobileDigits),
+      password,
+      designation: designation ? String(designation).trim() : '',
+      collegeId: collegeId || undefined,
+      role: 5,
+      status: true,
+      isDeleted: false,
+      permissions: {
+        permission_type: 'Custom',
+        custom_permissions: {
+          can_view_clubs: true,
+          can_be_club_admin: true,
+        },
+      },
+    });
+
+    await user.save();
+    const token = await user.generateAuthToken();
+
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      role: 5,
+      email: user.email,
+      mobile: user.mobile,
+      designation: user.designation,
+      collegeId: user.collegeId,
+      permissions: user.permissions,
+      token,
+    };
+
+    return res.status(201).json({
+      status: true,
+      message: 'Club registration successful',
+      token,
+      role: 5,
+      userData,
+      data: { user: userData, token },
+    });
+  } catch (err) {
+    console.log('Error in POST /club/register:', err.message);
+    return res.status(500).json({ status: false, error: err.message });
+  }
+};
+
 module.exports.country = async (req, res) => {
   try {
     const countries = await Country.find({});
