@@ -1,0 +1,120 @@
+<script>
+(function () {
+  if (!document.querySelector('.company-hiring-open')) return;
+  const stages = [
+    ['shortlisted', 'Shortlisted'],
+    ['interview due', 'Interview Due'],
+    ['interviewed', 'Interviewed'],
+    ['on hold', 'On Hold'],
+    ['offer letter rollout', 'Offer Letter Rollout'],
+    ['hiring on hold', 'Hiring on Hold'],
+    ['hired', 'Hired'],
+    ['rejected', 'Rejected']
+  ];
+  const optionsNode = document.getElementById('corp-hiring-options');
+  const options = optionsNode ? JSON.parse(optionsNode.textContent || '{}') : { jobs: [], people: [] };
+  const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
+  let dialog;
+
+  function fill(select, rows, blank, selected) {
+    select.replaceChildren(new Option(blank, ''));
+    (rows || []).forEach((row) => select.appendChild(new Option(row.name || row.title, row.id)));
+    select.value = (rows || []).some((row) => row.id === selected) ? selected : '';
+  }
+
+  function openHiring(button) {
+    if (!dialog) { dialog = el('dialog', 'company-followup-dialog'); document.body.appendChild(dialog); }
+    dialog.replaceChildren();
+    const header = el('div', 'company-followup-dialog-header');
+    const heading = el('h2', '', 'Hiring Status');
+    heading.id = 'company-hiring-heading';
+    dialog.setAttribute('aria-labelledby', heading.id);
+    const close = el('button', 'company-student-icon', '×');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close');
+    close.addEventListener('click', () => dialog.close());
+    header.append(heading, close);
+    dialog.appendChild(header);
+    const content = el('div', 'company-followup-dialog-content');
+    dialog.appendChild(content);
+    const message = el('div', 'company-followup-message', '');
+    message.setAttribute('role', 'status');
+    const form = el('form', 'company-followup-form company-status-form');
+    const statusSelect = el('select', 'form-control');
+    statusSelect.appendChild(new Option('Select Option', ''));
+    stages.forEach((stage) => statusSelect.appendChild(new Option(stage[1], stage[0])));
+    statusSelect.value = stages.some((stage) => stage[0] === button.dataset.hiringStatus) ? button.dataset.hiringStatus : '';
+    const statusLabel = el('label', '', 'Hiring Status');
+    statusLabel.appendChild(statusSelect);
+    const jobSelect = el('select', 'form-control');
+    fill(jobSelect, options.jobs, 'Select Option', button.dataset.hiringJob || '');
+    const jobLabel = el('label', '', 'Select JD');
+    jobLabel.appendChild(jobSelect);
+    const date = el('input', 'form-control');
+    date.type = 'date';
+    date.value = button.dataset.hiringDate || '';
+    const dateLabel = el('label', '', 'Event Date');
+    dateLabel.appendChild(date);
+    const personSelect = el('select', 'form-control');
+    fill(personSelect, options.people, 'Select Option', button.dataset.hiringPerson || '');
+    const personLabel = el('label', '', 'Concerned Person');
+    personLabel.appendChild(personSelect);
+    const comment = el('textarea', 'form-control');
+    comment.rows = 3;
+    comment.maxLength = 2000;
+    comment.value = button.dataset.hiringComment || '';
+    const commentLabel = el('label', 'company-followup-full', 'Comment');
+    commentLabel.appendChild(comment);
+    const actions = el('div', 'company-followup-full');
+    actions.style.display = 'flex';
+    actions.style.justifyContent = 'flex-end';
+    actions.style.gap = '8px';
+    const cancel = el('button', 'company-followup-link', 'Cancel');
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => dialog.close());
+    const submit = el('button', 'company-followup-submit', 'Update');
+    submit.type = 'submit';
+    actions.append(cancel, submit);
+    form.append(statusLabel, jobLabel, dateLabel, personLabel, commentLabel, actions, message);
+    content.appendChild(form);
+    dialog.showModal();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!statusSelect.value) { message.textContent = 'Select a hiring status.'; return; }
+      submit.disabled = true;
+      message.textContent = '';
+      try {
+        const headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('token');
+        if (token) headers['x-auth'] = token;
+        const response = await fetch('/company/candidate/hiring-stage', {
+          method: 'POST',
+          headers,
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            candidate: button.dataset.candidateId,
+            status: statusSelect.value,
+            job: jobSelect.value,
+            eventDate: date.value,
+            concernedPerson: personSelect.value,
+            comment: comment.value.trim()
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || 'Unable to update hiring status.');
+        window.location.reload();
+      } catch (error) {
+        message.textContent = error.message;
+        submit.disabled = false;
+      }
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.company-hiring-open');
+    if (!button || !button.dataset.candidateId) return;
+    event.preventDefault();
+    openHiring(button);
+  });
+})();
+</script> 

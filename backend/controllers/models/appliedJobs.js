@@ -60,6 +60,18 @@ const appliedJobsSchema = new Schema(
         googleCalendarEventId: { type: String, default: "" },
       },
     ],
+    companyFollowups: [
+      {
+        type: { type: String, enum: ["Call", "Visit"], required: true },
+        followupDate: { type: Date, required: true },
+        remarks: { type: String, trim: true, default: "" },
+        status: { type: String, enum: ["planned", "done", "missed"], default: "planned" },
+        createdBy: { type: ObjectId, ref: "User", required: true },
+        createdAt: { type: Date, default: Date.now },
+        completedAt: { type: Date },
+        completedBy: { type: ObjectId, ref: "User" },
+      },
+    ],
     logs: [
       {
         user: { type: ObjectId, ref: "User" },

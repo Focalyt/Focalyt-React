@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import axios from "axios";
 import {
   Calendar,
+  Check,
+  Clock,
   Lock,
   Mail,
   MapPin,
@@ -17,16 +19,24 @@ import { trackMetaConversion } from "../../utils/conversionTrakingRoutes";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
-function ageFromDob(value) {
-  if (!value) return null;
-  const birth = new Date(value);
-  if (Number.isNaN(birth.getTime())) return null;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const month = today.getMonth() - birth.getMonth();
-  if (month < 0 || (month === 0 && today.getDate() < birth.getDate())) age -= 1;
-  return age;
+// OTP is paused on the public Apply Now form. Set this to true to live Send OTP, Verify, and Resend again.
+const OTP_ENABLED = false;
+
+function PerkMark({ type }) {
+  if (type === "gift") return <Check size={14} strokeWidth={2.6} />;
+  if (type === "clock") return <Clock size={14} strokeWidth={2.2} />;
+  if (type === "dot") return <span className="pam-perk-dot" />;
+  return <span className="pam-perk-diamond" aria-hidden="true" />;
 }
+
+function formatDetailPrice(details, badge) {
+  if (details?.isFree || details?.price === "Free") return "Free";
+  const price = String(details?.price || "").trim();
+  if (!price || price === "—") return badge || "";
+  if (/^[₹]|free/i.test(price)) return price;
+  return `₹ ${price}`;
+}
+
 const PublicApplyContext = createContext(null);
 
 export function isCandidateLoggedIn() {
@@ -152,9 +162,9 @@ function ApplyIllustration() {
   );
 }
 
-function Field({ icon: Icon, children }) {
+function Field({ icon: Icon, invalid, children }) {
   return (
-    <div className="pam-field">
+    <div className={`pam-field${invalid ? " is-invalid" : ""}`}>
       <span className="pam-field__icon">
         <Icon size={16} />
       </span>
@@ -186,8 +196,6 @@ function PublicApplyModal() {
   const [qualification, setQualification] = useState("");
   const [jobRules, setJobRules] = useState(null);
   const [rulesLoading, setRulesLoading] = useState(false);
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [educationConfirmed, setEducationConfirmed] = useState(false);
   const [docFiles, setDocFiles] = useState({});
   const [isNewUser, setIsNewUser] = useState(true);
   const [otpSent, setOtpSent] = useState(false);
@@ -196,7 +204,10 @@ function PublicApplyModal() {
   const [verifying, setVerifying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [dobError, setDobError] = useState("");
+  const [qualificationError, setQualificationError] = useState("");
   const [success, setSuccess] = useState("");
+  const fieldCheckRef = useRef({ dob: 0, qualification: 0 });
   const [applied, setApplied] = useState(false);
   const [mobileTab, setMobileTab] = useState("apply");
 
@@ -217,8 +228,6 @@ function PublicApplyModal() {
     setQualification("");
     setJobRules(null);
     setRulesLoading(false);
-    setAgeConfirmed(false);
-    setEducationConfirmed(false);
     setDocFiles({});
     setIsNewUser(true);
     setOtpSent(false);
@@ -228,6 +237,8 @@ function PublicApplyModal() {
     setSubmitting(false);
     submittingRef.current = false;
     setError("");
+    setDobError("");
+    setQualificationError("");
     setSuccess("");
     setApplied(false);
   }, []);
@@ -243,7 +254,8 @@ function PublicApplyModal() {
     };
   }, [target, resetForm]);
 
-  const showProfileFields = Boolean(target) && otpVerified && isNewUser;
+  const otpPassed = !OTP_ENABLED || otpVerified;
+  const showProfileFields = Boolean(target) && otpPassed && isNewUser;
 
   useEffect(() => {
     if (!target) return undefined;
@@ -438,6 +450,52 @@ function PublicApplyModal() {
     }
   };
 
+  const checkJobField = async (field, value) => {
+    if (!target || target.kind !== "job" || !target.id || !value) return "";
+    const res = await axios.post(`${backendUrl}/api/jobFieldCheck/${target.id}`, {
+      field,
+      dob: field === "dob" ? value : undefined,
+      qualificationId: field === "qualification" ? value : undefined,
+    });
+    const message = typeof res.data?.message === "string" ? res.data.message : "";
+    if (res.data?.status === false && !message) {
+      throw new Error("Could not check this field.");
+    }
+    return message;
+  };
+
+  const handleDobChange = async (value) => {
+    setDob(value);
+    setDobError("");
+    if (!value || target?.kind !== "job") return;
+    const ticket = fieldCheckRef.current.dob + 1;
+    fieldCheckRef.current.dob = ticket;
+    try {
+      const message = await checkJobField("dob", value);
+      if (fieldCheckRef.current.dob === ticket) setDobError(message);
+    } catch (err) {
+      if (fieldCheckRef.current.dob === ticket) {
+        setDobError(err.message || "Could not check age for this job.");
+      }
+    }
+  };
+
+  const handleQualificationChange = async (value) => {
+    setQualification(value);
+    setQualificationError("");
+    if (!value || target?.kind !== "job") return;
+    const ticket = fieldCheckRef.current.qualification + 1;
+    fieldCheckRef.current.qualification = ticket;
+    try {
+      const message = await checkJobField("qualification", value);
+      if (fieldCheckRef.current.qualification === ticket) setQualificationError(message);
+    } catch (err) {
+      if (fieldCheckRef.current.qualification === ticket) {
+        setQualificationError(err.message || "Could not check qualification for this job.");
+      }
+    }
+  };
+
   const uploadMandatoryDocs = async () => {
     const docs = Array.isArray(jobRules?.docs) ? jobRules.docs : [];
     if (!docs.length || target?.kind !== "job") return;
@@ -514,7 +572,12 @@ function PublicApplyModal() {
     setSuccess("");
 
     if (applied) return;
-    if (!otpVerified) {
+    if (!validateMobile()) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    // OTP check is skipped while OTP_ENABLED is false.
+    if (OTP_ENABLED && !otpVerified) {
       setError("Please verify the OTP before submitting.");
       return;
     }
@@ -528,26 +591,25 @@ function PublicApplyModal() {
         return;
       }
       const docs = Array.isArray(jobRules.docs) ? jobRules.docs : [];
-      if (jobRules.ageMin != null && jobRules.ageMax != null) {
-        if (!ageConfirmed) {
-          setError("Please confirm that your age is eligible for this job.");
+      if (isNewUser) {
+        let nextDobError = "";
+        let nextQualificationError = "";
+        if (!dob) nextDobError = "Please select your date of birth.";
+        if (!qualification) nextQualificationError = "Please select your qualification.";
+        try {
+          if (dob) nextDobError = await checkJobField("dob", dob);
+          if (qualification) nextQualificationError = await checkJobField("qualification", qualification);
+        } catch (err) {
+          const message = err.message || "Could not check this job's requirements.";
+          if (/qualification/i.test(message)) setQualificationError(message);
+          else setDobError(message);
           return;
         }
-        if (isNewUser) {
-          const age = ageFromDob(dob);
-          if (age == null || age < Number(jobRules.ageMin) || age > Number(jobRules.ageMax)) {
-            setError(`This job requires age between ${jobRules.ageMin} and ${jobRules.ageMax} years.`);
-            return;
-          }
-        }
-      }
-      if (jobRules.qualificationId) {
-        if (!educationConfirmed) {
-          setError(`Please confirm your qualification is ${jobRules.qualificationName || "the required qualification"}.`);
-          return;
-        }
-        if (isNewUser && String(qualification) !== String(jobRules.qualificationId)) {
-          setError(`This job requires ${jobRules.qualificationName || "the listed qualification"}. Choose that qualification exactly.`);
+        setDobError(nextDobError);
+        setQualificationError(nextQualificationError);
+        if (nextDobError || nextQualificationError) {
+          const fieldId = nextDobError ? "pam-dob-field" : "pam-qualification-field";
+          document.getElementById(fieldId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
           return;
         }
       }
@@ -580,7 +642,7 @@ function PublicApplyModal() {
         return;
       }
       if (!dob) {
-        setError("Please select your date of birth.");
+        setDobError("Please select your date of birth.");
         return;
       }
       if (!gender) {
@@ -588,7 +650,7 @@ function PublicApplyModal() {
         return;
       }
       if (!qualification) {
-        setError("Please select your qualification.");
+        setQualificationError("Please select your qualification.");
         return;
       }
       if (!address.trim() || !latitude || !longitude || !state) {
@@ -653,7 +715,16 @@ function PublicApplyModal() {
       await loginAndContinue({ treatAsExisting: !isNewUser });
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
-      setError(typeof errorMsg === "string" ? errorMsg : "Something went wrong. Please try again.");
+      const message = typeof errorMsg === "string" ? errorMsg : "Something went wrong. Please try again.";
+      if (/age between|date of birth/i.test(message)) {
+        setDobError(message);
+        document.getElementById("pam-dob-field")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else if (/qualification/i.test(message)) {
+        setQualificationError(message);
+        document.getElementById("pam-qualification-field")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      } else {
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -706,7 +777,7 @@ function PublicApplyModal() {
                 e.currentTarget.src = THUMB_FALLBACK;
               }}
             />
-            <p className="pam-detail__kicker">Course details</p>
+            <p className="pam-detail__kicker">{isCourse ? "Course details" : "Job details"}</p>
             <h2 id="pam-title">{target.name}</h2>
             <p className="pam-detail__meta">
               {target.location || "NA"}
@@ -716,13 +787,16 @@ function PublicApplyModal() {
             {Array.isArray(details.perks) && details.perks.length ? (
               <ul className="pam-detail__perks">
                 {details.perks.map((perk) => (
-                  <li key={perk.text}>{perk.text}</li>
+                  <li key={perk.text} className={`pam-perk pam-perk--${perk.type || "dot"}`}>
+                    <PerkMark type={perk.type} />
+                    <span>{perk.text}</span>
+                  </li>
                 ))}
               </ul>
             ) : null}
             {details.description ? <p className="pam-detail__desc">{details.description}</p> : null}
             <div className="pam-detail__price">
-              <strong>{details.isFree || details.price === "Free" ? "Free" : details.price ? `₹ ${details.price}` : target.badge}</strong>
+              <strong>{formatDetailPrice(details, target.badge)}</strong>
               {details.duration ? <span>{details.duration}</span> : null}
               {details.extraFee ? <span>{details.extraFee}</span> : null}
               {details.ratingCount ? <span>{details.ratingCount}</span> : null}
@@ -767,7 +841,11 @@ function PublicApplyModal() {
           <div className="pam-head">
             <div>
               <h2>Register</h2>
-              <p>Fill in your details to enroll in this course.</p>
+              <p>
+                {isCourse
+                  ? "Fill in your details to enroll in this course."
+                  : "Fill in your details to apply for this job."}
+              </p>
             </div>
           </div>
         ) : null}
@@ -775,7 +853,7 @@ function PublicApplyModal() {
         <form className="pam-form" onSubmit={handleSubmit}>
           <label className="pam-line">
             <span>Mobile Number <i>*</i></span>
-            <div className={`pam-mobile${otpSent ? " is-full" : ""}`}>
+            <div className={`pam-mobile${OTP_ENABLED && !otpSent ? "" : " is-full"}`}>
               <Field icon={Phone}>
                 <span className="pam-cc">+91</span>
                 <input
@@ -784,11 +862,12 @@ function PublicApplyModal() {
                   maxLength={10}
                   placeholder="Enter mobile number"
                   value={mobile}
-                  disabled={otpSent}
+                  disabled={OTP_ENABLED && otpSent}
                   onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 />
               </Field>
-              {!otpSent ? (
+              {/* OTP paused. Set OTP_ENABLED to true to show Send OTP again. */}
+              {OTP_ENABLED && !otpSent ? (
                 <button type="button" className="pam-otp-btn" onClick={handleSendOtp} disabled={sendingOtp}>
                   {sendingOtp ? "Sending..." : "Send OTP"}
                 </button>
@@ -796,7 +875,7 @@ function PublicApplyModal() {
             </div>
           </label>
 
-          {otpSent ? (
+          {OTP_ENABLED && otpSent ? (
             <label className="pam-line">
               <span>Enter OTP <i>*</i></span>
               <div className={`pam-mobile${otpVerified ? " is-full" : ""}`}>
@@ -825,13 +904,13 @@ function PublicApplyModal() {
             </label>
           ) : null}
 
-          {otpSent && !otpVerified ? (
+          {OTP_ENABLED && otpSent && !otpVerified ? (
             <button type="button" className="pam-resend-btn" onClick={handleResendOtp} disabled={sendingOtp}>
               {sendingOtp ? "Sending..." : "Resend OTP"}
             </button>
           ) : null}
 
-          {otpVerified && isNewUser ? (
+          {otpPassed && isNewUser ? (
           <>
           <label className="pam-line">
             <span>Full Name <i>*</i></span>
@@ -858,11 +937,14 @@ function PublicApplyModal() {
             </Field>
           </label>
 
-          <label className="pam-line">
+          <label className="pam-line" id="pam-dob-field">
             <span>Date of Birth <i>*</i></span>
-            <Field icon={Calendar}>
-              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-            </Field>
+            <div className="pam-control">
+              <Field icon={Calendar} invalid={Boolean(dobError)}>
+                <input type="date" value={dob} onChange={(e) => handleDobChange(e.target.value)} />
+              </Field>
+              {dobError ? <p className="pam-field-error" role="alert">{dobError}</p> : null}
+            </div>
           </label>
 
           <label className="pam-line">
@@ -877,15 +959,18 @@ function PublicApplyModal() {
             </div>
           </label>
 
-          <label className="pam-line">
+          <label className="pam-line" id="pam-qualification-field">
             <span>Qualification <i>*</i></span>
-            <div className="pam-select-wrap">
-              <select value={qualification} onChange={(e) => setQualification(e.target.value)}>
-                <option value="">Select qualification</option>
-                {qualifications.map((item) => (
-                  <option key={item._id} value={item._id}>{item.name}</option>
-                ))}
-              </select>
+            <div className="pam-control">
+              <div className={`pam-select-wrap${qualificationError ? " is-invalid" : ""}`}>
+                <select value={qualification} onChange={(e) => handleQualificationChange(e.target.value)}>
+                  <option value="">Select qualification</option>
+                  {qualifications.map((item) => (
+                    <option key={item._id} value={item._id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+              {qualificationError ? <p className="pam-field-error" role="alert">{qualificationError}</p> : null}
             </div>
           </label>
 
@@ -906,29 +991,9 @@ function PublicApplyModal() {
           </>
           ) : null}
 
-          {otpVerified && target.kind === "job" ? (
+          {otpPassed && target.kind === "job" ? (
             <div className="pam-job-rules">
               {rulesLoading ? <p className="pam-rules-note">Checking this job's requirements...</p> : null}
-              {jobRules?.ageMin != null && jobRules?.ageMax != null ? (
-                <label className="pam-check">
-                  <input
-                    type="checkbox"
-                    checked={ageConfirmed}
-                    onChange={(e) => setAgeConfirmed(e.target.checked)}
-                  />
-                  <span>I confirm that my age is eligible for this job.</span>
-                </label>
-              ) : null}
-              {jobRules?.qualificationId ? (
-                <label className="pam-check">
-                  <input
-                    type="checkbox"
-                    checked={educationConfirmed}
-                    onChange={(e) => setEducationConfirmed(e.target.checked)}
-                  />
-                  <span>My qualification is {jobRules.qualificationName || "the required qualification"}.</span>
-                </label>
-              ) : null}
               {Array.isArray(jobRules?.docs) && jobRules.docs.length ? (
                 <div className="pam-docs">
                   <p>Upload the documents required for this job.</p>
@@ -951,7 +1016,7 @@ function PublicApplyModal() {
             </div>
           ) : null}
 
-          {otpVerified && isNewUser ? (
+          {otpPassed && isNewUser ? (
           <>
           <label className="pam-check">
             <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
@@ -965,7 +1030,7 @@ function PublicApplyModal() {
           </>
           ) : null}
 
-          {otpVerified && !isNewUser ? (
+          {otpPassed && !isNewUser ? (
             <button type="submit" className="pam-submit" disabled={submitting || applied}>
               {applied ? "Application submitted" : submitting ? "Submitting..." : "Submit Application"}
               <span aria-hidden="true">→</span>
@@ -1002,8 +1067,15 @@ function PublicApplyModal() {
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
   padding: 22px 22px 18px;
   position: relative;
-  font-family: inherit;
-  color: #0f172a;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: var(--foc-text-base, 1rem);
+  color: var(--foc-color-text, #0f172a);
+}
+.pam-card button,
+.pam-card input,
+.pam-card select,
+.pam-card textarea {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
 }
 .pam-card.is-split {
   width: min(980px, 100%);
@@ -1038,62 +1110,93 @@ function PublicApplyModal() {
 }
 .pam-detail__kicker {
   margin: 14px 0 4px;
-  font-size: 12px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #2563eb;
+  color: var(--foc-cyan, #1ba7ff);
 }
 .pam-detail h2 {
   margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: var(--foc-leading-tight, 1.12);
+  color: var(--foc-color-text, #061426);
 }
 .pam-detail__meta {
   margin: 6px 0 0;
-  color: #64748b;
+  color: var(--foc-color-text-muted, #3e5876);
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 .pam-detail__tag {
   display: inline-block;
   margin-top: 10px;
-  font-size: 12px;
-  color: #1d4ed8;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6570;
   background: #fff;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  padding: 3px 10px;
+  border: 1px solid #d7dbe2;
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 .pam-detail__perks {
   list-style: none;
   margin: 14px 0 0;
   padding: 0;
   display: grid;
+  gap: 7px;
+}
+.pam-detail__perks li,
+.pam-perk {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-}
-.pam-detail__perks li {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 13px;
-  color: #334155;
-  padding-left: 14px;
-  position: relative;
+  font-weight: 500;
+  line-height: 1.4;
+  padding-left: 0;
 }
-.pam-detail__perks li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
+.pam-detail__perks li::before { content: none; }
+.pam-perk svg,
+.pam-perk-dot,
+.pam-perk-diamond {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.pam-perk--gift { color: #1b8a3e; }
+.pam-perk--clock { color: #0a8a86; }
+.pam-perk--dot { color: var(--foc-color-text, #061426); }
+.pam-perk--heritage { color: #b0892e; }
+.pam-perk-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #4b5563;
+  margin-top: 6px;
+}
+.pam-perk-diamond {
+  width: 8px;
+  height: 8px;
+  background: #1a73e8;
+  transform: rotate(45deg);
+  margin-top: 5px;
+  border-radius: 1px;
 }
 .pam-detail__desc {
   margin: 14px 0 0;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 13px;
+  font-weight: 400;
   line-height: 1.5;
-  color: #475569;
+  color: var(--foc-color-text-muted, #3e5876);
 }
 .pam-detail__price {
   margin-top: 16px;
@@ -1101,11 +1204,17 @@ function PublicApplyModal() {
   gap: 2px;
 }
 .pam-detail__price strong {
-  font-size: 22px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--foc-color-text, #061426);
 }
 .pam-detail__price span {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 12px;
-  color: #64748b;
+  font-weight: 500;
+  color: var(--foc-color-text-muted, #3e5876);
 }
 .pam-register {
   padding: 22px 22px 18px;
@@ -1139,16 +1248,21 @@ function PublicApplyModal() {
 }
 .pam-head h2 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: var(--foc-leading-tight, 1.12);
+  color: var(--foc-color-text, #061426);
 }
 .pam-head p {
   margin: 6px 0 0;
-  color: #64748b;
-  font-size: 14px;
-  line-height: 1.4;
-  max-width: 230px;
+  color: var(--foc-color-text-muted, #3e5876);
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.6;
+  max-width: 280px;
 }
 .pam-register .pam-head p {
   max-width: none;
@@ -1165,9 +1279,38 @@ function PublicApplyModal() {
 }
 .pam-line .pam-field,
 .pam-line .pam-mobile,
-.pam-line .pam-select-wrap {
+.pam-line .pam-select-wrap,
+.pam-line .pam-control {
   flex: 1;
   min-width: 0;
+}
+.pam-line:has(.pam-control) {
+  align-items: flex-start;
+}
+.pam-line:has(.pam-control) > span {
+  padding-top: 12px;
+}
+.pam-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pam-field-error {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+.pam-field.is-invalid,
+.pam-select-wrap.is-invalid select {
+  border-color: #f87171;
+  background-color: #fff7f7;
 }
 .pam-item {
   margin-top: 14px;
@@ -1215,9 +1358,14 @@ function PublicApplyModal() {
 .pam-form label {
   display: grid;
   gap: 6px;
-  font-size: 13px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--foc-color-text-muted, #3e5876);
+}
+.pam-line > span {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .pam-form label i {
   color: #ef4444;
@@ -1238,8 +1386,11 @@ function PublicApplyModal() {
   outline: none;
   width: 100%;
   background: transparent;
-  font-size: 14px;
-  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--foc-color-text, #061426);
   min-height: 42px;
 }
 .pam-field__icon { color: #94a3b8; display: grid; place-items: center; }
@@ -1323,8 +1474,11 @@ function PublicApplyModal() {
   border-radius: 14px;
   min-height: 48px;
   color: #fff;
-  font-size: 16px;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1382,7 +1536,7 @@ function PublicApplyModal() {
 @media (max-width: 520px) {
   .pam-card { padding: 18px 14px 14px; border-radius: 18px; }
   .pam-card.is-split { padding: 0; }
-  .pam-head h2 { font-size: 24px; }
+  .pam-head h2 { font-size: 1.05rem; }
   .pam-mobile { grid-template-columns: minmax(0, 1fr) auto; }
   .pam-otp-btn, .pam-verify-btn { min-width: 0; padding: 0 12px; }
   .pam-register { padding: 18px 14px 14px; }

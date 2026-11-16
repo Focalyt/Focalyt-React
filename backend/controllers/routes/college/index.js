@@ -326,7 +326,7 @@ function isB2cQuickSearch(name) {
 	return Boolean(name && String(name).trim());
 }
 
-/** Dept/project/course/center/batch/name selection widens Admin from own leads to all leads. */
+/** Dept/project/course/center/batch/name selection widens any user from own leads to matching leads. */
 function hasB2cUserSelectedWideningFilter({
 	projectsArray,
 	verticalsArray,
@@ -389,11 +389,11 @@ async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options
 	}
 
 	const isAdmin = user?.permissions?.permission_type === 'Admin';
-	// Admin default: own/associated leads. All leads only if they picked a widening filter.
+	// Default is own/associated leads. A dept, project, course, center, or batch filter shows every matching lead.
+	if (options.userSelectedWideningFilter) {
+		return [];
+	}
 	if (isAdmin) {
-		if (options.userSelectedWideningFilter) {
-			return [];
-		}
 		return user?._id ? [user._id] : [];
 	}
 
@@ -2616,7 +2616,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
 			hasFollowUpCall, hasFollowUpVisit, leadSource, includeKyc,
-			aiCalled, aiCallFromDate, aiCallToDate, statusDiff,
+			aiCalled, aiCallFromDate, aiCallToDate, statusDiff, statusNear,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2649,7 +2649,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		}));
 
 		// Person Owner/Counsellor filters use dedicated ownership match.
-		// Admin with no filter: own/co-owned only. Widening filters (or quick search): all leads.
+		// No filter: own/co-owned only. Dept, project, course, center, batch, or quick search: every matching lead.
 		let teamMembers = hasPersonFilter
 			? []
 			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
@@ -2738,6 +2738,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			aiCallFromDate,
 			aiCallToDate,
 			statusDiff,
+			statusNear,
 		};
 
 		const countPipeline = buildSimplifiedPipeline({
@@ -2779,7 +2780,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		const facetCount = (key) => Number(countResult?.[key]?.[0]?.n || 0);
 		const totalCount = compareMode ? facetCount('total') : countResult;
 		const compare = compareMode
-			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same') }
+			? { aiCalled: facetCount('aiCalled'), changed: facetCount('changed'), same: facetCount('same'), nearly: facetCount('nearly') }
 			: null;
 
 
@@ -2956,6 +2957,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					_id: doc._aiLeadStatus?._id || null,
 					title: doc._aiLeadStatus?.title || 'Untouch',
 				},
+				statusMatched: statusesMatch(doc._leadStatus, doc._aiLeadStatus),
+				nearlyMatched: statusesNearlyMatch(doc._leadStatus, doc._aiLeadStatus),
 				_leadSubStatus: selectedSubstatus ? selectedSubstatus._id : doc._leadSubStatus || null,
 				selectedSubstatus: {
 					_id: selectedSubstatus ? selectedSubstatus._id : null,
@@ -3966,12 +3969,32 @@ async function resolveB2cCandidateSearchIds(name) {
 	return rows.map((row) => row._id);
 }
 
+function comparableStatusTitle(status) {
+	const title = String(status?.title || '').trim().toLowerCase();
+	if (!title || title === 'no status') return 'untouch';
+	return title;
+}
+
+const NEARLY_MATCH_STATUSES = new Set(['hot', 'warm', 'won']);
+
+function statusesMatch(humanStatus, aiStatus) {
+	return comparableStatusTitle(humanStatus) === comparableStatusTitle(aiStatus);
+}
+
+function statusesNearlyMatch(humanStatus, aiStatus) {
+	const human = comparableStatusTitle(humanStatus);
+	const ai = comparableStatusTitle(aiStatus);
+	return human !== ai && NEARLY_MATCH_STATUSES.has(human) && NEARLY_MATCH_STATUSES.has(ai);
+}
+
 function aiCompareRequested(filters = {}) {
 	return String(filters.aiCalled) === 'true'
 		|| Boolean(filters.aiCallFromDate)
 		|| Boolean(filters.aiCallToDate)
 		|| filters.statusDiff === 'true'
-		|| filters.statusDiff === 'false';
+		|| filters.statusDiff === 'false'
+		|| filters.statusNear === 'true'
+		|| filters.statusNear === 'false';
 }
 
 function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
@@ -4027,24 +4050,47 @@ function appendAiCompare(pipeline, filters = {}, { forCount = false } = {}) {
 
 	const sameMatch = { $expr: { $eq: ['$_cmpAi', '$_cmpHuman'] } };
 	const changedMatch = { $expr: { $ne: ['$_cmpAi', '$_cmpHuman'] } };
-	const narrowed = filters.statusDiff === 'true'
-		? changedMatch
-		: filters.statusDiff === 'false'
-			? sameMatch
-			: null;
-	if (narrowed) pipeline.push({ $match: narrowed });
+	const nearlyMatch = {
+		$expr: {
+			$and: [
+				{ $ne: ['$_cmpAi', '$_cmpHuman'] },
+				{ $in: ['$_cmpAi', ['hot', 'warm', 'won']] },
+				{ $in: ['$_cmpHuman', ['hot', 'warm', 'won']] },
+			],
+		},
+	};
+	const notNearlyMatch = {
+		$expr: {
+			$or: [
+				{ $eq: ['$_cmpAi', '$_cmpHuman'] },
+				{ $not: { $in: ['$_cmpAi', ['hot', 'warm', 'won']] } },
+				{ $not: { $in: ['$_cmpHuman', ['hot', 'warm', 'won']] } },
+			],
+		},
+	};
+	const compareClauses = [];
+	if (filters.statusDiff === 'false') compareClauses.push(sameMatch);
+	else if (filters.statusDiff === 'true') compareClauses.push(changedMatch);
+	if (filters.statusNear === 'true') compareClauses.push(nearlyMatch);
+	else if (filters.statusNear === 'false') compareClauses.push(notNearlyMatch);
+	const narrowed = compareClauses.length > 1
+		? { $and: compareClauses }
+		: (compareClauses[0] || null);
 
 	if (forCount) {
 		pipeline.push({
 			$facet: {
-				total: [{ $count: 'n' }],
+				total: narrowed ? [{ $match: narrowed }, { $count: 'n' }] : [{ $count: 'n' }],
 				aiCalled: [{ $match: { 'aiVoice.lastEvent': 'CALL_COMPLETED' } }, { $count: 'n' }],
 				same: [{ $match: sameMatch }, { $count: 'n' }],
 				changed: [{ $match: changedMatch }, { $count: 'n' }],
+				nearly: [{ $match: nearlyMatch }, { $count: 'n' }],
 			},
 		});
 		return true;
 	}
+
+	if (narrowed) pipeline.push({ $match: narrowed });
 
 	pipeline.push({ $project: { _cmpHumanDoc: 0, _cmpAiDoc: 0, _cmpHuman: 0, _cmpAi: 0 } });
 	return false;
@@ -8179,7 +8225,7 @@ router.get('/list_all_projects', [isCollege], async (req, res) => {
 // POST /api/centers/add
 router.post('/add_canter', [isCollege], async (req, res) => {
 	try {
-		let { name, location, status, project } = req.body;
+		let { name, location, status, project, hostelName } = req.body;
 		const user = req.user; // agar aap authentication middleware laga rahe hain
 		const collegeId = req.user.college._id;
 
@@ -8212,6 +8258,7 @@ router.post('/add_canter', [isCollege], async (req, res) => {
 		const newCenter = new Center({
 			name,
 			address: location,
+			hostelName: typeof hostelName === 'string' ? hostelName.trim() : '',
 			status: status,
 			project: projectArray,
 			createdBy: user ? user._id : null,

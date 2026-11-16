@@ -4,10 +4,14 @@ import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
 import FrontLayout from '../../../Component/Layouts/Front';
 import { buildCourseApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
+import publicDetailTheme from '../publicDetailTheme';
+import SimilarStrip from '../SimilarStrip';
+import { CourseCard } from '../Courses/Course';
 
 function CourseDetails() {
     const { courseId } = useParams();
     const [course, setCourse] = useState(null);
+    const [similarCourses, setSimilarCourses] = useState([]);
     const [termsArray, setTermsArray] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -22,6 +26,7 @@ function CourseDetails() {
                 setLoading(true);
                 const response = await axios.get(`${backendUrl}/coursedetails/${courseId}`);
                 setCourse(response.data.course);
+                setSimilarCourses(Array.isArray(response.data.similarCourses) ? response.data.similarCourses : []);
             } catch (err) {
                 setError("Failed to load course details");
                 console.error(err);
@@ -65,9 +70,9 @@ function CourseDetails() {
 
 
 
-    if (loading) return <FrontLayout><div className="text-center py-5">Loading course details...</div></FrontLayout>;
-    if (error) return <FrontLayout><div className="text-center py-5 text-danger">Error: {error}</div></FrontLayout>;
-    if (!course) return <FrontLayout><div className="text-center py-5">Course not found</div></FrontLayout>;
+    if (loading) return <FrontLayout><div className="foc-public-detail text-center py-5">Loading course details...</div></FrontLayout>;
+    if (error) return <FrontLayout><div className="foc-public-detail text-center py-5 text-danger">Error: {error}</div></FrontLayout>;
+    if (!course) return <FrontLayout><div className="foc-public-detail text-center py-5">Course not found</div></FrontLayout>;
 
     // Share card meta: thumbnail (OG image), title, description
     const courseTitle = course.name || 'Course';
@@ -109,6 +114,7 @@ function CourseDetails() {
                 <meta name="twitter:image" content={shareImage} />
             </Helmet>
 <FrontLayout>
+            <div className="foc-public-detail">
             <section className="section-padding-120 mt-5">
                 <div className="container">
                     <div className="row">
@@ -737,6 +743,38 @@ function CourseDetails() {
                 </div>
             </section>
 
+            {similarCourses.length > 0 && (
+                <SimilarStrip title="Similar" accent="Courses">
+                    {similarCourses.map((item) => (
+                        <CourseCard
+                            key={item._id}
+                            course={item}
+                            bucketUrl={bucketUrl}
+                            onPlayVideo={(url) => {
+                                const source = document.getElementById("vodeoElement");
+                                const video = document.getElementById("courseVid");
+                                if (source) source.src = url || "";
+                                if (video) video.load();
+                            }}
+                            onShare={async (sharedCourse) => {
+                                const url = `${window.location.origin}/coursedetails/${sharedCourse._id}`;
+                                const text = sharedCourse.name || "Course";
+                                if (navigator.share) {
+                                    try {
+                                        await navigator.share({ title: text, url });
+                                        return;
+                                    } catch (error) {
+                                        console.error(error);
+                                    }
+                                }
+                                navigator.clipboard?.writeText(url);
+                            }}
+                            onRequestCallback={() => {}}
+                        />
+                    ))}
+                </SimilarStrip>
+            )}
+
             {/* <!-- Modal --> */}
             <div className="modal fade" id="videoModal" tabindex="-1" role="dialog" aria-labelledby="videoModalTitle"
                 aria-hidden="true">
@@ -925,6 +963,8 @@ a.pointer.img-fluid {
 
                 }
             </style>
+            <style>{publicDetailTheme}</style>
+            </div>
 
 </FrontLayout>
         </>

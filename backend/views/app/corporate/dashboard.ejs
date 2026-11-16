@@ -1,307 +1,320 @@
 <% include ./partials/header %>
-<body class="vertical-layout vertical-menu-modern 2-columns  navbar-floating footer-static  " data-open="click"
-  data-menu="vertical-menu-modern" data-col="2-columns">
-  <!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-W39K27R"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
-  <% include ./partials/navbar%>
-  <% include ./partials/leftpane%>
-
+<body class="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
+  <% include ./partials/navbar %>
+  <% include ./partials/leftpane %>
   <div class="app-content content">
-    <div class="content-overlay"></div>
-    <div class="header-navbar-shadow"></div>
     <div class="content-wrapper">
-      <div class="content-header row">
-      </div>
-      <div class="content-body">
-        <section id="company_dashboard">
-          <div class="row">
-            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-2 mb-2 mx-auto">
-              <div class="col-xl-12 Company_card text-center py-1 one">
-                <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/user_avatar.png" class="img-fluid">
-                <h5 class="text-white pt-2 mb-0" id="company-name">Welcome <%= company?.name %></h5>
+      <main class="content-body">
+        <!-- <div class="recruiter-head">
+          <div><div class="recruiter-eyebrow">FOCALYT RECRUITER WORKSPACE</div><h1>Find the right talent. Build your team.</h1><p>Welcome back, <%= company?.name || 'hiring team' %>. Your hiring workspace is ready.</p></div>
+          <span class="recruiter-badge recruiter-badge-gray">Company account</span>
+        </div> -->
+        <!-- <section class="recruiter-searchhero" aria-labelledby="talent-search-heading">
+          <h2 id="talent-search-heading">Who are you looking to hire?</h2>
+          <span class="recruiter-muted">Search your talent pool by qualification, experience and preferred location.</span>
+          <form class="recruiter-searchbar" method="GET" action="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates">
+            <select name="highestqualification" aria-label="Candidate qualification"><option value="">All qualifications</option><% qualifications.forEach(function(q) { %><option value="<%= q._id %>"><%= q.name %></option><% }); %></select>
+            <select name="experience" aria-label="Minimum experience"><option value="">All experience</option><option value="0">Fresher</option><option value="1">1+ years</option><option value="3">3+ years</option><option value="5">5+ years</option></select>
+            <button class="btn btn-primary" type="submit">Search candidates</button>
+          </form>
+          <div class="recruiter-quicksearch"><span class="recruiter-muted">Quick searches:</span><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates?experience=0">Freshers</a><span class="recruiter-muted">&middot;</span><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates?experience=3">Experienced talent</a><span class="recruiter-muted">&middot;</span><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/nearbyCandidates">Candidates near me</a></div>
+        </section> -->
+        <!-- <section class="recruiter-stats" aria-label="Hiring overview">
+          <% [
+            ['Active jobs', vacancyCount || 0, 'Manage job postings', '/list/jobs'],
+            ['Job responses', applicationCount || 0, 'Review applications', '/interested-candidates'],
+            ['Shortlisted', shortlistedCandidates || 0, 'Move hiring forward', '/candidate/shortlisted'],
+            ['Available credits', company?.creditLeft || 0, 'View your profile', '/myProfile']
+          ].forEach(function(stat) { %>
+            <div class="card recruiter-stat"><span class="recruiter-muted"><%= stat[0] %></span><strong><%= stat[1] %></strong><a href="<%= process.env.MIPIE_BACKEND_URL %>/company<%= stat[3] %>"><%= stat[2] %> &rarr;</a></div>
+          <% }); %>
+        </section> -->
+        <% if (false) { %>
+        <div class="recruiter-two">
+          <section class="card recruiter-panel">
+            <div class="recruiter-bar"><h2>Active jobs &amp; responses</h2><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs">View all jobs &rarr;</a></div>
+            <% if (jobs.length) { jobs.slice(0, 5).forEach(function(job) { %>
+              <div class="recruiter-jobrow"><div><h3><%= job.title || 'Job requirement' %></h3><p>Review this requirement and its hiring details.</p><span class="recruiter-badge">Active</span></div><a class="btn btn-outline-primary btn-sm" href="<%= process.env.MIPIE_BACKEND_URL %>/company/jobs/<%= job._id %>">View job &rarr;</a></div>
+            <% }); } else { %>
+              <div class="recruiter-empty"><i class="feather icon-file-text" aria-hidden="true"></i><h3>Your next hire starts here</h3><p>Post a requirement to start receiving applications.</p><a class="btn btn-primary" href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs">+ Post a job</a></div>
+            <% } %>
+          </section>
+          <div>
+            <section class="card recruiter-panel">
+              <div class="recruiter-bar"><h2>Ongoing hiring</h2><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/onGoingHiring">View all &rarr;</a></div>
+              <% if (ongoingCandidates.length) { ongoingCandidates.forEach(function(item) { if (!item.candidate) return; %>
+                <div class="recruiter-hiring-row"><span class="recruiter-avatar"><%= (item.candidate.name || 'C').trim().slice(0, 1).toUpperCase() %></span><div><h3><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%= item.candidate._id %>"><%= item.candidate.name || 'Candidate' %></a></h3><span class="recruiter-badge recruiter-badge-gray"><%= item.status || 'In progress' %></span></div></div>
+              <% }); } else { %><div class="recruiter-empty"><i class="feather icon-users" aria-hidden="true"></i>No candidates in ongoing hiring yet.</div><% } %>
+            </section>
+          </div>
+        </div>
+        <% } %>
+        <!-- <section class="card recruiter-panel"><h3 style="font-size:15px">Your recruitment plan</h3><p class="recruiter-muted"><strong style="font-size:25px;color:var(--recruiter-ink)"><%= company?.creditLeft || 0 %></strong> credits available</p><p class="recruiter-muted" style="font-size:12px">Keep your company profile up to date to help candidates get to know your team.</p><a class="btn btn-outline-primary btn-sm" href="<%= process.env.MIPIE_BACKEND_URL %>/company/myProfile">View company profile &rarr;</a></section> -->
+        <section class="corp-app-filter" aria-labelledby="recent-applications-heading">
+          <form class="corp-app-filter__bar" id="corpAppFilters" method="GET" action="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">
+            <input type="hidden" name="date" id="corpDate" value="<%= filters.date %>">
+            <input type="hidden" name="status" id="corpStatus" value="<%= filters.status %>">
+            <div class="corp-app-filter__lead">
+              <div class="corp-app-filter__title-row">
+                <h2 id="recent-applications-heading">Recent applications</h2>
+                <a class="corp-app-filter__viewall" href="<%= process.env.MIPIE_BACKEND_URL %>/company/interested-candidates">View all</a>
               </div>
-            </div>
-            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-2 mb-2 mx-auto">
-              <div class="col-xl-12 Company_card py-2 two">
-                <div class="row">
-                  <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/white_suitcase.png" class="img-fluid">
-                  </div>
-                  <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
-                    <h2 class="text-white"><%= vacancyCount %></h2>
-                    <p class="text-white">Total Job Post</p>
-                    <a class="btn btn-outline-cs" href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs">View<i class="fa fa-chevron-right text-white fa-view"></i></a>
+              <div class="corp-app-filter__pills">
+                <% [
+                  ['today', 'Today'],
+                  ['yesterday', 'Yesterday'],
+                  ['prev3days', 'Previous 3 days'],
+                  ['thisMonth', 'This Month']
+                ].forEach(function(item) { %>
+                  <button type="button" class="corp-app-filter__pill<%= filters.date === item[0] ? ' is-active' : '' %>" data-date="<%= item[0] %>"><%= item[1] %></button>
+                <% }); %>
+                <div class="corp-app-filter__range">
+                  <button type="button" class="corp-app-filter__pill<%= filters.date === 'custom' ? ' is-active' : '' %>" id="corpRangeToggle" aria-expanded="false" aria-controls="corpRangeDropdown">
+                    <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+                    Date Range
+                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                  </button>
+                  <div class="corp-app-filter__dropdown" id="corpRangeDropdown" hidden>
+                    <div class="corp-app-filter__dropdown-title">Date Range</div>
+                    <div class="corp-app-filter__dates">
+                      <label>From<input type="date" name="from" value="<%= filters.from %>" max="<%= filters.to || '' %>"></label>
+                      <label>To<input type="date" name="to" value="<%= filters.to %>" min="<%= filters.from || '' %>"></label>
+                    </div>
+                    <button type="submit" class="corp-app-filter__apply" onclick="document.getElementById('corpDate').value='custom'">Apply</button>
                   </div>
                 </div>
+                <% if (filters.date || filters.qualification || filters.experience || filters.job || filters.status) { %>
+                  <a class="corp-app-filter__pill corp-app-filter__pill--clear" href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Clear</a>
+                <% } %>
               </div>
             </div>
-            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-2 mb-2 mx-auto">
-              <div class="col-xl-12 Company_card py-2 three">
-                <div class="row">
-                  <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/shortlist.png" class="img-fluid">
-                  </div>
-                  <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
-                    <h2 class="text-white"><%= shortlistedCandidates %></h2>
-                    <p class="text-white">Shortlisted</p>
-                    <a class="btn btn-outline-cs" href="candidate/shortlisted">View<i class="fa fa-chevron-right text-white fa-view"></i></a>
-                  </div>
-                </div>
+            <div class="corp-app-filter__dropdowns">
+              <div class="corp-app-filter__item">
+                <label class="corp-app-filter__label" for="corpQualification"><i class="fas fa-graduation-cap" aria-hidden="true"></i> Qualification</label>
+                <select id="corpQualification" name="qualification" aria-label="Qualification">
+                  <option value="">All</option>
+                  <% qualifications.forEach(function(item) { %>
+                    <option value="<%= item._id %>"<%= String(filters.qualification) === String(item._id) ? ' selected' : '' %>><%= item.name %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="corp-app-filter__item">
+                <label class="corp-app-filter__label" for="corpExperience"><i class="fas fa-briefcase" aria-hidden="true"></i> Experience</label>
+                <select id="corpExperience" name="experience" aria-label="Experience">
+                  <option value="">All</option>
+                  <% [['0', 'Fresher'], ['1', '1+ years'], ['3', '3+ years'], ['5', '5+ years']].forEach(function(item) { %>
+                    <option value="<%= item[0] %>"<%= filters.experience === item[0] ? ' selected' : '' %>><%= item[1] %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="corp-app-filter__item corp-app-filter__item--job">
+                <label class="corp-app-filter__label" for="corpActiveJob"><i class="fas fa-file-alt" aria-hidden="true"></i> Active Jobs</label>
+                <select id="corpActiveJob" name="job" aria-label="Active jobs">
+                  <option value="">All</option>
+                  <% jobs.forEach(function(job) { %>
+                    <option value="<%= job._id %>"<%= String(filters.job) === String(job._id) ? ' selected' : '' %>><%= job.title || 'Job requirement' %></option>
+                  <% }); %>
+                </select>
               </div>
             </div>
-            <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-2 mb-2 mx-auto">
-              <div class="col-xl-12 Company_card py-2 four">
-                <div class="row">
-                  <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/credits.png" class="img-fluid">
-                  </div>
-                  <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
-                    <h2 class="text-white"><%= company?.creditLeft %></h2>
-                    <p class="text-white">Available Credits</p>
-                    <a class="btn btn-outline-cs" href="#">View<i class="fa fa-chevron-right text-white fa-view"></i></a>
-                  </div>
-                </div>
-              </div>
+          </form>
+          <div class="corp-app-filter__spacer" id="corpAppFilterSpacer" aria-hidden="true"></div>
+          <section class="corp-perf" aria-label="Performance">
+            <span class="corp-perf__label">Performance</span>
+            <div class="corp-perf__chips">
+              <button type="button" class="corp-perf__chip<%= filters.status ? '' : ' is-active' %>" data-status="">All (<%= performanceTotal || 0 %>)</button>
+              <% (performanceChips || []).forEach(function(chip) { %>
+                <button type="button" class="corp-perf__chip<%= filters.status === chip._id ? ' is-active' : '' %>" data-status="<%= chip._id %>"><%= String(chip.title || 'Status').toUpperCase() %> (<%= chip.count || 0 %>)</button>
+              <% }); %>
+              <% if (!(performanceChips || []).length) { %>
+                <span class="corp-perf__empty">No statuses yet. Add them from Status.</span>
+              <% } %>
             </div>
-            <div class="col-xl-3 col-lg-3 col-md-12 col-sm-12 col-12 mb-xl-2 mb-lg-2 mb-md-2 mb-sm-2 mb-2 mx-auto d-none">
-              <div class="col-xl-12 Company_card py-2 five">
-                <div class="row">
-                  <div class="col-xl-4 col-lg-4 col-md-4 col-sm-6 col-6 text-center px-0">
-                    <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/icons/bag.png" class="img-fluid">
-                  </div>
-                  <div class="col-xl-8 col-lg-8 col-md-8 col-sm-6 col-6">
-                    <h2 class="text-primary">02</h2>
-                    <p class="text-primary">Total Job Post</p>
-                    <a class="btn btn-outline-cs">View<i class="fa fa-chevron-right text-white fa-view"></i></a>
-                  </div>
-                </div>
-              </div>
-            </div>
+          </section>
+          <script type="application/json" id="corp-hiring-options"><%- JSON.stringify({
+            jobs: (jobs || []).map(function (job) { return { id: String(job._id), title: job.title || 'Job' }; }),
+            people: (company.companyExecutives || []).map(function (person) { return { id: String(person._id), name: person.name || 'Executive' }; })
+          }).replace(/</g, '\\u003c') %></script>
+          <div class="company-student-list">
+            <% if (appliedCandidates.length) { appliedCandidates.forEach(function(application) { %>
+              <%- include('./partials/student-card', {studentCard: {
+                student: application._candidate || {},
+                contactVisible: application.masked !== true,
+                masked: application.masked === true,
+                recordId: application._id,
+                applicationId: application._id,
+                source: 'profile',
+                companyFollowups: [],
+                qualification: application._candidate?.highestQualification?.name,
+                stage: application.hiringStatus?.status || 'Interested',
+                hiringEditable: true,
+                hiringStatusValue: String(application.hiringStatus?.status || '').toLowerCase(),
+                hiringJob: application.hiringStatus?.job || application._job?._id || '',
+                hiringDate: application.hiringDate || '',
+                hiringPerson: application.hiringStatus?.concernedPerson || '',
+                hiringComment: application.hiringStatus?.comment || '',
+                performance: application.performance,
+                companyName: application._job?.title || 'Job unavailable',
+                resumeUrl: ''
+              }}) %>
+            <% }); } else { %>
+              <div class="recruiter-empty">No applications match these filters.</div>
+            <% } %>
           </div>
         </section>
-        <section id="dashboard-analytics" class="d-none">
-          <div class="row">
-            <div class="col-lg-6 col-md-12 col-sm-12">
-              <div class="card bg-analytics text-white">
-                <div class="card-content">
-                  <div class="card-body text-center">
-                    <img src="https://mentorryimgs.s3.ap-south-1.amazonaws.com/app-assets/images/elements/decore-left.png" class="img-left" alt="
-            card-img-left">
-                    <img src="https://mentorryimgs.s3.ap-south-1.amazonaws.com/app-assets/images/elements/decore-right.png" class="img-right" alt="
-            card-img-right">
-                    <div class="avatar avatar-xl bg-primary shadow mt-0">
-                      <div class="avatar-content">
-                        <i class="feather icon-award white font-large-1"></i>
-                      </div>
-                    </div>
-                    <div class="text-center">
-                      <h1 class="mb-2 text-white" id="company-name">Welcome <%= company?.name %></h1>                     
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- <div class="col-lg-3 col-md-6 col-12">
-              <div class="card">
-                 <div class="card-header d-flex flex-column align-items-start pb-0">
-                  <div class="avatar bg-rgba-primary p-50 m-0">
-                    <div class="avatar-content">
-                      <i class="feather icon-users text-primary font-medium-5"></i>
-                    </div>
-                  </div>
-                 <h2 class="text-bold-700 mt-1 mb-25"><a href="/portal/design/dashboard/candidate/your-profile.html" class="btn btn-primary shadow waves-effect waves-light">Complete Your Profile<i class="feather icon-chevrons-right"></i></a></h2>
-                 <br> <p class="mb-0">Profile Status <b id="profile-status"></b></p>
-                <br>  
-                 </div> -->
-                <!-- <div class="card-content" style="position: relative;">   
-                <div class="resize-triggers"><div class="expand-trigger"><div style="width: 380px; height: 1px;"></div></div><div class="contract-trigger"></div></div></div>
-              </div>
-            </div> --> 
-            <div class="col-lg-3 col-md-6 col-12">
-              <div class="card">
-                <div class="card-header d-flex flex-column align-items-start pb-0">
-                  <p class="mb-1">Total Job Post</p>
-                  <div class="container">
-                    <div class="row">
-                      <div class="col">
-                        <h2 class="text-bold-700 ">
-                          <%= vacancyCount %>
-                        </h2>
-                      </div>
-                      <div class="col">
-                        <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs" class="btn btn-primary btn-sm text-right">View</a>
-                      </div>
-                    </div>
-                  </div>
-                  
-                </div>
-                <div class="card-content">
-                  <!-- <div id="subscribe-gain-chart"></div> -->
-                </div>
-              </div>
-            </div>
-            <div class="col-lg-3 col-md-6 col-12">
-              <div class="card">
-                <div class="card-header d-flex flex-column align-items-start pb-0">
-                  <p class="mb-1">Shortlisted Candidates</p>
-                  <div class="container">
-                  <div class="row">
-                    <div class="col"><h2 class="text-bold-700">
-                      <%= shortlistedCandidates %>
-                    </h2></div>
-                    <div class="col"> <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/shortlisted" class="btn btn-primary btn-sm text-right">View</a></div>
-                  </div>
-                </div>                
-                </div>
-                <div class="card-content">
-                  <div>
-                    <!-- <div id="orders-received-chart"></div> -->
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>          
-        </section>
-         <section id="jobs_update">
-          <div class="row">
-            <div class="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-3 mb-3 candidate-card">
-              <div class="card mt-1 mb-5">
-                <div class="col-xl-12 py-1">
-                 <div class="row">
-                  <div class="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto">
-                    <h4 class="card-title text-capitalize">Ongoing Interviews</h4>
-                  </div>
-                  <div class="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right">
-                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/onGoingHiring" class="btn btn-outline-primary btn-sm text-capitalize">View All</a>
-                  </div>
-                 </div>
-                </div>
-                <div class="card-content">
-                  <div class="table-responsive">
-                    <table class="table table-hover-animation mb-0 table-hover">
-                      <thead>
-                        <tr>
-                          <th>Candidates</th>
-                          <th>Qualification</th>
-                          <th>Hiring Stage</th>
-                          <th>Experience</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody id="table-body" class="text-capitalize">
-                        <% if(ongoingCandidates?.length > 0){ %>
-                        <% ongoingCandidates.forEach((can)=> { %>
-                          <tr>
-                            <td><%= can.candidate?.name %></td>
-                            <td><%= (qualifications?.filter(q => can.candidate?.highestQualification == q._id ))[0]?.name %></td>
-                            <td><%= can.status ? can.status : 'NA' %></td>
-                            <td><%= !can.candidate?.isExperienced ? 'Fresher' : can.candidate?.totalExperience ? can.candidate?.totalExperience  + ' Years': 'NA' %></td>
-                            <td class="actions">
-                              <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%=can.candidate._id%>"><i
-                                class="fa-regular fa-user"></i></a>
-                            </td>
-                          </tr>
-                          <% }) } else {%>
-                            <tr><td colspan="5"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/pages/shortlist.jpg" class="img-fluid"/></a></td></tr>
-                            <%}%>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-3 mb-3 candidate-card">
-              <div class="card mt-1 mb-5">
-                <div class="col-xl-12 py-1">
-                 <div class="row">
-                  <div class="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto ">
-                    <h4 class="card-title text-capitalize">Interested Candidates</h4>
-                  </div>
-                  <div class="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right">
-                    <a href="#" class="btn btn-outline-primary btn-sm">View All</a>
-                  </div>
-                 </div>
-                </div>
-                <div class="card-content">
-                  <div class="table-responsive">
-                    <table class="table table-hover-animation mb-0 table-hover">
-                      <thead>
-                        <tr>
-                          <th>Candidates</th>
-                          <th>Qualification</th>
-                          <th>JD title</th>
-                          <th>Experience</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody id="table-body" class="text-capitalize">
-                        <% if (appliedCandidates && appliedCandidates.length > 0) { %>
-                          <% appliedCandidates.forEach((candidate) => { %>
-                          <tr>
-                            <td><%= candidate._candidate?.name || 'NA' %></td>
-                            <td><%= candidate._candidate?.highestQualification?.name || 'NA' %></td>
-                            <td><%= candidate._job?.title || 'NA' %></td>
-                            <td><%= candidate._candidate?.totalExperience ? candidate._candidate.totalExperience : 'Fresher' %></td>
-                            <td class="actions">
-                              <% if (candidate._candidate && candidate._candidate._id) { %>
-                                <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/newcandidate/<%= candidate._candidate._id %>">
-                                  <i class="fa-regular fa-user"></i>
-                                </a>
-                                <!-- <a href="https://wa.me/91<%= candidate._candidate?.whatsapp %>" target="_blank"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/whatsappicon.png" width="18%" class="mx-1"></a> 
-                                   <a href="tel:<%= candidate._candidate?.mobile %>"> <img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/telephone.png" width="18.5%"> </a> -->
-                              <% } else { %>
-                                NA
-                              <% } %>
-                            </td>
-                          </tr>
-                          <% }) } else {%>
-                            <tr><td colspan="5"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/list/jobs"><img src="<%= process.env.MIPIE_BACKEND_URL %>/images/pages/add_job.jpg" class="img-fluid"/></a></td></tr>
-                            <%}%>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-      </div>
-      </div>      
-      </div>
+        <style>
+          body:has(.recruiter-sidebar):has(.corp-app-filter) .app-content.content { padding-top: 0 !important; }
+          .corp-app-filter { margin-bottom: 8px; }
+          .corp-app-filter__spacer { height: 96px; }
+          .corp-app-filter__bar {
+            display: grid;
+            grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+            align-items: center;
+            gap: 8px 12px;
+            background: #fff;
+            border: 0;
+            border-radius: 0;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            position: fixed;
+            top: var(--recruiter-header-height);
+            left: calc(220px + 36px + max(0px, (100vw - 220px - 72px - 1500px) / 2));
+            width: min(1500px, calc(100vw - 220px - 72px));
+            z-index: 1025;
+            padding: 10px 8px;
+            margin: 0;
+          }
+          .corp-app-filter__lead { min-width: 0; padding-left: 8px; }
+          .corp-app-filter__title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 10px; margin-bottom: 4px; }
+          body:has(.recruiter-sidebar) .corp-app-filter__title-row h2 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #212529; line-height: 1.2; }
+          .corp-app-filter__viewall { font-size: 12px; font-weight: 600; white-space: nowrap; }
+          .corp-app-filter__pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+          .corp-app-filter__pill {
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+            height: 28px; padding: 0 10px; border: 1.5px solid #e5e7eb; border-radius: 999px;
+            background: #fff; color: #4b5563; font-size: 11px; font-weight: 600; line-height: 1;
+            white-space: nowrap; cursor: pointer; text-decoration: none; box-shadow: none;
+          }
+          .corp-app-filter__pill:hover { border-color: rgba(250, 85, 121, 0.45); color: rgb(250, 85, 121); background: rgba(250, 85, 121, 0.06); text-decoration: none; }
+          .corp-app-filter__pill.is-active { background: #fc567b; border-color: rgb(250, 85, 121); color: #fff; box-shadow: 0 2px 8px rgba(250, 85, 121, 0.22); }
+          .corp-app-filter__pill--clear { border-color: #fca5a5; color: #dc2626; }
+          .corp-app-filter__pill--clear:hover { background: #fef2f2; color: #b91c1c; }
+          .corp-app-filter__range { position: relative; }
+          .corp-app-filter__dropdown {
+            position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: 280px;
+            padding: 12px; background: #fff; border: 1px solid #e8eaed; border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+          }
+          .corp-app-filter__dropdown[hidden] { display: none; }
+          .corp-app-filter__dropdown-title { font-size: 12px; font-weight: 700; color: #1f2937; margin-bottom: 8px; }
+          .corp-app-filter__dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+          body:has(.recruiter-sidebar) .corp-app-filter__dates label { display: grid; gap: 4px; margin: 0; font-size: 11px; font-weight: 600; color: #6b7280; }
+          .corp-app-filter__dates input { height: 34px; border: 1.5px solid #e8eaed; border-radius: 8px; padding: 0 8px; font-size: 12px; color: #1f2937; background: #f9fafb; }
+          .corp-app-filter__apply { width: 100%; margin-top: 10px; height: 32px; border: 0; border-radius: 8px; background: #fc567b; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+          .corp-app-filter__dropdowns {
+            display: flex; flex-wrap: nowrap; align-items: flex-end; justify-content: flex-end;
+            gap: 4px; width: 100%; min-width: 0;
+          }
+          .corp-app-filter__item { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 0; max-width: 70px; }
+          .corp-app-filter__item--job { max-width: 150px; flex: 1.4 1 110px; }
+          body:has(.recruiter-sidebar) .corp-app-filter__label {
+            margin: 0; font-size: 8px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+            color: #6b7280; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          }
+          .corp-app-filter__label i { margin-right: 2px; color: rgb(250, 85, 121); font-size: 7px; }
+          .corp-app-filter__item select {
+            width: 100%; height: 30px; padding: 4px 16px 4px 6px; border: 1.5px solid #e8eaed; border-radius: 8px;
+            background-color: #f9fafb; color: #1f2937; font-size: 10px; font-weight: 500; line-height: 1.3; cursor: pointer;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 5px center; background-size: 10px;
+          }
+          .corp-app-filter__item select:hover { border-color: rgba(250, 85, 121, 0.4); background-color: #fff; }
+          .corp-app-filter__item select:focus { outline: none; border-color: rgb(250, 85, 121); background-color: #fff; box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.14); }
+          .corp-app-filter .company-student-list { padding: 0; }
+          .corp-perf { position: relative; border: 1px solid #dee2e6; border-radius: 8px; background: #fff; padding: 12px 10px 8px; margin: 4px 0 14px; }
+          .corp-perf__label { position: absolute; top: -10px; left: 12px; padding: 0 6px; background: #fff; font-size: 13px; font-weight: 600; color: #333; }
+          .corp-perf__chips { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; align-items: center; padding-top: 4px; }
+          .corp-perf__chip { flex: 0 0 auto; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: rgb(250, 85, 121); background: #fff; border: 1.5px solid rgb(250, 85, 121); }
+          .corp-perf__chip.is-active { color: #fff; background: rgb(250, 85, 121); border-color: rgb(250, 85, 121); }
+          .corp-perf__empty { font-size: 12px; font-weight: 600; color: #9ca3af; white-space: nowrap; }
+          @media (max-width: 900px) {
+            .corp-app-filter__bar { grid-template-columns: 1fr; padding: 10px 12px; }
+            .corp-app-filter__dropdowns { justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; }
+            .corp-app-filter__item { flex: 0 0 82px; max-width: none; width: 82px; }
+            .corp-app-filter__item--job { flex-basis: 140px; width: 140px; }
+          }
+          @media (max-width: 767px) {
+            .corp-app-filter__bar { left: 14px; width: calc(100vw - 28px); }
+          }
+        </style>
+        <script>
+          (function () {
+            var form = document.getElementById('corpAppFilters');
+            var spacer = document.getElementById('corpAppFilterSpacer');
+            function placeFilterBar() {
+              if (form && spacer) spacer.style.height = form.offsetHeight + 'px';
+            }
+            placeFilterBar();
+            window.addEventListener('resize', placeFilterBar);
+            if (!form) return;
+            var dateInput = document.getElementById('corpDate');
+            var statusInput = document.getElementById('corpStatus');
+            document.querySelectorAll('[data-status]').forEach(function (button) {
+              button.addEventListener('click', function () {
+                var next = button.getAttribute('data-status') || '';
+                statusInput.value = statusInput.value === next ? '' : next;
+                form.submit();
+              });
+            });
+            var dropdown = document.getElementById('corpRangeDropdown');
+            var toggle = document.getElementById('corpRangeToggle');
+            form.querySelectorAll('[data-date]').forEach(function (button) {
+              button.addEventListener('click', function () {
+                var next = button.getAttribute('data-date');
+                dateInput.value = dateInput.value === next ? '' : next;
+                form.querySelector('[name="from"]').value = '';
+                form.querySelector('[name="to"]').value = '';
+                form.submit();
+              });
+            });
+            form.querySelectorAll('select').forEach(function (select) {
+              select.addEventListener('change', function () { form.submit(); });
+            });
+            if (toggle) {
+              toggle.addEventListener('click', function () {
+                var open = dropdown.hasAttribute('hidden');
+                dropdown.hidden = !open;
+                toggle.setAttribute('aria-expanded', String(open));
+              });
+            }
+            document.addEventListener('click', function (event) {
+              if (!event.target.closest('.corp-app-filter__range')) dropdown.hidden = true;
+            });
+          })();
+          function openMap(lat, long) {
+            window.open('https://maps.google.com/?q=' + lat + ',' + long, '_blank', 'noopener');
+          }
+          function maskUnmask(id) {
+            axios({
+              method: 'get',
+              url: '<%= process.env.MIPIE_BACKEND_URL %>/company/get-candidate-details',
+              params: { userId: id },
+              headers: { 'x-auth': localStorage.getItem('token') }
+            }).then(function () {
+              window.location.reload();
+            }).catch(function (error) {
+              if (error.response && error.response.status === 400) {
+                alert('Not enough credits to view this contact.');
+              }
+            });
+          }
+        </script>
+        <div class="recruiter-quickgrid">
+          <a class="recruiter-quickcard" href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates"><i class="feather icon-search" aria-hidden="true"></i><h3>Search candidates</h3><p>Find promising candidates for your next opening.</p></a>
+          <a class="recruiter-quickcard" href="<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/shortlisted"><i class="feather icon-award" aria-hidden="true"></i><h3>Your shortlist</h3><p>Review saved profiles and take the next hiring step.</p></a>
+          <a class="recruiter-quickcard" href="<%= process.env.MIPIE_BACKEND_URL %>/company/notifications"><i class="feather icon-bell" aria-hidden="true"></i><h3>Notifications</h3><p>Stay up to date with activity in your workspace.</p></a>
+        </div>
+      </main>
     </div>
   </div>
-
- 
-  <div class="sidenav-overlay"></div>
-  <div class="drag-target"></div>
-  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js" integrity="sha512-aVKKRRi/Q/YV+4mjoKBsE4x3H+BkegoM/em46NNlCqNTmUYADjBbeNefNxYV7giUp0VxICtqdrbqU7iVaeZNXA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
-  <!-- <script>
-     const userEmail=localStorage.getItem("registeredEmail");
-     const body={userMail:userEmail};
-    $.get("/app/corporate/checkCompany",body).done((res)=>{
-      const companyName=document.getElementById('company-name');
-      const userName=document.getElementById('user-name');
-       if(res.status===200){
-        console.log(res)
-        localStorage.setItem("company",res.companyInfo);
-        companyName.innerHTML=`Welcome ${res.companyName}`;
-        userName.innerHTML=res.userName
-       }
-    })
-    const logoutBlock=document.getElementById('logout-block');
-    const logoutDiv=document.getElementById('logout-div')
-    logoutBlock.addEventListener('click',()=>{
-      if(logoutDiv.style.display==="none"){
-        logoutDiv.style.display="block";
-      }else{
-        logoutDiv.style.display="none";
-      }
-    })
-  </script> -->
-
-  <% include ./partials/footer%>
-</body>
-</html>
+  <% include ./partials/footer %>

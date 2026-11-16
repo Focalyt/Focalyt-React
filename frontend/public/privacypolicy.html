@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index, follow">
+  <meta name="description" content="Focalyt Privacy Policy covering Focalyt CRM Lead Integration, Facebook and Instagram Lead Ads, student and institutional information, data sharing, retention, and deletion requests.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Focalyt">
+  <meta property="og:title" content="Privacy Policy | Focalyt">
+  <meta property="og:description" content="Learn how Focalyt collects, uses, protects and deletes data, including information received through Facebook and Instagram Lead Ads.">
+  <meta property="og:url" content="https://focalyt.com/privacypolicy">
+  <meta property="og:image" content="https://focalyt.com/Assets/public/images/logo/focal.png">
+  <meta property="og:image:secure_url" content="https://focalyt.com/Assets/public/images/logo/focal.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1211">
+  <meta property="og:image:height" content="606">
+  <meta name="theme-color" content="#f5fbff">
+  <link rel="canonical" href="https://focalyt.com/privacypolicy">
+  <title>Privacy Policy | Focalyt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Orbitron:wght@600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5fbff;
+      --surface: #ffffff;
+      --ink: #061426;
+      --heading: #061426;
+      --muted: #3e5876;
+      --accent: #1ba7ff;
+      --accent-2: #ff2daa;
+      --line: rgba(4, 25, 45, 0.12);
+      --header-h: 74px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 16px); }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-underline-offset: 3px; overflow-wrap: anywhere; }
+    a:hover { color: var(--accent-2); }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -70px;
+      background: #fff;
+      color: var(--heading);
+      padding: 10px 16px;
+      z-index: 50;
+    }
+    .skip-link:focus { top: 12px; }
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(245, 251, 255, 0.94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+    }
+    .site-header::after {
+      content: "";
+      display: block;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+    }
+    .nav-inner {
+      position: relative;
+      max-width: 1140px;
+      margin: 0 auto;
+      min-height: var(--header-h);
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { display: flex; align-items: center; text-decoration: none; }
+    .brand img { width: 168px; height: auto; display: block; }
+    .nav-toggle { position: absolute; opacity: 0; pointer-events: none; }
+    .nav-burger {
+      display: none;
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+    }
+    .nav-burger span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: var(--heading);
+      border-radius: 2px;
+    }
+    .nav-links { display: flex; align-items: center; gap: 4px; }
+    .nav-links a {
+      font-family: Orbitron, Inter, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 10px 14px;
+      border-radius: 999px;
+    }
+    .nav-links a:hover,
+    .nav-links a[aria-current="page"] {
+      color: var(--accent);
+      background: rgba(27, 167, 255, 0.1);
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+    .hero { padding: 48px 0 32px; }
+    h1 {
+      color: var(--heading);
+      font-family: Orbitron, Inter, sans-serif;
+      font-size: clamp(28px, 4vw, 40px);
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin: 0 0 16px;
+      font-weight: 700;
+    }
+    .intro { font-size: 18px; line-height: 1.65; margin: 0 0 16px; }
+    .meta { font-size: 14px; color: var(--muted); margin: 0; }
+    .toc { padding: 28px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .toc h2 { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 12px; font-family: Orbitron, Inter, sans-serif; }
+    .toc ol { padding: 0; margin: 0; list-style: none; columns: 2; column-gap: 32px; }
+    .toc li { margin: 0; break-inside: avoid; }
+    .toc a { display: block; padding: 4px 0; font-size: 14px; line-height: 1.5; color: var(--ink); text-decoration: none; }
+    .toc a:hover, .toc a:focus-visible { color: var(--accent); }
+    .policy { padding-bottom: 24px; }
+    .policy-section { padding: 36px 0; border-bottom: 1px solid var(--line); scroll-margin-top: calc(var(--header-h) + 16px); }
+    .policy-section:last-of-type { border-bottom: none; }
+    .policy-section h2 { color: var(--heading); font-size: 24px; line-height: 1.3; margin: 0 0 20px; font-weight: 700; }
+    .policy-section h3 { color: var(--heading); font-size: 16px; font-weight: 600; line-height: 1.5; margin: 28px 0 8px; }
+    .policy-section h3:first-of-type { margin-top: 16px; }
+    p { margin: 0 0 14px; }
+    p:last-child { margin-bottom: 0; }
+    ul, ol { padding-left: 22px; margin: 8px 0 18px; }
+    li { margin: 3px 0; }
+    strong { color: var(--heading); font-weight: 600; }
+    .site-footer {
+      margin-top: 12px;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .footer-inner { max-width: 1140px; margin: 0 auto; padding: 36px 24px 16px; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 28px; }
+    .footer-brand img { width: 150px; height: auto; display: block; }
+    .footer-title {
+      margin: 0 0 14px;
+      font-family: Orbitron, Inter, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .footer-links { list-style: none; margin: 0; padding: 0; }
+    .footer-links li { margin: 0 0 10px; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+    .footer-links a:hover { color: var(--accent); }
+    .footer-bottom { border-top: 1px solid var(--line); }
+    .footer-bottom p { max-width: 1140px; margin: 0 auto; padding: 16px 24px 22px; font-size: 13px; color: var(--muted); }
+    .footer-bottom strong { color: var(--accent-2); letter-spacing: 0.04em; }
+    @media (max-width: 800px) {
+      .nav-burger { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 8px 16px 16px;
+        background: #ffffff;
+        border-bottom: 1px solid var(--line);
+        box-shadow: 0 16px 32px rgba(6, 20, 38, 0.08);
+      }
+      .nav-toggle:checked ~ .nav-links { display: flex; }
+      .nav-toggle:focus-visible ~ .nav-burger { outline: 2px solid var(--accent); outline-offset: 3px; }
+      .footer-inner { grid-template-columns: 1fr; }
+      .wrap { padding: 0 18px; }
+      .hero { padding: 32px 0 24px; }
+      .intro { font-size: 16px; }
+      .toc ol { columns: 1; }
+      .policy-section { padding: 28px 0; }
+      .policy-section h2 { font-size: 21px; }
+    }
+    @media print {
+      .site-header, .toc, .site-footer, .skip-link { display: none; }
+      body { font-size: 11pt; color: #000; background: #fff; }
+      a { color: inherit; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to privacy policy</a>
+  <header class="site-header">
+    <div class="nav-inner">
+      <a class="brand" href="https://focalyt.com/" aria-label="Focalyt home">
+        <img src="/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" width="224" height="99">
+      </a>
+      <input class="nav-toggle" type="checkbox" id="nav-toggle" aria-label="Open navigation menu">
+      <label class="nav-burger" for="nav-toggle"><span></span><span></span><span></span></label>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="https://focalyt.com/">Home</a>
+        <a href="https://focalyt.com/about">About Us</a>
+        <a href="https://focalyt.com/courses">Courses</a>
+        <a href="https://focalyt.com/contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+  <div class="wrap hero">
+    <h1>Privacy Policy</h1>
+    <p class="intro">How Focalyt collects, uses, safeguards, and handles personal information across our educational platform and <strong>Focalyt CRM Lead Integration</strong> for Facebook and Instagram Lead Ads.</p>
+    <p class="meta">Last updated <time datetime="2026-11-02">2 November 2026</time></p>
+  </div>
+  <div class="wrap">
+    <nav class="toc" aria-label="Privacy policy table of contents">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#introduction">Introduction</a></li>
+        <li><a href="#meta-lead-ads">Facebook and Instagram Lead Ads Integration</a></li>
+        <li><a href="#information-collected">Other Information We Collect</a></li>
+        <li><a href="#how-we-use-information">How We Use Personal Information</a></li>
+        <li><a href="#information-sharing">Information Sharing and Disclosure</a></li>
+        <li><a href="#data-retention">Data Storage and Retention</a></li>
+        <li><a href="#data-security">Data Security and Protection</a></li>
+        <li><a href="#your-rights">Your Privacy Rights and Choices</a></li>
+        <li><a href="#data-deletion">Data Deletion Instructions</a></li>
+        <li><a href="#childrens-privacy">Children&#x27;s Privacy and Educational Data</a></li>
+        <li><a href="#educational-data">Educational Data and Institutional Responsibilities</a></li>
+        <li><a href="#third-party-services">Third-Party Services and External Links</a></li>
+        <li><a href="#cookies">Cookies and Website Technologies</a></li>
+        <li><a href="#policy-changes">Changes to This Privacy Policy</a></li>
+        <li><a href="#contact">Contact Information</a></li>
+      </ol>
+    </nav>
+    <main class="policy" id="main-content">
+      <section class="policy-section" id="introduction" aria-labelledby="heading-1">
+<h2 id="heading-1">1. Introduction</h2>
+<p>Welcome to Focalyt.</p>
+<p>Focalyt is an educational management and CRM platform designed to help educational institutions manage student enquiries, admissions, courses, training programs, student records, and communications.</p>
+<p>This Privacy Policy explains how Focalyt collects, processes, uses, stores, shares, and protects personal information when users interact with our website, educational management platform, CRM services, WhatsApp Business integrations, and Facebook and Instagram Lead Ads integrations.</p>
+<p>This policy also applies to our Meta application, <strong>Focalyt CRM Lead Integration</strong>, which connects Facebook and Instagram Lead Ads with Focalyt CRM.</p>
+<p>We respect user privacy and are committed to handling personal information responsibly, transparently, and in accordance with applicable data protection laws.</p>
+<p>When you use our services or submit information through connected lead forms, your information may be processed as described in this policy, subject to applicable consent and other legal requirements.</p>
+
+</section>
+      <section class="policy-section" id="meta-lead-ads" aria-labelledby="heading-2">
+<h2 id="heading-2">2. Facebook and Instagram Lead Ads Integration</h2>
+<h3>2.1 About Focalyt CRM Lead Integration</h3>
+<p>Focalyt CRM Lead Integration is an application that connects Facebook and Instagram Lead Ads with the Focalyt CRM platform.</p>
+<p>Educational institutions can connect their authorized Facebook Pages and Lead Ads forms to Focalyt CRM to receive and manage enquiries generated through Facebook and Instagram advertisements.</p>
+<p>When someone submits a connected Lead Ads form, the integration retrieves the information supplied in that form and creates or updates the corresponding enquiry record in Focalyt CRM.</p>
+<p>The integration operates only for Facebook Pages and lead forms connected and authorized by the participating educational institution.</p>
+<h3>2.2 Information Collected from Meta Lead Ads</h3>
+<p>When a user submits a Facebook or Instagram Lead Ads form connected to Focalyt CRM, we may receive the following information:</p>
+<ul>
+<li>Full name</li>
+<li>Mobile or telephone number</li>
+<li>Email address</li>
+<li>WhatsApp contact number</li>
+<li>Gender, if requested in the form</li>
+<li>Answers to questions included in the Lead Ads form</li>
+<li>Course, training program, or job preferences</li>
+<li>Lead form submission date and time</li>
+<li>Facebook Lead ID</li>
+<li>Facebook Page ID</li>
+<li>Lead Form ID</li>
+<li>Advertisement ID</li>
+<li>Other form information voluntarily provided by the user</li>
+</ul>
+<p>The actual information collected depends on the fields included in the Lead Ads form configured by the educational institution.</p>
+<p>We do not automatically collect information from unrelated Facebook Pages or Lead Ads forms that have not been connected to Focalyt CRM.</p>
+<h3>2.3 How We Receive and Process Meta Lead Data</h3>
+<p>When a user submits a connected Facebook or Instagram Lead Ads form:</p>
+<ol>
+<li>Meta sends a webhook notification indicating that a new lead has been submitted.</li>
+<li>The notification includes technical identifiers such as the Lead ID, Page ID, Form ID, and relevant submission details.</li>
+<li>Focalyt CRM Lead Integration uses the authorized Meta integration to retrieve the information submitted by the user.</li>
+<li>Focalyt identifies the educational institution and the course, job, or enquiry category associated with the connected form.</li>
+<li>The application processes and validates the submitted information.</li>
+<li>A CRM lead or candidate record is created or updated based on the information provided.</li>
+<li>Authorized institutional staff can access the enquiry and follow up with the user.</li>
+</ol>
+<p>A name and valid mobile number are required for the existing lead-creation process. Other details, such as email address, WhatsApp number, and gender, are stored when provided.</p>
+<p>If an existing candidate record matches the submitted mobile number, Focalyt may associate the new enquiry with that record instead of creating a duplicate person.</p>
+<p>Technical lead identifiers may be retained to identify and process submissions and prevent duplicate processing.</p>
+<h3>2.4 Purpose of Using Meta Lead Data</h3>
+<p>Information received through Facebook and Instagram Lead Ads is used to:</p>
+<ul>
+<li>Register user enquiries in Focalyt CRM.</li>
+<li>Associate enquiries with the correct educational institution.</li>
+<li>Identify courses, training programs, or jobs relevant to the enquiry.</li>
+<li>Allow authorized institutional staff to contact the interested user.</li>
+<li>Manage admission-related or program-related follow-ups.</li>
+<li>Maintain enquiry history and communication records.</li>
+<li>Prevent duplicate lead creation.</li>
+<li>Support CRM operations and enquiry management.</li>
+</ul>
+<p>We do not sell personal information collected through Meta Lead Ads.</p>
+<p>Focalyt does not use this integration to create unrelated advertising audiences or market the data to unrelated third parties.</p>
+<h3>2.5 Access to Meta Lead Data</h3>
+<p>Personal information received through Focalyt CRM Lead Integration may be accessible to:</p>
+<ul>
+<li>Authorized users of the educational institution that received the enquiry.</li>
+<li>Focalyt personnel who require access for authorized technical support, security, or platform operations.</li>
+<li>Service providers that support the secure operation of Focalyt CRM, subject to appropriate contractual and confidentiality protections.</li>
+<li>Authorities when disclosure is required by applicable law.</li>
+</ul>
+<p>Lead information is associated with the institution responsible for the connected advertisement.</p>
+<p>Focalyt does not intentionally make one institution's lead records accessible to unrelated institutions.</p>
+<h3>2.6 Meta Account Permissions and Integration Control</h3>
+<p>Educational institutions must authorize the connection between their Facebook Pages and Focalyt CRM.</p>
+<p>The application uses Meta permissions and technical access necessary to operate the authorized Lead Ads integration.</p>
+<p>Institutions can disconnect their Facebook integration or manage permissions through the relevant Meta or Focalyt settings.</p>
+<p>Disconnecting the integration prevents future retrieval through that connection but does not necessarily delete lead information previously stored in Focalyt CRM.</p>
+<p>Requests to delete previously collected information are handled through the process described in <a href="#data-deletion">Section 9</a>.</p>
+
+</section>
+      <section class="policy-section" id="information-collected" aria-labelledby="heading-3">
+<h2 id="heading-3">3. Other Information We Collect</h2>
+<p>In addition to Meta Lead Ads information, Focalyt may process information required to provide educational management and CRM services.</p>
+<h3>3.1 Educational Institution Information</h3>
+<ul>
+<li>Institution name and business contact information</li>
+<li>Address and registration details</li>
+<li>Authorized administrator and staff information</li>
+<li>Login and account details</li>
+<li>Institution configuration and service preferences</li>
+<li>Billing and payment-related records</li>
+</ul>
+<h3>3.2 Course and Training Information</h3>
+<ul>
+<li>Course names, descriptions, schedules, and fees</li>
+<li>Training program details</li>
+<li>Course materials and educational resources</li>
+<li>Instructor information</li>
+<li>Batch allocation and attendance information</li>
+<li>Certification and completion records</li>
+</ul>
+<h3>3.3 Student Information</h3>
+<ul>
+<li>Student name and contact details</li>
+<li>Educational background</li>
+<li>Enrollment and admission information</li>
+<li>Attendance records</li>
+<li>Academic progress and assessment results</li>
+<li>Emergency contact information</li>
+<li>Parent or guardian information, where applicable</li>
+</ul>
+<h3>3.4 CRM and Lead Management Information</h3>
+<ul>
+<li>Lead and candidate contact details</li>
+<li>Enquiry source and referral information</li>
+<li>Course or job preferences</li>
+<li>Admission and application status</li>
+<li>Follow-up notes and communication history</li>
+<li>Enquiry conversion and enrollment records</li>
+</ul>
+<h3>3.5 WhatsApp Business Integration Information</h3>
+<p>When institutions use connected WhatsApp Business services, Focalyt may process:</p>
+<ul>
+<li>Authorized WhatsApp Business account information</li>
+<li>Business phone numbers</li>
+<li>Message templates</li>
+<li>Message delivery and status information</li>
+<li>Communication records and responses</li>
+<li>Communication analytics relevant to the service</li>
+</ul>
+<h3>3.6 Website and Technical Information</h3>
+<p>When users access Focalyt services, technical information may be processed as necessary for website operations, authentication, analytics, troubleshooting, and security.</p>
+<p>This may include IP addresses, browser information, device information, access timestamps, and application activity records.</p>
+
+</section>
+      <section class="policy-section" id="how-we-use-information" aria-labelledby="heading-4">
+<h2 id="heading-4">4. How We Use Personal Information</h2>
+<p>Focalyt uses personal information to operate its educational management and CRM services.</p>
+<h3>4.1 Educational Management</h3>
+<p>We process information to:</p>
+<ul>
+<li>Manage institutional course catalogs.</li>
+<li>Support student admissions and enrollments.</li>
+<li>Maintain academic and training records.</li>
+<li>Organize batches, classes, and schedules.</li>
+<li>Record attendance and academic progress.</li>
+<li>Support certification and completion processes.</li>
+</ul>
+<h3>4.2 Lead and Candidate Management</h3>
+<p>We use enquiry information to:</p>
+<ul>
+<li>Register prospective student or candidate enquiries.</li>
+<li>Assign enquiries to relevant institutions and programs.</li>
+<li>Manage follow-ups and admissions.</li>
+<li>Track enquiry status and application progress.</li>
+<li>Maintain accurate CRM records.</li>
+</ul>
+<h3>4.3 Communication</h3>
+<p>Information may be used to:</p>
+<ul>
+<li>Respond to enquiries.</li>
+<li>Provide requested course and admission details.</li>
+<li>Send enrollment and schedule updates.</li>
+<li>Communicate through authorized channels, including email, telephone, and WhatsApp.</li>
+<li>Deliver administrative and service-related notifications.</li>
+<li>Send promotional communications where permitted and with any consent required by law.</li>
+</ul>
+<h3>4.4 Platform Operations and Security</h3>
+<p>We may process information to:</p>
+<ul>
+<li>Maintain and improve platform functionality.</li>
+<li>Troubleshoot technical issues.</li>
+<li>Prevent unauthorized access.</li>
+<li>Detect misuse and security threats.</li>
+<li>Maintain service reliability.</li>
+<li>Fulfill applicable legal obligations.</li>
+</ul>
+<p>We limit the processing of personal information to purposes that are relevant, authorized, and legally permitted.</p>
+
+</section>
+      <section class="policy-section" id="information-sharing" aria-labelledby="heading-5">
+<h2 id="heading-5">5. Information Sharing and Disclosure</h2>
+<p>Focalyt does not sell personal information.</p>
+<p>We may share or make information accessible only where necessary for legitimate service operations or where legally permitted.</p>
+<h3>5.1 Educational Institutions</h3>
+<p>Personal information submitted through a connected institution's lead form is made available to authorized staff of that institution for enquiry management and follow-up.</p>
+<h3>5.2 Authorized Staff and Educational Personnel</h3>
+<p>Relevant student and academic information may be accessible to administrators, instructors, or other authorized personnel as required to provide educational services.</p>
+<h3>5.3 Technology and Service Providers</h3>
+<p>We may use third-party technology providers for services such as cloud hosting, infrastructure, messaging, authentication, and platform operations.</p>
+<p>Such providers should access or process personal information only to provide their authorized services and in accordance with applicable contractual and legal requirements.</p>
+<h3>5.4 Meta and WhatsApp Services</h3>
+<p>Facebook, Instagram, and WhatsApp integrations involve services provided by Meta Platforms.</p>
+<p>Meta independently processes information according to its own privacy policies and applicable terms.</p>
+<p>Focalyt's deletion of a CRM record does not automatically remove information independently held by Meta.</p>
+<h3>5.5 Legal Requirements</h3>
+<p>We may disclose information when required to comply with applicable law, legal proceedings, lawful regulatory requests, or valid government orders.</p>
+<h3>5.6 Restrictions on Information Sharing</h3>
+<p>We do not intentionally:</p>
+<ul>
+<li>Sell personal information to third-party data brokers.</li>
+<li>Share one institution's confidential student records with unrelated institutions.</li>
+<li>Disclose academic records to unauthorized parties.</li>
+<li>Use Meta Lead Ads information for unrelated commercial purposes.</li>
+</ul>
+
+</section>
+      <section class="policy-section" id="data-retention" aria-labelledby="heading-6">
+<h2 id="heading-6">6. Data Storage and Retention</h2>
+<p>Personal information is stored in systems used to operate Focalyt's educational management and CRM services.</p>
+<p>Information is retained for as long as reasonably necessary to provide the relevant service, maintain legitimate operational records, fulfill applicable contractual obligations, or comply with legal requirements.</p>
+<p>Retention may depend on the type of information, the institution's requirements, and applicable laws.</p>
+<p>Lead information collected through Facebook and Instagram may remain in Focalyt CRM while the receiving educational institution manages the enquiry, unless deletion is requested or the information is no longer required.</p>
+<p>When information is no longer necessary, we take appropriate steps to delete, anonymize, or otherwise dispose of it, subject to applicable legal retention obligations.</p>
+<p>Users may request deletion of their information using the procedure described in <a href="#data-deletion">Section 9</a>.</p>
+
+</section>
+      <section class="policy-section" id="data-security" aria-labelledby="heading-7">
+<h2 id="heading-7">7. Data Security and Protection</h2>
+<p>Focalyt takes reasonable technical and organizational measures to protect personal information against unauthorized access, alteration, disclosure, loss, or misuse.</p>
+<p>Depending on the service and system involved, security measures may include:</p>
+<ul>
+<li>Authentication and access controls</li>
+<li>Restricted access for authorized personnel</li>
+<li>Secure communication protocols</li>
+<li>Infrastructure and application security controls</li>
+<li>Monitoring and troubleshooting procedures</li>
+<li>Measures to prevent unauthorized access</li>
+<li>Processes for investigating and responding to security incidents</li>
+</ul>
+<p>Access to institutional and lead information is limited according to applicable user roles and permissions.</p>
+<p>Although we work to protect personal information, no method of internet transmission or electronic storage can be guaranteed to be completely secure.</p>
+
+</section>
+      <section class="policy-section" id="your-rights" aria-labelledby="heading-8">
+<h2 id="heading-8">8. Your Privacy Rights and Choices</h2>
+<p>Depending on applicable law and the nature of our relationship with you, you may have the right to:</p>
+<h3>8.1 Access Your Information</h3>
+<p>Request information about personal data held or processed through Focalyt services.</p>
+<h3>8.2 Correct Your Information</h3>
+<p>Request correction of inaccurate or outdated personal information.</p>
+<h3>8.3 Request Deletion</h3>
+<p>Request deletion of personal data collected through Focalyt, including information received from Facebook and Instagram Lead Ads.</p>
+<h3>8.4 Withdraw Consent</h3>
+<p>Withdraw consent for processing activities that rely on consent, subject to applicable legal requirements.</p>
+<h3>8.5 Manage Communications</h3>
+<p>Request that an institution stop sending promotional communications or update your communication preferences.</p>
+<h3>8.6 Contact Us About Privacy Concerns</h3>
+<p>Raise concerns about how your personal information has been collected, accessed, shared, or processed.</p>
+<p>We may need to verify your identity or coordinate with the educational institution responsible for the information before fulfilling a request.</p>
+
+</section>
+      <section class="policy-section" id="data-deletion" aria-labelledby="heading-9">
+<h2 id="heading-9">9. Data Deletion Instructions</h2>
+<p>Users may request the deletion of personal information collected or stored through Focalyt services, including data received through our Meta application, Focalyt CRM Lead Integration.</p>
+<h3>9.1 How to Request Deletion</h3>
+<p><strong>Option 1 — Email Request</strong></p>
+<p>Send an email to <strong><a href="mailto:info@focalyt.com">info@focalyt.com</a></strong> with the subject <strong>Personal Data Deletion Request</strong>.</p>
+<p>Include the following information where available:</p>
+<ul>
+<li>Your name</li>
+<li>The phone number or email address associated with the enquiry</li>
+<li>The name of the educational institution, if known</li>
+<li>A short description of the information you want deleted</li>
+</ul>
+<p>You do not need to provide every listed detail if it was not originally collected. We may request additional information only when reasonably necessary to locate the relevant record and verify the request.</p>
+<p><strong>Option 2 — Data Deletion Instructions Page</strong></p>
+<p>Visit <strong><a href="https://focalyt.com/data-deletion">https://focalyt.com/data-deletion</a></strong> and follow the instructions provided to submit a deletion request.</p>
+<h3>9.2 How We Handle Deletion Requests</h3>
+<p>After receiving a deletion request:</p>
+<ol>
+<li>We review the request and identify the relevant personal information.</li>
+<li>We may verify the requester's identity to protect against unauthorized deletion.</li>
+<li>Where necessary, we coordinate with the educational institution responsible for the information.</li>
+<li>We delete or anonymize relevant information when required and permitted by applicable law.</li>
+<li>Where information must be retained for legal or regulatory reasons, we restrict its handling as appropriate.</li>
+<li>We communicate the outcome of the request through the available contact channel.</li>
+</ol>
+<p>Deletion requests are currently handled manually.</p>
+<h3>9.3 Facebook and Instagram Data Deletion</h3>
+<p>Users who submitted information through Facebook or Instagram Lead Ads may request deletion of the corresponding information stored in Focalyt CRM.</p>
+<p>Deleting information from Focalyt CRM does not automatically delete information stored separately by Meta.</p>
+<p>Users may manage information held by Facebook and Instagram through their respective account privacy controls.</p>
+<h3>9.4 Disconnection of an Integration</h3>
+<p>An educational institution may disconnect its Meta integration.</p>
+<p>Disconnection stops future data retrieval through that integration but does not automatically remove records previously collected.</p>
+<p>Previously stored records can be addressed through Focalyt's deletion procedures.</p>
+
+</section>
+      <section class="policy-section" id="childrens-privacy" aria-labelledby="heading-10">
+<h2 id="heading-10">10. Children's Privacy and Educational Data</h2>
+<p>Focalyt provides services to educational institutions that may manage information about students under 18 years of age.</p>
+<p>We recognize that children's personal information requires appropriate protection.</p>
+<p>Where required by applicable law, the collection and processing of children's personal information must be supported by valid parental or guardian consent or another legally permitted basis.</p>
+<p>Educational institutions are responsible for providing appropriate notices and obtaining required permissions for information they submit to or manage through Focalyt.</p>
+<p>Parents or legal guardians may contact the relevant institution or Focalyt to request access to, correction of, or deletion of a child's personal information, subject to applicable law and verification requirements.</p>
+<p>We seek to limit access to children's information to authorized personnel and legitimate educational purposes.</p>
+
+</section>
+      <section class="policy-section" id="educational-data" aria-labelledby="heading-11">
+<h2 id="heading-11">11. Educational Data and Institutional Responsibilities</h2>
+<p>Educational institutions using Focalyt are responsible for ensuring that the personal information they collect and manage through the platform is obtained and processed lawfully.</p>
+<p>Institutions should provide appropriate privacy notices, obtain any required consent, maintain accurate records, and manage access to student and lead information.</p>
+<p>Focalyt processes information in connection with the services provided to these institutions.</p>
+<p>Where education-specific privacy requirements apply, including FERPA for covered institutions in the United States, the relevant institution and Focalyt must meet their respective applicable responsibilities.</p>
+<p>Institutions should not upload or disclose information through Focalyt unless they are authorized to do so.</p>
+
+</section>
+      <section class="policy-section" id="third-party-services" aria-labelledby="heading-12">
+<h2 id="heading-12">12. Third-Party Services and External Links</h2>
+<p>Focalyt services may integrate with or contain links to third-party platforms, including:</p>
+<ul>
+<li>Facebook</li>
+<li>Instagram</li>
+<li>WhatsApp Business</li>
+<li>Authorized messaging and communication providers</li>
+<li>Cloud infrastructure and technical service providers</li>
+</ul>
+<p>Third-party services may have their own terms and privacy policies governing how they collect and process information.</p>
+<p>Users should review the privacy policies of those services when interacting with them.</p>
+<p>Focalyt is not responsible for the independent privacy practices of third-party websites or services that it does not control.</p>
+
+</section>
+      <section class="policy-section" id="cookies" aria-labelledby="heading-13">
+<h2 id="heading-13">13. Cookies and Website Technologies</h2>
+<p>Focalyt may use cookies or similar technologies where necessary to support website functionality, account sessions, authentication, security, and service performance.</p>
+<p>Where analytics or other optional tracking technologies are used, we provide any notices and choices required by applicable law.</p>
+<p>Users can manage certain cookie preferences through their browser settings, although disabling essential cookies may affect some website features.</p>
+
+</section>
+      <section class="policy-section" id="policy-changes" aria-labelledby="heading-14">
+<h2 id="heading-14">14. Changes to This Privacy Policy</h2>
+<p>We may update this Privacy Policy to reflect changes in our services, integrations, data processing practices, or applicable legal requirements.</p>
+<p>When changes are made, we will update the &quot;Last Updated&quot; date displayed on this page.</p>
+<p>Where required by applicable law, we will provide additional notice or obtain consent before implementing relevant changes.</p>
+<p>Users are encouraged to review this policy periodically.</p>
+
+</section>
+      <section class="policy-section" id="contact" aria-labelledby="heading-15">
+<h2 id="heading-15">15. Contact Information</h2>
+<p>For questions, privacy concerns, requests to access or correct information, or personal data deletion requests, please contact:</p>
+<p><strong>Focalyt</strong><br />
+Educational Management Platform &amp; CRM Lead Integration</p>
+<p><strong>Website:</strong> <a href="https://focalyt.com">https://focalyt.com</a><br />
+<strong>Email:</strong> <a href="mailto:info@focalyt.com">info@focalyt.com</a><br />
+<strong>Privacy Policy:</strong> <a href="https://focalyt.com/privacy-policy">https://focalyt.com/privacy-policy</a><br />
+<strong>Data Deletion Instructions:</strong> <a href="https://focalyt.com/data-deletion">https://focalyt.com/data-deletion</a></p>
+<p>We will review privacy-related requests and respond in accordance with applicable legal and operational requirements.</p>
+
+</section>
+    </main>
+  </div>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <a class="footer-brand" href="https://focalyt.com/" aria-label="Focalyt home">
+          <img src="/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" width="224" height="99">
+        </a>
+      </div>
+      <div>
+        <p class="footer-title">Useful links</p>
+        <ul class="footer-links">
+          <li><a href="https://focalyt.com/">Home</a></li>
+          <li><a href="https://focalyt.com/privacypolicy" aria-current="page">Privacy Policy</a></li>
+          <li><a href="https://focalyt.com/data-deletion">Data Deletion</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title">Contact</p>
+        <ul class="footer-links">
+          <li><a href="mailto:info@focalyt.com">info@focalyt.com</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; Copyright 2026, All Rights Reserved by <strong>FOCALYT</strong></p>
+    </div>
+  </footer>
+</body>
+</html>

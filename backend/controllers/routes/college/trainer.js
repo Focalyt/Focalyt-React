@@ -32,7 +32,8 @@ const allowedDocumentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', '
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession, SessionPlan, SessionFeedback, SessionAttendance  } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession, SessionPlan, SessionFeedback, SessionAttendance, DailyTrainerReport, DailyReportSetting, BatchSessionAssignment } = require("../../models");
+const { mapSessionToClient } = require('./sessionPlan');
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -793,6 +794,131 @@ router.post('/addSession', isCollege, async (req, res) => {
 	}
 });
 
+const toFilterObjectId = (value) => (
+	value && mongoose.Types.ObjectId.isValid(String(value))
+		? new mongoose.Types.ObjectId(String(value))
+		: null
+);
+
+// Sessions for the report-card filter. A session matches the selected course,
+// including course plans that are not stored on a batch. A selected batch also
+// includes plans saved on that batch and plans referred into it.
+router.get('/filter-sessions', isCollege, async (req, res) => {
+	try {
+		const collegeId = req.college?._id;
+		if (!collegeId) {
+			return res.status(403).json({ status: false, message: 'College not found' });
+		}
+
+		const departmentId = toFilterObjectId(req.query.department);
+		const projectId = toFilterObjectId(req.query.project);
+		const centerId = toFilterObjectId(req.query.center);
+		const courseId = toFilterObjectId(req.query.course);
+		const batchId = toFilterObjectId(req.query.batch);
+		if (!departmentId && !projectId && !centerId && !courseId && !batchId) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+
+		const batchDoc = batchId
+			? await Batch.findOne({ _id: batchId, college: collegeId }).select('name courseId centerId').lean()
+			: null;
+		if (batchId && !batchDoc) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+
+		const courseQuery = { college: collegeId, isDeleted: { $ne: true } };
+		const resolvedCourseId = courseId || batchDoc?.courseId || null;
+		if (resolvedCourseId) {
+			courseQuery._id = resolvedCourseId;
+		} else {
+			if (departmentId) courseQuery.vertical = departmentId;
+			if (projectId) courseQuery.project = projectId;
+			if (centerId) courseQuery.center = centerId;
+		}
+
+		const courses = await Courses.find(courseQuery).select('_id name vertical project').lean();
+		const courseIds = courses.map((course) => course._id);
+		if (!courseIds.length) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+
+		const planQuery = {
+			college: collegeId,
+			isDeleted: false,
+			course: { $in: courseIds },
+		};
+		const assignmentBySession = new Map();
+		const rememberAssignment = (row) => {
+			const key = String(row?.session || '');
+			if (!key || assignmentBySession.has(key)) return;
+			assignmentBySession.set(key, row);
+		};
+		if (batchDoc) {
+			const assigned = await BatchSessionAssignment.find({ batch: batchDoc._id })
+				.select('session trainer')
+				.populate('trainer', 'name')
+				.lean();
+			assigned.forEach(rememberAssignment);
+			const assignedIds = assigned.map((row) => row.session).filter(Boolean);
+			planQuery.$or = [
+				{ batch: batchDoc._id },
+				{ batch: null },
+				{ batch: { $exists: false } },
+				...(assignedIds.length ? [{ _id: { $in: assignedIds } }] : []),
+			];
+		} else if (centerId) {
+			const centerBatches = await Batch.find({
+				college: collegeId,
+				centerId,
+				courseId: { $in: courseIds },
+			}).select('_id').lean();
+			const centerBatchIds = centerBatches.map((batch) => batch._id);
+			const assigned = centerBatchIds.length
+				? await BatchSessionAssignment.find({ batch: { $in: centerBatchIds } })
+					.select('session trainer')
+					.populate('trainer', 'name')
+					.lean()
+				: [];
+			assigned.forEach(rememberAssignment);
+			const assignedIds = assigned.map((row) => row.session).filter(Boolean);
+			planQuery.$or = [
+				{ batch: { $in: centerBatchIds } },
+				{ batch: null },
+				{ batch: { $exists: false } },
+				...(assignedIds.length ? [{ _id: { $in: assignedIds } }] : []),
+			];
+		}
+
+		const plans = await SessionPlan.find(planQuery).sort({ sessionNumber: 1, createdAt: 1 }).lean();
+		const coursesById = new Map(courses.map((course) => [String(course._id), course]));
+		const data = plans.map((plan) => {
+			const course = coursesById.get(String(plan.course)) || {};
+			const mapped = mapSessionToClient(plan);
+			const assignment = assignmentBySession.get(String(plan._id));
+			const trainerName = assignment?.trainer?.name || mapped.fieldTrainerName || '';
+			return {
+				...mapped,
+				department: course.vertical ? String(course.vertical) : mapped.department,
+				project: course.project ? String(course.project) : mapped.project,
+				course: course._id ? String(course._id) : mapped.course,
+				courseName: course.name || mapped.courseName,
+				courseTrade: course.name || mapped.courseTrade,
+				batch: batchDoc ? String(batchDoc._id) : mapped.batch,
+				batchCode: batchDoc?.name || mapped.batchCode,
+				center: batchDoc?.centerId ? String(batchDoc.centerId) : (centerId ? String(centerId) : mapped.center),
+				trainerName,
+				fieldTrainerName: trainerName,
+				fieldTrainerId: assignment?.trainer?._id ? String(assignment.trainer._id) : mapped.fieldTrainerId,
+			};
+		});
+
+		return res.status(200).json({ status: true, data });
+	} catch (error) {
+		console.error('GET /college/trainer/filter-sessions', error);
+		return res.status(500).json({ status: false, message: error.message || 'Failed to load sessions' });
+	}
+});
+
 router.get('/sessions/:batchId', isCollege, async (req, res) => {
 	try {
 		const college = req.college;
@@ -1043,13 +1169,19 @@ router.get('/batch-students/:batchId', authorizeTrainingAccess, async (req, res)
 			}
 		}
 
-		const students = await AppliedCourses.find({
+		const batchStudentFilter = {
 			batch: batchId,
 			$or: [
 				{ isBatchAssigned: true },
 				{ admissionDone: true },
 			],
-		})
+		};
+		if (String(req.query.countOnly || '') === '1') {
+			const count = await AppliedCourses.countDocuments(batchStudentFilter);
+			return res.status(200).json({ success: true, count });
+		}
+
+		const students = await AppliedCourses.find(batchStudentFilter)
 			.populate('_candidate', 'name mobile email personalInfo')
 			.populate({
 				path: '_course',
@@ -1505,5 +1637,1168 @@ router.get('/session-feedback/batch/:batchId', isCollege, async (req, res) => {
 	}
 });
 
+
+const REPORT_IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+const REPORT_VIDEO_EXT = ['mp4', 'mkv', 'mov', 'avi', 'wmv', 'webm'];
+const REPORT_DOC_EXT = [...REPORT_IMAGE_EXT, 'pdf', 'doc', 'docx'];
+const REPORT_FILE_SLOTS = {
+	manualAttendanceFiles: { label: 'Manual attendance', max: 5, maxBytes: 100 * 1024 * 1024, kind: 'document' },
+	morningPhotos: { label: 'Morning photos', max: 5, maxBytes: 10 * 1024 * 1024, kind: 'image' },
+	morningVideo: { label: 'Morning video', max: 1, maxBytes: 100 * 1024 * 1024, kind: 'video' },
+	afternoonPhotos: { label: 'Afternoon photos', max: 5, maxBytes: 10 * 1024 * 1024, kind: 'image' },
+	afternoonVideo: { label: 'Afternoon video', max: 1, maxBytes: 100 * 1024 * 1024, kind: 'video' },
+	eveningPhotos: { label: 'Evening photos', max: 5, maxBytes: 10 * 1024 * 1024, kind: 'image' },
+	eveningGroupPhoto: { label: 'Evening group photo', max: 1, maxBytes: 10 * 1024 * 1024, kind: 'image' },
+	assessmentFiles: { label: 'Assessment files', max: 5, maxBytes: 10 * 1024 * 1024, kind: 'document' },
+	activityProofs: { label: 'Activity proof', max: 10, maxBytes: 10 * 1024 * 1024, kind: 'image' },
+};
+
+const DTR_FIELDS = [
+	{ key: 'trainerName', label: 'Trainer name', source: 'Logged-in trainer', group: 'portal', locked: true },
+	{ key: 'reportDate', label: 'Report date', source: 'Date selected on the report', group: 'portal', locked: true },
+	{ key: 'batch', label: 'Batch', source: 'Batches assigned to the trainer', group: 'portal', locked: true },
+	{ key: 'project', label: 'Project', source: 'Project on the batch course', group: 'portal' },
+	{ key: 'location', label: 'Location', source: 'Center of the batch', group: 'portal' },
+	{ key: 'jobRole', label: 'Job role', source: 'Course name of the batch', group: 'portal' },
+	{ key: 'inTime', label: 'In time', source: 'Session start time for that date', group: 'portal' },
+	{ key: 'outTime', label: 'Out time', source: 'Session end time for that date', group: 'portal' },
+	{ key: 'batchSize', label: 'Batch size', source: 'Students in the batch', group: 'portal' },
+	{ key: 'totalPresent', label: 'Total present', source: 'Saved session attendance', group: 'portal' },
+	{ key: 'totalAbsent', label: 'Total absent', source: 'Saved session attendance', group: 'portal' },
+	{ key: 'topic', label: 'Topic', source: 'Topic covered on the session', group: 'portal' },
+	{ key: 'softSkill', label: 'Soft skill topic', source: 'Activity type on the session', group: 'portal' },
+	{ key: 'manualAttendance', label: 'Manual attendance', source: 'Trainer marks Yes or No and uploads the file', group: 'trainer' },
+	{ key: 'morningPhotos', label: 'Morning theory photos', source: 'Trainer uploads the photos', group: 'trainer' },
+	{ key: 'morningVideo', label: 'Morning theory video', source: 'Trainer uploads the video', group: 'trainer' },
+	{ key: 'afternoonPhotos', label: 'Afternoon practical photos', source: 'Trainer uploads the photos', group: 'trainer' },
+	{ key: 'afternoonVideo', label: 'Afternoon practical video', source: 'Trainer uploads the video', group: 'trainer' },
+	{ key: 'eveningPhotos', label: 'Evening class photos', source: 'Trainer uploads the photos', group: 'trainer' },
+	{ key: 'eveningGroupPhoto', label: 'Evening group photo', source: 'Trainer uploads the photo', group: 'trainer' },
+	{ key: 'internalAssessment', label: 'Internal assessment', source: 'Trainer marks Yes or No and uploads the papers', group: 'trainer' },
+	{ key: 'activityTopic', label: 'Activity topic', source: 'Trainer writes the activity', group: 'trainer' },
+	{ key: 'activityProofs', label: 'Activity proof', source: 'Trainer uploads the photos', group: 'trainer' },
+];
+
+const DTR_SLOT_SETTING = {
+	manualAttendanceFiles: 'manualAttendance',
+	assessmentFiles: 'internalAssessment',
+};
+
+const defaultAttachedDtrFields = () => DTR_FIELDS.map((field) => field.key);
+
+const mapDtrSettings = (doc) => {
+	const saved = Array.isArray(doc?.attachedFields) ? doc.attachedFields : [];
+	const known = new Set(DTR_FIELDS.map((field) => field.key));
+	const attached = saved.filter((key) => known.has(key));
+	DTR_FIELDS.filter((field) => field.locked).forEach((field) => {
+		if (!attached.includes(field.key)) attached.push(field.key);
+	});
+	return {
+		enabled: doc?.enabled !== false,
+		attachedFields: attached.length ? attached : defaultAttachedDtrFields(),
+		fields: DTR_FIELDS,
+	};
+};
+
+const loadDtrSettings = async (collegeId) => {
+	const doc = await DailyReportSetting.findOne({
+		college: collegeId,
+		course: null,
+		$or: [{ courses: { $exists: false } }, { courses: { $size: 0 } }],
+	}).lean();
+	if (!doc) {
+		return {
+			enabled: true,
+			attachedFields: defaultAttachedDtrFields(),
+			fields: DTR_FIELDS,
+		};
+	}
+	return mapDtrSettings(doc);
+};
+
+const reportHttpError = (status, message) => {
+	const error = new Error(message);
+	error.status = status;
+	return error;
+};
+
+const asUploadArray = (value) => {
+	if (!value) return [];
+	return Array.isArray(value) ? value : [value];
+};
+
+const parseReportDateKey = (value) => {
+	const text = String(value || '').trim();
+	return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+};
+
+const parseReportYesNo = (value, fieldName) => {
+	const text = String(value || 'No').trim();
+	if (text !== 'Yes' && text !== 'No') {
+		throw reportHttpError(400, `${fieldName} must be Yes or No`);
+	}
+	return text;
+};
+
+const parseReportCount = (value, fieldName) => {
+	if (value === '' || value == null) return 0;
+	const num = Number(value);
+	if (!Number.isInteger(num) || num < 0) {
+		throw reportHttpError(400, `${fieldName} must be a whole number`);
+	}
+	return num;
+};
+
+const mapReportFile = (file) => {
+	if (!file) return null;
+	const item = typeof file.toObject === 'function' ? file.toObject() : { ...file };
+	return {
+		id: String(item._id || ''),
+		fileName: item.fileName || '',
+		fileUrl: item.fileUrl ? resolvePublicUrl(item.fileUrl) : '',
+		fileSize: item.fileSize || 0,
+		mimeType: item.mimeType || '',
+	};
+};
+
+const mapDailyReport = (doc) => {
+	const item = typeof doc.toObject === 'function' ? doc.toObject() : doc;
+	const files = (key) => (item[key] || []).map(mapReportFile).filter((file) => file?.id);
+	return {
+		id: String(item._id),
+		reportDate: item.reportDateKey || '',
+		trainerId: item.trainer ? String(item.trainer) : '',
+		trainerName: item.trainerName || '',
+		projectName: item.projectName || '',
+		location: item.centerName || '',
+		jobRole: item.jobRole || '',
+		courseName: item.courseName || item.jobRole || '',
+		verticalName: item.verticalName || '',
+		templateId: item.template ? String(item.template) : '',
+		answers: (item.answers || []).filter((answer) => answer.key !== 'batchAttendance').map((answer) => ({
+			key: answer.key || '',
+			label: answer.label || '',
+			type: answer.type || 'text',
+			value: answer.value || '',
+			files: (answer.files || []).map(mapReportFile).filter((file) => file?.id),
+		})),
+		batchId: item.batch ? String(item.batch) : '',
+		batchCode: item.batchCode || '',
+		inTime: item.inTime || '',
+		outTime: item.outTime || '',
+		batchSize: item.batchSize ?? 0,
+		totalPresent: item.totalPresent ?? 0,
+		totalAbsent: item.totalAbsent ?? 0,
+		manualAttendanceUpdated: item.manualAttendanceUpdated || 'No',
+		topic: item.topic || '',
+		softSkillTopic: item.softSkillTopic || '',
+		internalAssessment: item.internalAssessment || 'No',
+		activityTopic: item.activityTopic || '',
+		manualAttendanceFiles: files('manualAttendanceFiles'),
+		morningPhotos: files('morningPhotos'),
+		morningVideo: files('morningVideo'),
+		afternoonPhotos: files('afternoonPhotos'),
+		afternoonVideo: files('afternoonVideo'),
+		eveningPhotos: files('eveningPhotos'),
+		eveningGroupPhoto: files('eveningGroupPhoto'),
+		assessmentFiles: files('assessmentFiles'),
+		activityProofs: files('activityProofs'),
+		createdAt: item.createdAt || null,
+		updatedAt: item.updatedAt || null,
+	};
+};
+
+const collectReportSlotFiles = (files, slot) => {
+	const rule = REPORT_FILE_SLOTS[slot];
+	const incoming = asUploadArray(files?.[slot]);
+	if (incoming.length > rule.max) {
+		throw reportHttpError(400, `${rule.label} allows up to ${rule.max} file(s)`);
+	}
+	const allowed = rule.kind === 'image'
+		? REPORT_IMAGE_EXT
+		: rule.kind === 'video'
+			? REPORT_VIDEO_EXT
+			: REPORT_DOC_EXT;
+	incoming.forEach((file) => {
+		const ext = getFileExtension(file.name);
+		if (!allowed.includes(ext)) {
+			throw reportHttpError(400, `${file.name || 'File'} is not an allowed ${rule.label} file`);
+		}
+		if ((file.size || 0) > rule.maxBytes) {
+			const maxMb = Math.round(rule.maxBytes / (1024 * 1024));
+			throw reportHttpError(400, `${file.name || 'File'} is larger than ${maxMb} MB`);
+		}
+	});
+	return incoming;
+};
+
+const uploadDailyReportFile = async (file, collegeId) => {
+	const ext = getFileExtension(file.name);
+	const key = `DailyTrainerReport/${collegeId}/${uuid()}.${ext}`;
+	await s3.upload({
+		Bucket: bucketName,
+		Key: key,
+		Body: file.data,
+		ContentType: file.mimetype,
+	}).promise();
+	return {
+		fileName: file.name,
+		fileUrl: key,
+		fileSize: file.size || 0,
+		mimeType: file.mimetype || '',
+	};
+};
+
+const applyReportUploads = async (doc, files, removeIds = [], attachedFields = defaultAttachedDtrFields()) => {
+	const attached = new Set(attachedFields);
+	const removeSet = new Set((removeIds || []).map(String));
+	for (const slot of Object.keys(REPORT_FILE_SLOTS)) {
+		const settingKey = DTR_SLOT_SETTING[slot] || slot;
+		if (!attached.has(settingKey)) continue;
+		const incoming = collectReportSlotFiles(files, slot);
+		const kept = (doc[slot] || []).filter((file) => !removeSet.has(String(file._id)));
+		if (kept.length + incoming.length > REPORT_FILE_SLOTS[slot].max) {
+			throw reportHttpError(400, `${REPORT_FILE_SLOTS[slot].label} allows up to ${REPORT_FILE_SLOTS[slot].max} file(s)`);
+		}
+		const uploaded = [];
+		for (const file of incoming) {
+			uploaded.push(await uploadDailyReportFile(file, doc.college));
+		}
+		doc[slot] = kept.concat(uploaded);
+		doc.markModified(slot);
+	}
+
+	if (attached.has('manualAttendance') && doc.manualAttendanceUpdated === 'Yes' && doc.manualAttendanceFiles.length === 0) {
+		throw reportHttpError(400, 'Upload the manual attendance file when attendance is marked Yes');
+	}
+	if (attached.has('internalAssessment') && doc.internalAssessment === 'Yes' && doc.assessmentFiles.length === 0) {
+		throw reportHttpError(400, 'Upload the assessment file when internal assessment is Yes');
+	}
+};
+
+const loadReportBatchContext = async (req, batchId) => {
+	if (!mongoose.Types.ObjectId.isValid(batchId)) {
+		throw reportHttpError(400, 'Select a batch');
+	}
+
+	const batchDoc = await Batch.findById(batchId);
+	if (!batchDoc) {
+		throw reportHttpError(404, 'Batch not found');
+	}
+	if (String(batchDoc.college) !== String(req.college._id)) {
+		throw reportHttpError(403, 'You do not have permission for this batch');
+	}
+
+	if (req.user.role === 4) {
+		const onBatch = (batchDoc.trainers || []).some(
+			(trainerId) => String(trainerId) === String(req.user._id)
+		);
+		const onPlan = await SessionPlan.exists({
+			batch: batchId,
+			fieldTrainer: req.user._id,
+			isDeleted: false,
+		});
+		const onAssignment = await BatchSessionAssignment.exists({
+			batch: batchId,
+			$or: [{ trainer: req.user._id }, { seniorTrainer: req.user._id }],
+		});
+		if (!onBatch && !onPlan && !onAssignment) {
+			throw reportHttpError(403, 'You are not assigned to this batch');
+		}
+	}
+
+	const [courseDoc, centerDoc, batchSize] = await Promise.all([
+		batchDoc.courseId ? Courses.findById(batchDoc.courseId).select('name projectName project vertical') : null,
+		batchDoc.centerId ? Center.findById(batchDoc.centerId).select('name') : null,
+		AppliedCourses.countDocuments({
+			batch: batchDoc._id,
+			$or: [
+				{ isBatchAssigned: true },
+				{ admissionDone: true },
+			],
+		}),
+	]);
+	let verticalName = '';
+	if (courseDoc?.vertical) {
+		const vertical = await Vertical.findById(courseDoc.vertical).select('name').lean();
+		verticalName = vertical?.name || '';
+	}
+
+	return {
+		batch: batchDoc._id,
+		batchCode: batchDoc.name || '',
+		course: courseDoc?._id || batchDoc.courseId || null,
+		jobRole: courseDoc?.name || '',
+		project: courseDoc?.project || null,
+		projectName: courseDoc?.projectName || '',
+		verticalName,
+		center: centerDoc?._id || batchDoc.centerId || null,
+		centerName: centerDoc?.name || '',
+		batchSize,
+	};
+};
+
+const readReportFields = (body, attachedFields = defaultAttachedDtrFields()) => {
+	const attached = new Set(attachedFields);
+	const reportDateKey = parseReportDateKey(body.reportDate);
+	if (!reportDateKey) {
+		throw reportHttpError(400, 'Report date is required');
+	}
+	const inTime = String(body.inTime || '').trim();
+	const outTime = String(body.outTime || '').trim();
+	if (attached.has('inTime') && !inTime) {
+		throw reportHttpError(400, 'In time is required');
+	}
+	if (attached.has('outTime') && !outTime) {
+		throw reportHttpError(400, 'Out time is required');
+	}
+	return {
+		reportDateKey,
+		reportDate: new Date(`${reportDateKey}T00:00:00.000Z`),
+		inTime,
+		outTime,
+		batchSize: attached.has('batchSize') ? parseReportCount(body.batchSize, 'Batch size') : 0,
+		totalPresent: attached.has('totalPresent') ? parseReportCount(body.totalPresent, 'Present') : 0,
+		totalAbsent: attached.has('totalAbsent') ? parseReportCount(body.totalAbsent, 'Absent') : 0,
+		manualAttendanceUpdated: attached.has('manualAttendance')
+			? parseReportYesNo(body.manualAttendanceUpdated, 'Manual attendance')
+			: 'No',
+		topic: attached.has('topic') ? String(body.topic || '').trim() : '',
+		softSkillTopic: attached.has('softSkill') ? String(body.softSkillTopic || '').trim() : '',
+		internalAssessment: attached.has('internalAssessment')
+			? parseReportYesNo(body.internalAssessment, 'Internal assessment')
+			: 'No',
+		activityTopic: attached.has('activityTopic') ? String(body.activityTopic || '').trim() : '',
+	};
+};
+
+const readRemovedReportFileIds = (body) => {
+	if (!body?.removeFileIds) return [];
+	try {
+		const parsed = JSON.parse(body.removeFileIds);
+		return Array.isArray(parsed) ? parsed.map(String) : [];
+	} catch (error) {
+		return [];
+	}
+};
+
+const DTR_FIELD_TYPES = ['text', 'textarea', 'number', 'date', 'time', 'yesno', 'select', 'radio', 'file'];
+
+const canSetDtr = (user) => user?.role === 2
+	|| user?.permissions?.permission_type === 'Admin'
+	|| user?.permissions?.custom_permissions?.can_be_academic_coordinator === true;
+
+const mapTemplateField = (field) => ({
+	key: field.key || '',
+	label: field.label || '',
+	type: field.type || 'text',
+	required: field.required === true,
+	placeholder: field.placeholder || '',
+	options: Array.isArray(field.options) ? field.options.filter(Boolean) : [],
+	portalKey: field.portalKey || '',
+	fileKind: field.fileKind || 'image',
+	maxFiles: Math.min(10, Math.max(1, Number(field.maxFiles) || 1)),
+});
+
+const idStrings = (list, single) => {
+	const many = (Array.isArray(list) ? list : []).map((id) => String(id || '')).filter((id) => id && id !== 'null');
+	if (many.length) return many;
+	return single ? [String(single)] : [];
+};
+
+const nameList = (list, single) => {
+	const many = (Array.isArray(list) ? list : []).map((name) => String(name || '').trim()).filter(Boolean);
+	if (many.length) return many;
+	return single ? [String(single)] : [];
+};
+
+const mapTemplate = (doc) => {
+	const departmentIds = idStrings(doc.verticals, doc.vertical);
+	const departmentNames = nameList(doc.verticalNames, doc.verticalName);
+	const projectIds = idStrings(doc.projects, doc.project);
+	const projectNames = nameList(doc.projectNames, doc.projectName);
+	const centerIds = idStrings(doc.centers, doc.center);
+	const centerNames = nameList(doc.centerNames, doc.centerName);
+	const courseIds = idStrings(doc.courses, doc.course);
+	const courseNames = nameList(doc.courseNames, doc.courseName);
+	return {
+		id: String(doc._id),
+		name: doc.name || 'Daily trainer report',
+		enabled: doc.enabled !== false,
+		departmentIds,
+		departmentNames,
+		departmentId: departmentIds[0] || '',
+		departmentName: departmentNames.join(', '),
+		projectIds,
+		projectNames,
+		projectId: projectIds[0] || '',
+		projectName: projectNames.join(', '),
+		centerIds,
+		centerNames,
+		centerId: centerIds[0] || '',
+		centerName: centerNames.join(', '),
+		courseIds,
+		courseNames,
+		courseId: courseIds[0] || '',
+		courseName: courseNames.join(', '),
+		batchIds: (doc.batches || []).map((id) => String(id)),
+		batchNames: Array.isArray(doc.batchNames) ? doc.batchNames : [],
+		trainerIds: (doc.trainers || []).map((id) => String(id)),
+		trainerNames: Array.isArray(doc.trainerNames) ? doc.trainerNames : [],
+		topicIds: Array.isArray(doc.topicIds) ? doc.topicIds.map(String) : [],
+		topicNames: Array.isArray(doc.topicNames) ? doc.topicNames : [],
+		fields: (doc.fields || []).map(mapTemplateField).filter((field) => field.key !== 'batchAttendance'),
+	};
+};
+
+const normalizeTemplateFields = (fields) => {
+	const source = (Array.isArray(fields) ? fields : []).filter((field) => field?.key !== 'batchAttendance');
+	if (!source.length) {
+		throw reportHttpError(400, 'Add at least one field');
+	}
+	const used = new Set();
+	return source.map((field, index) => {
+		const label = String(field?.label || '').trim();
+		if (!label) throw reportHttpError(400, 'Every field needs a label');
+		const type = DTR_FIELD_TYPES.includes(field?.type) ? field.type : 'text';
+		let key = String(field?.key || '').trim().replace(/[^\w-]/g, '');
+		if (!key) key = `field_${index + 1}`;
+		while (used.has(key)) key = `${key}_${index + 1}`;
+		used.add(key);
+		const choiceType = type === 'yesno' ? 'radio' : type;
+		const options = choiceType === 'select' || choiceType === 'radio'
+			? String(field?.optionsText || (Array.isArray(field?.options) ? field.options.join('\n') : ''))
+				.split(/\n|,/)
+				.map((item) => item.trim())
+				.filter(Boolean)
+			: [];
+		const choices = type === 'yesno' && options.length < 2 ? ['Yes', 'No'] : options;
+		if ((choiceType === 'select' || choiceType === 'radio') && choices.length < 2) {
+			throw reportHttpError(400, `${label} needs at least two options`);
+		}
+		const portalKey = '';
+		return {
+			key,
+			label,
+			type: choiceType,
+			required: field?.required === true,
+			placeholder: String(field?.placeholder || '').trim(),
+			options: choices,
+			portalKey,
+			fileKind: ['image', 'video', 'document'].includes(field?.fileKind) ? field.fileKind : 'image',
+			maxFiles: Math.min(10, Math.max(1, Number(field?.maxFiles) || 1)),
+		};
+	});
+};
+
+const uniqueObjectIds = (value) => [...new Set(
+	(Array.isArray(value) ? value : [value])
+		.map((id) => String(id || ''))
+		.filter((id) => mongoose.Types.ObjectId.isValid(id))
+)];
+
+const belongsToCollege = (doc, collegeId) => !doc?.college || String(doc.college) === String(collegeId);
+
+const orderedDocs = (ids, docs, missingMessage) => {
+	const byId = new Map(docs.map((doc) => [String(doc._id), doc]));
+	if (ids.some((id) => !byId.has(id))) throw reportHttpError(400, missingMessage);
+	return ids.map((id) => byId.get(id));
+};
+
+const loadTemplateScope = async (collegeId, body) => {
+	const departmentIds = uniqueObjectIds(body.departmentIds?.length ? body.departmentIds : body.departmentId);
+	const projectIds = uniqueObjectIds(body.projectIds?.length ? body.projectIds : body.projectId);
+	const centerIds = uniqueObjectIds(body.centerIds?.length ? body.centerIds : body.centerId);
+	const courseIds = uniqueObjectIds(body.courseIds?.length ? body.courseIds : body.courseId);
+	if (!departmentIds.length) throw reportHttpError(400, 'Select at least one department');
+	if (!projectIds.length) throw reportHttpError(400, 'Select at least one project');
+	if (!centerIds.length) throw reportHttpError(400, 'Select at least one center');
+	if (!courseIds.length) throw reportHttpError(400, 'Select at least one course');
+
+	const [verticalDocs, projectDocs, centerDocs, courseDocs] = await Promise.all([
+		Vertical.find({ _id: { $in: departmentIds } }).select('name college').lean(),
+		Project.find({ _id: { $in: projectIds } }).select('name college vertical').lean(),
+		Center.find({ _id: { $in: centerIds } }).select('name college projects').lean(),
+		Courses.find({ _id: { $in: courseIds } }).select('name college vertical project center centerId').lean(),
+	]);
+
+	const verticals = orderedDocs(
+		departmentIds,
+		verticalDocs.filter((doc) => belongsToCollege(doc, collegeId)),
+		'Select departments from this college'
+	);
+	const projects = orderedDocs(
+		projectIds,
+		projectDocs.filter((doc) => belongsToCollege(doc, collegeId) && departmentIds.includes(String(doc.vertical || ''))),
+		'Select projects from the chosen departments'
+	);
+	const centers = orderedDocs(
+		centerIds,
+		centerDocs.filter((doc) => belongsToCollege(doc, collegeId) && (doc.projects || []).some((id) => projectIds.includes(String(id)))),
+		'Select centers from the chosen projects'
+	);
+	const courses = orderedDocs(
+		courseIds,
+		courseDocs.filter((doc) => {
+			if (!belongsToCollege(doc, collegeId)) return false;
+			if (doc.vertical && !departmentIds.includes(String(doc.vertical))) return false;
+			if (doc.project && !projectIds.includes(String(doc.project))) return false;
+			const linkedCenters = [...(doc.center || []), doc.centerId]
+				.map((id) => String(id || ''))
+				.filter((id) => mongoose.Types.ObjectId.isValid(id));
+			return !linkedCenters.length || linkedCenters.some((id) => centerIds.includes(id));
+		}),
+		'Select courses from the chosen centers'
+	);
+
+	const verticalNames = verticals.map((doc) => doc.name || 'Department');
+	const projectNames = projects.map((doc) => doc.name || 'Project');
+	const centerNames = centers.map((doc) => doc.name || 'Center');
+	const courseNames = courses.map((doc) => doc.name || 'Course');
+	return {
+		verticals: verticals.map((doc) => doc._id),
+		verticalNames,
+		vertical: verticals[0]._id,
+		verticalName: verticalNames.join(', '),
+		projects: projects.map((doc) => doc._id),
+		projectNames,
+		project: projects[0]._id,
+		projectName: projectNames.join(', '),
+		centers: centers.map((doc) => doc._id),
+		centerNames,
+		center: centers[0]._id,
+		centerName: centerNames.join(', '),
+		courses: courses.map((doc) => doc._id),
+		courseNames,
+		course: courses[0]._id,
+		courseName: courseNames.join(', '),
+	};
+};
+
+const loadTemplateBatches = async (collegeId, courseIds, centerIds, batchIds) => {
+	const ids = uniqueObjectIds(batchIds);
+	if (!ids.length) throw reportHttpError(400, 'Select at least one batch');
+	const docs = await Batch.find({
+		_id: { $in: ids },
+		courseId: { $in: courseIds },
+		centerId: { $in: centerIds },
+		college: collegeId,
+	}).select('name').lean();
+	const ordered = orderedDocs(ids, docs, 'Select batches from the chosen courses and centers');
+	return {
+		batches: ordered.map((doc) => doc._id),
+		batchNames: ordered.map((doc) => doc.name || 'Batch'),
+	};
+};
+
+const templateIdList = (list, single) => {
+	const ids = (Array.isArray(list) ? list : []).map((id) => String(id || '')).filter(Boolean);
+	if (ids.length) return ids;
+	return single ? [String(single)] : [];
+};
+
+const templateIncludesId = (list, single, value) => {
+	const ids = templateIdList(list, single);
+	if (!ids.length || !value) return true;
+	return ids.some((id) => id === String(value));
+};
+
+const templateIncludesBatch = (template, batchId) => templateIncludesId(template?.batches, null, batchId);
+
+const templateIncludesCourse = (template, courseId) => templateIncludesId(template?.courses, template?.course, courseId);
+
+const templateIncludesCenter = (template, centerId) => templateIncludesId(template?.centers, template?.center, centerId);
+
+const topicNamesOnPlan = (plan) => {
+	const items = (plan.subSessionItems || [])
+		.map((item) => String(item?.name || item?.topic || '').trim())
+		.filter(Boolean);
+	if (items.length) return items;
+	return String(plan.topicCovered || '').split(',').map((item) => item.trim()).filter(Boolean);
+};
+
+const loadTemplateTopics = async (collegeId, courseIds, batchIds, topicIds) => {
+	const ids = [...new Set((Array.isArray(topicIds) ? topicIds : []).map((id) => String(id || '').trim()).filter(Boolean))];
+	const plans = await SessionPlan.find({
+		college: collegeId,
+		isDeleted: false,
+		course: { $in: courseIds },
+	}).select('course batch subSessionItems topicCovered').lean();
+	const selectedBatches = new Set((batchIds || []).map((id) => String(id)));
+	const allowed = new Map();
+	plans.forEach((plan) => {
+		const batchId = plan.batch ? String(plan.batch) : '';
+		if (selectedBatches.size && batchId && !selectedBatches.has(batchId)) return;
+		const courseId = String(plan.course || '');
+		topicNamesOnPlan(plan).forEach((name) => {
+			const id = `${courseId}::${name.toLowerCase()}`;
+			if (!allowed.has(id)) allowed.set(id, name);
+		});
+	});
+	if (!ids.length) return { topicIds: [], topicNames: [] };
+	if (ids.some((id) => !allowed.has(id))) {
+		throw reportHttpError(400, 'Select topic names from ACLP for the chosen courses');
+	}
+	return {
+		topicIds: ids,
+		topicNames: ids.map((id) => allowed.get(id)),
+	};
+};
+
+const loadTemplateTrainers = async (batchIds, trainerIds) => {
+	const ids = [...new Set((Array.isArray(trainerIds) ? trainerIds : []).map(String).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+	if (!ids.length) throw reportHttpError(400, 'Select at least one trainer');
+	const batches = await Batch.find({ _id: { $in: batchIds } }).select('trainers seniorTrainer').lean();
+	const allowed = new Set();
+	batches.forEach((batch) => {
+		(batch.trainers || []).forEach((id) => allowed.add(String(id)));
+		if (batch.seniorTrainer) allowed.add(String(batch.seniorTrainer));
+	});
+	if (ids.some((id) => !allowed.has(id))) {
+		throw reportHttpError(400, 'Select trainers assigned to the chosen batches');
+	}
+	const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+	const nameById = new Map(users.map((user) => [String(user._id), user.name || 'Trainer']));
+	return {
+		trainers: ids,
+		trainerNames: ids.map((id) => nameById.get(id) || 'Trainer'),
+	};
+};
+
+const templateIncludesTrainer = (template, userId) => {
+	const ids = template?.trainers || [];
+	if (!ids.length) return true;
+	return ids.some((id) => String(id) === String(userId));
+};
+
+const buildTemplateAnswers = async (template, body, files, collegeId, previousAnswers = []) => {
+	let values = {};
+	try {
+		values = JSON.parse(body.answers || '{}');
+	} catch (error) {
+		values = {};
+	}
+	const previousByKey = new Map((previousAnswers || []).map((answer) => [answer.key, answer]));
+	const answers = [];
+	for (const field of (template.fields || []).filter((item) => item.key !== 'batchAttendance')) {
+		if (field.type === 'file') {
+			const incoming = asUploadArray(files?.[`file_${field.key}`]);
+			const allowed = field.fileKind === 'video'
+				? REPORT_VIDEO_EXT
+				: field.fileKind === 'document'
+					? REPORT_DOC_EXT
+					: REPORT_IMAGE_EXT;
+			const maxBytes = field.fileKind === 'video' || field.fileKind === 'document'
+				? 100 * 1024 * 1024
+				: 10 * 1024 * 1024;
+			if (incoming.length > field.maxFiles) {
+				throw reportHttpError(400, `${field.label} allows up to ${field.maxFiles} file(s)`);
+			}
+			incoming.forEach((file) => {
+				const ext = getFileExtension(file.name);
+				if (!allowed.includes(ext)) throw reportHttpError(400, `${file.name} is not allowed for ${field.label}`);
+				if ((file.size || 0) > maxBytes) throw reportHttpError(400, `${file.name} is too large`);
+			});
+			const removed = new Set(readRemovedReportFileIds(body));
+			const kept = (previousByKey.get(field.key)?.files || []).filter((file) => {
+				const id = String(file?._id || file?.id || '');
+				return id && !removed.has(id);
+			});
+			const uploaded = [];
+			for (const file of incoming) {
+				uploaded.push(await uploadDailyReportFile(file, collegeId));
+			}
+			const storedFiles = kept.concat(uploaded).slice(0, field.maxFiles);
+			if (field.required && storedFiles.length === 0) {
+				throw reportHttpError(400, `${field.label} is required`);
+			}
+			answers.push({ key: field.key, label: field.label, type: field.type, value: '', files: storedFiles });
+			continue;
+		}
+		const value = String(values[field.key] ?? '').trim();
+		if (field.required && !value) throw reportHttpError(400, `${field.label} is required`);
+		if (field.type === 'yesno' && value && value !== 'Yes' && value !== 'No') {
+			throw reportHttpError(400, `${field.label} must be Yes or No`);
+		}
+		if (field.type === 'number' && value && !Number.isInteger(Number(value))) {
+			throw reportHttpError(400, `${field.label} must be a whole number`);
+		}
+		answers.push({ key: field.key, label: field.label, type: field.type, value, files: [] });
+	}
+	const studentCounts = [
+		{ key: 'presentStudent', label: 'Present student' },
+		{ key: 'absentStudent', label: 'Absent student' },
+		{ key: 'onLeaveStudent', label: 'On leave student' },
+		{ key: 'dropoutStudent', label: 'Dropout student' },
+	];
+	studentCounts.forEach((field) => {
+		if (answers.some((answer) => answer.key === field.key)) return;
+		const value = String(values[field.key] ?? '').trim();
+		if (value && (!Number.isInteger(Number(value)) || Number(value) < 0)) {
+			throw reportHttpError(400, `${field.label} must be a whole number`);
+		}
+		answers.push({ key: field.key, label: field.label, type: 'number', value, files: [] });
+	});
+	const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+	const hasTopicField = (template.fields || []).some((field) => field.key === 'topicName' || labelKey(field.label) === 'topicname');
+	if (!hasTopicField && !answers.some((answer) => answer.key === 'topicName')) {
+		const topicAnswer = {
+			key: 'topicName',
+			label: 'Topic name',
+			type: 'select',
+			value: String(values.topicName ?? '').trim(),
+			files: [],
+		};
+		const batchIndex = answers.findIndex((answer) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(answer.label)));
+		if (batchIndex >= 0) answers.splice(batchIndex + 1, 0, topicAnswer);
+		else answers.push(topicAnswer);
+	}
+	return answers;
+};
+
+const studentCountTotalError = (answers, batchSize) => {
+	const size = Number(batchSize);
+	if (!Number.isInteger(size) || size < 0) {
+		return 'Batch size is not available for this batch.';
+	}
+	const keys = ['presentStudent', 'absentStudent', 'onLeaveStudent', 'dropoutStudent'];
+	let total = 0;
+	for (const key of keys) {
+		const raw = String((answers.find((answer) => answer.key === key) || {}).value || '').trim();
+		const num = Number(raw);
+		if (raw === '' || !Number.isInteger(num) || num < 0) {
+			return 'Present student, Absent student, On leave student and Dropout student must be whole numbers, and their total must equal the batch size.';
+		}
+		total += num;
+	}
+	if (total !== size) {
+		return `Present student + Absent student + On leave student + Dropout student is ${total}. It must equal the batch size of ${size}.`;
+	}
+	return '';
+};
+
+const applyPortalSnapshot = (target, template, answers) => {
+	const valueByKey = new Map((answers || []).map((answer) => [answer.key, answer.value || '']));
+	const portal = {};
+	(template.fields || []).forEach((field) => {
+		if (field.portalKey) portal[field.portalKey] = valueByKey.get(field.key) || '';
+	});
+	if (portal.inTime) target.inTime = portal.inTime;
+	if (portal.outTime) target.outTime = portal.outTime;
+	if (portal.topic) target.topic = portal.topic;
+	if (valueByKey.get('topicName')) target.topic = valueByKey.get('topicName');
+	if (portal.softSkill) target.softSkillTopic = portal.softSkill;
+	['batchSize', 'totalPresent', 'totalAbsent'].forEach((key) => {
+		if (portal[key] === undefined || portal[key] === '') return;
+		const num = Number(portal[key]);
+		if (Number.isInteger(num) && num >= 0) target[key] = num;
+	});
+};
+
+router.get('/daily-report-settings', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const templates = await DailyReportSetting.find({ college: req.college._id, course: { $ne: null } })
+			.sort({ updatedAt: -1 })
+			.lean();
+		return res.status(200).json({
+			status: true,
+			data: { templates: templates.map(mapTemplate) },
+		});
+	} catch (error) {
+		console.error('Error fetching DTR settings:', error);
+		return res.status(500).json({ status: false, message: error.message || 'Server error' });
+	}
+});
+
+router.post('/daily-report-settings', authorizeTrainingAccess, async (req, res) => {
+	try {
+		if (!canSetDtr(req.user)) {
+			return res.status(403).json({ status: false, message: 'Only an academic coordinator can change DTR settings' });
+		}
+		const scope = await loadTemplateScope(req.college._id, req.body || {});
+		const batchScope = await loadTemplateBatches(req.college._id, scope.courses, scope.centers, req.body?.batchIds);
+		const trainerScope = await loadTemplateTrainers(batchScope.batches, req.body?.trainerIds);
+		const topicScope = await loadTemplateTopics(req.college._id, scope.courses, batchScope.batches, req.body?.topicIds);
+		const fields = normalizeTemplateFields(req.body?.fields);
+		const saved = await DailyReportSetting.create({
+			college: req.college._id,
+			name: String(req.body?.name || `${scope.courseName} DTR`).trim(),
+			enabled: req.body?.enabled !== false,
+			...scope,
+			...batchScope,
+			...trainerScope,
+			...topicScope,
+			fields,
+		});
+		return res.status(200).json({ status: true, message: 'DTR created', data: mapTemplate(saved) });
+	} catch (error) {
+		console.error('Error creating DTR:', error);
+		return res.status(error.status || 500).json({ status: false, message: error.message || 'Server error' });
+	}
+});
+
+router.put('/daily-report-settings/:id', authorizeTrainingAccess, async (req, res) => {
+	try {
+		if (!canSetDtr(req.user)) {
+			return res.status(403).json({ status: false, message: 'Only an academic coordinator can change DTR settings' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+			return res.status(400).json({ status: false, message: 'DTR not found' });
+		}
+		const template = await DailyReportSetting.findOne({ _id: req.params.id, college: req.college._id });
+		if (!template) return res.status(404).json({ status: false, message: 'DTR not found' });
+		const scope = await loadTemplateScope(req.college._id, req.body || {});
+		const batchScope = await loadTemplateBatches(req.college._id, scope.courses, scope.centers, req.body?.batchIds);
+		const trainerScope = await loadTemplateTrainers(batchScope.batches, req.body?.trainerIds);
+		const topicScope = await loadTemplateTopics(req.college._id, scope.courses, batchScope.batches, req.body?.topicIds);
+		template.name = String(req.body?.name || template.name).trim();
+		template.enabled = req.body?.enabled !== false;
+		Object.assign(template, scope, batchScope, trainerScope, topicScope);
+		template.fields = normalizeTemplateFields(req.body?.fields);
+		['fields', 'verticals', 'verticalNames', 'projects', 'projectNames', 'centers', 'centerNames', 'courses', 'courseNames', 'batches', 'batchNames', 'trainers', 'trainerNames', 'topicIds', 'topicNames'].forEach((key) => {
+			template.markModified(key);
+		});
+		await template.save();
+		return res.status(200).json({ status: true, message: 'DTR saved', data: mapTemplate(template) });
+	} catch (error) {
+		console.error('Error updating DTR:', error);
+		return res.status(error.status || 500).json({ status: false, message: error.message || 'Server error' });
+	}
+});
+
+router.get('/batch-topics/:batchId', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const context = await loadReportBatchContext(req, req.params.batchId);
+		if (!context.course) {
+			return res.status(200).json({ status: true, data: [] });
+		}
+		const assignments = await BatchSessionAssignment.find({
+			course: context.course,
+			batch: context.batch,
+			$or: [
+				{ trainer: { $ne: null } },
+				{ seniorTrainer: { $ne: null } },
+			],
+		}).select('session').lean();
+		const assignedIds = assignments.map((row) => row.session).filter(Boolean);
+		const plans = await SessionPlan.find({
+			college: req.college._id,
+			isDeleted: false,
+			course: context.course,
+			$or: [
+				{ _id: { $in: assignedIds } },
+				{ fieldTrainer: { $ne: null } },
+				{ seniorTrainer: { $ne: null } },
+			],
+		}).select('title sessionNumber topicCovered').sort({ sessionNumber: 1, createdAt: 1 }).lean();
+		const names = new Map();
+		plans.forEach((plan) => {
+			const title = String(plan.title || plan.topicCovered || '').trim();
+			if (!title) return;
+			const number = String(plan.sessionNumber || '').trim();
+			const name = number ? `${number} · ${title}` : title;
+			const key = name.toLowerCase();
+			if (!names.has(key)) names.set(key, name);
+		});
+		return res.status(200).json({ status: true, data: [...names.values()] });
+	} catch (error) {
+		console.error('Error fetching batch topics:', error);
+		return res.status(error.status || 500).json({ status: false, message: error.message || 'Server error' });
+	}
+});
+
+router.get('/daily-reports', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const query = { college: req.college._id };
+		if (req.user.role === 4) {
+			query.trainer = req.user._id;
+		} else if (req.query.trainerId && mongoose.Types.ObjectId.isValid(req.query.trainerId)) {
+			query.trainer = req.query.trainerId;
+		}
+		if (parseReportDateKey(req.query.from) || parseReportDateKey(req.query.to)) {
+			query.reportDateKey = {};
+			if (parseReportDateKey(req.query.from)) query.reportDateKey.$gte = req.query.from;
+			if (parseReportDateKey(req.query.to)) query.reportDateKey.$lte = req.query.to;
+		}
+
+		const reports = await DailyTrainerReport.find(query)
+			.sort({ reportDateKey: -1, createdAt: -1 })
+			.limit(200)
+			.lean();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Daily trainer reports fetched',
+			data: reports.map(mapDailyReport),
+		});
+	} catch (error) {
+		console.error('Error fetching daily trainer reports:', error);
+		return res.status(error.status || 500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.get('/daily-reports/:id', authorizeTrainingAccess, async (req, res) => {
+	try {
+		if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+			return res.status(400).json({ status: false, message: 'Report not found' });
+		}
+		const report = await DailyTrainerReport.findOne({
+			_id: req.params.id,
+			college: req.college._id,
+		});
+		if (!report) {
+			return res.status(404).json({ status: false, message: 'Report not found' });
+		}
+		if (req.user.role === 4 && String(report.trainer) !== String(req.user._id)) {
+			return res.status(403).json({ status: false, message: 'You cannot view this report' });
+		}
+		return res.status(200).json({
+			status: true,
+			data: mapDailyReport(report),
+		});
+	} catch (error) {
+		console.error('Error fetching daily trainer report:', error);
+		return res.status(error.status || 500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.post('/daily-reports', authorizeTrainingAccess, async (req, res) => {
+	try {
+		if (req.body?.templateId) {
+			if (!mongoose.Types.ObjectId.isValid(req.body.templateId)) {
+				return res.status(400).json({ status: false, message: 'Select a DTR for this course' });
+			}
+			const template = await DailyReportSetting.findOne({
+				_id: req.body.templateId,
+				college: req.college._id,
+				enabled: true,
+			});
+			if (!template) {
+				return res.status(404).json({ status: false, message: 'No DTR is set for this course' });
+			}
+			const reportDateKey = parseReportDateKey(req.body.reportDate);
+			if (!reportDateKey) {
+				return res.status(400).json({ status: false, message: 'Report date is required' });
+			}
+			const context = await loadReportBatchContext(req, req.body.batchId);
+			if (!templateIncludesCourse(template, context.course)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the courses for this DTR' });
+			}
+			if (!templateIncludesCenter(template, context.center)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the centers for this DTR' });
+			}
+			if (!templateIncludesBatch(template, context.batch)) {
+				return res.status(400).json({ status: false, message: 'This batch is not included in the DTR' });
+			}
+			if (!templateIncludesTrainer(template, req.user._id)) {
+				return res.status(403).json({ status: false, message: 'This DTR is not assigned to you' });
+			}
+			const duplicate = await DailyTrainerReport.findOne({
+				trainer: req.user._id,
+				batch: context.batch,
+				reportDateKey,
+			}).select('_id');
+			if (duplicate) {
+				return res.status(409).json({
+					status: false,
+					message: 'A report already exists for this batch on this date',
+					data: { id: String(duplicate._id) },
+				});
+			}
+			const answers = await buildTemplateAnswers(template, req.body, req.files, req.college._id);
+			const countError = studentCountTotalError(answers, context.batchSize);
+			if (countError) {
+				return res.status(400).json({ status: false, message: countError });
+			}
+			const report = new DailyTrainerReport({
+				college: req.college._id,
+				trainer: req.user._id,
+				trainerName: req.user.name || '',
+				template: template._id,
+				reportDateKey,
+				reportDate: new Date(`${reportDateKey}T00:00:00.000Z`),
+				courseName: context.jobRole || (template.courseNames || [])[0] || template.courseName || '',
+				verticalName: context.verticalName || (template.verticalNames || [])[0] || template.verticalName || '',
+				answers,
+				...context,
+				projectName: context.projectName || (template.projectNames || [])[0] || template.projectName || '',
+			});
+			applyPortalSnapshot(report, template, answers);
+			report.inTime = String(req.body.inTime || '').trim();
+			report.outTime = String(req.body.outTime || '').trim();
+			await report.save();
+			return res.status(200).json({
+				status: true,
+				message: 'Daily trainer report saved',
+				data: mapDailyReport(report),
+			});
+		}
+
+		const settings = await loadDtrSettings(req.college._id);
+		if (!settings.enabled) {
+			return res.status(403).json({ status: false, message: 'Daily trainer report is turned off in Settings' });
+		}
+		const fields = readReportFields(req.body || {}, settings.attachedFields);
+		const context = await loadReportBatchContext(req, req.body?.batchId);
+		const duplicate = await DailyTrainerReport.findOne({
+			trainer: req.user._id,
+			batch: context.batch,
+			reportDateKey: fields.reportDateKey,
+		}).select('_id');
+		if (duplicate) {
+			return res.status(409).json({
+				status: false,
+				message: 'A report already exists for this batch on this date',
+				data: { id: String(duplicate._id) },
+			});
+		}
+
+		const report = new DailyTrainerReport({
+			college: req.college._id,
+			trainer: req.user._id,
+			trainerName: req.user.name || '',
+			...fields,
+			...context,
+		});
+		await applyReportUploads(report, req.files, readRemovedReportFileIds(req.body), settings.attachedFields);
+		await report.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Daily trainer report saved',
+			data: mapDailyReport(report),
+		});
+	} catch (error) {
+		console.error('Error saving daily trainer report:', error);
+		return res.status(error.status || 500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.put('/daily-reports/:id', authorizeTrainingAccess, async (req, res) => {
+	try {
+		if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+			return res.status(400).json({ status: false, message: 'Report not found' });
+		}
+
+		const report = await DailyTrainerReport.findOne({
+			_id: req.params.id,
+			college: req.college._id,
+			trainer: req.user._id,
+		});
+		if (!report) {
+			return res.status(404).json({ status: false, message: 'Report not found' });
+		}
+
+		if (req.body?.templateId && mongoose.Types.ObjectId.isValid(req.body.templateId)) {
+			const template = await DailyReportSetting.findOne({
+				_id: req.body.templateId,
+				college: req.college._id,
+				enabled: true,
+			});
+			if (!template) {
+				return res.status(404).json({ status: false, message: 'No DTR is set for this course' });
+			}
+			const reportDateKey = parseReportDateKey(req.body.reportDate);
+			if (!reportDateKey) {
+				return res.status(400).json({ status: false, message: 'Report date is required' });
+			}
+			const context = await loadReportBatchContext(req, req.body.batchId);
+			if (!templateIncludesCourse(template, context.course)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the courses for this DTR' });
+			}
+			if (!templateIncludesCenter(template, context.center)) {
+				return res.status(400).json({ status: false, message: 'This batch is not in the centers for this DTR' });
+			}
+			if (!templateIncludesBatch(template, context.batch)) {
+				return res.status(400).json({ status: false, message: 'This batch is not included in the DTR' });
+			}
+			if (!templateIncludesTrainer(template, req.user._id)) {
+				return res.status(403).json({ status: false, message: 'This DTR is not assigned to you' });
+			}
+			const duplicate = await DailyTrainerReport.findOne({
+				_id: { $ne: report._id },
+				trainer: req.user._id,
+				batch: context.batch,
+				reportDateKey,
+			}).select('_id');
+			if (duplicate) {
+				return res.status(409).json({
+					status: false,
+					message: 'A report already exists for this batch on this date',
+					data: { id: String(duplicate._id) },
+				});
+			}
+			report.answers = await buildTemplateAnswers(template, req.body, req.files, req.college._id, report.answers);
+			const countError = studentCountTotalError(report.answers, context.batchSize);
+			if (countError) {
+				return res.status(400).json({ status: false, message: countError });
+			}
+			Object.assign(report, context, {
+				template: template._id,
+				reportDateKey,
+				reportDate: new Date(`${reportDateKey}T00:00:00.000Z`),
+				courseName: context.jobRole || (template.courseNames || [])[0] || template.courseName || '',
+				verticalName: context.verticalName || (template.verticalNames || [])[0] || template.verticalName || '',
+				projectName: context.projectName || (template.projectNames || [])[0] || template.projectName || '',
+				trainerName: req.user.name || report.trainerName,
+			});
+			applyPortalSnapshot(report, template, report.answers);
+			report.inTime = String(req.body.inTime || '').trim();
+			report.outTime = String(req.body.outTime || '').trim();
+			report.markModified('answers');
+			await report.save();
+			return res.status(200).json({
+				status: true,
+				message: 'Daily trainer report updated',
+				data: mapDailyReport(report),
+			});
+		}
+
+		const settings = await loadDtrSettings(req.college._id);
+		if (!settings.enabled) {
+			return res.status(403).json({ status: false, message: 'Daily trainer report is turned off in Settings' });
+		}
+		const fields = readReportFields(req.body || {}, settings.attachedFields);
+		const context = await loadReportBatchContext(req, req.body?.batchId);
+		const duplicate = await DailyTrainerReport.findOne({
+			_id: { $ne: report._id },
+			trainer: req.user._id,
+			batch: context.batch,
+			reportDateKey: fields.reportDateKey,
+		}).select('_id');
+		if (duplicate) {
+			return res.status(409).json({
+				status: false,
+				message: 'A report already exists for this batch on this date',
+				data: { id: String(duplicate._id) },
+			});
+		}
+
+		Object.assign(report, fields, context, { trainerName: req.user.name || report.trainerName });
+		await applyReportUploads(report, req.files, readRemovedReportFileIds(req.body), settings.attachedFields);
+		await report.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Daily trainer report updated',
+			data: mapDailyReport(report),
+		});
+	} catch (error) {
+		console.error('Error updating daily trainer report:', error);
+		return res.status(error.status || 500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
 
 module.exports = router;

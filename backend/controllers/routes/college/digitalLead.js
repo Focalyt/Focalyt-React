@@ -84,36 +84,79 @@ async function markLeadsQueuedForAiCall(leadIds) {
 }
 
 let dataLeadSourceIdsCache = null;
+let metaJobLeadSourceIdsCache = null;
+let digitalLeadSourceIdsCache = null;
+const LEGACY_DIGITAL_LEAD_SOURCE_ID = '68c16764eeda1e3f36a329d9';
+
+async function sourceIdsByName(regex, cacheBox) {
+    if (cacheBox.ids) return cacheBox.ids;
+    const docs = await Source.find({ name: { $regex: regex } }).select('_id').lean();
+    const ids = docs.map((doc) => String(doc._id));
+    if (ids.length) cacheBox.ids = ids;
+    return ids;
+}
+
+function toObjectIds(ids) {
+    return (ids || [])
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+}
 
 async function getDataLeadSourceIds() {
-    if (dataLeadSourceIdsCache) return dataLeadSourceIdsCache;
-    const docs = await Source.find({ name: { $regex: /^data\s*leads?$/i } }).select('_id').lean();
-    const ids = docs.map((doc) => String(doc._id));
-    if (ids.length) dataLeadSourceIdsCache = ids;
+    if (!dataLeadSourceIdsCache) dataLeadSourceIdsCache = {};
+    return sourceIdsByName(/^data\s*leads?$/i, dataLeadSourceIdsCache);
+}
+
+async function getMetaJobLeadSourceIds() {
+    if (!metaJobLeadSourceIdsCache) metaJobLeadSourceIdsCache = {};
+    return sourceIdsByName(/^meta\s*job\s*leads?$/i, metaJobLeadSourceIdsCache);
+}
+
+async function getDigitalLeadSourceIds() {
+    if (!digitalLeadSourceIdsCache) digitalLeadSourceIdsCache = {};
+    const ids = await sourceIdsByName(/^digital\s*lead$/i, digitalLeadSourceIdsCache);
+    if (!ids.includes(LEGACY_DIGITAL_LEAD_SOURCE_ID)) ids.push(LEGACY_DIGITAL_LEAD_SOURCE_ID);
     return ids;
 }
 
 function parseLeadSourceFilter(raw) {
-    const value = String(raw || '').trim().toLowerCase();
-    if (['data', 'data-lead', 'data-leads'].includes(value)) return 'data-lead';
-    if (['digital', 'digital-lead', 'other', 'except-data'].includes(value)) return 'digital-lead';
+    const value = String(raw || '').trim();
+    const lower = value.toLowerCase();
+    if (['data', 'data-lead', 'data-leads'].includes(lower)) return 'data-lead';
+    if (['digital', 'digital-lead'].includes(lower)) return 'digital-lead';
+    if (/^[a-fA-F0-9]{24}$/.test(value)) return value;
     return '';
 }
 
 async function applyLeadSourceMatch(match, leadSourceFilter) {
     if (!leadSourceFilter) return;
-    const ids = (await getDataLeadSourceIds())
-        .filter((id) => mongoose.Types.ObjectId.isValid(id))
-        .map((id) => new mongoose.Types.ObjectId(id));
     if (leadSourceFilter === 'data-lead') {
-        match.registeredBy = { $in: ids };
+        match.registeredBy = { $in: toObjectIds(await getDataLeadSourceIds()) };
         return;
     }
-    if (leadSourceFilter === 'digital-lead' && ids.length) {
-        match.registeredBy = { $nin: ids };
+    if (leadSourceFilter === 'digital-lead') {
+        match.registeredBy = { $in: toObjectIds(await getDigitalLeadSourceIds()) };
+        return;
     }
+    if (!mongoose.Types.ObjectId.isValid(leadSourceFilter)) return;
+
+    const selectedId = String(leadSourceFilter);
+    if ((await getMetaJobLeadSourceIds()).includes(selectedId)) {
+        match.registeredBy = { $in: [] };
+        return;
+    }
+    if ((await getDataLeadSourceIds()).includes(selectedId)) {
+        match.registeredBy = { $in: toObjectIds(await getDataLeadSourceIds()) };
+        return;
+    }
+    if ((await getDigitalLeadSourceIds()).includes(selectedId)) {
+        match.registeredBy = { $in: toObjectIds(await getDigitalLeadSourceIds()) };
+        return;
+    }
+    match.registeredBy = new mongoose.Types.ObjectId(selectedId);
 }
 
+// Data Leads use the data campaign. Every other source, including sources added later, uses the digital campaign.
 async function resolveVoiceCampaignId(applied) {
     const registeredBy = String(applied?.registeredBy?._id || applied?.registeredBy || '');
     const isDataLead = Boolean(registeredBy) && (await getDataLeadSourceIds()).includes(registeredBy);
@@ -456,12 +499,44 @@ const markLeadDuplicateOnReapply = async (alreadyApplied, source) => {
     if (!Array.isArray(alreadyApplied.logs)) alreadyApplied.logs = [];
     alreadyApplied.logs.push({
         action: 'Lead marked Duplicate on reapply (same mobile + same course)',
-        remarks: source || 'Digital Lead',
+        remarks: source || '',
         timestamp: new Date(),
     });
     await alreadyApplied.save();
     return alreadyApplied;
 };
+
+function escapeSourceRegex(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function pickIncomingSource(body) {
+    if (!body || typeof body !== 'object') return '';
+    const keys = ['source', 'Source', 'SOURCE', 'leadSource', 'LeadSource', 'lead_source', 'Lead Source'];
+    for (const key of keys) {
+        const value = body[key];
+        if (value != null && String(value).trim()) return value;
+    }
+    return '';
+}
+
+// Sheet/API source can be a Source name or a Source id. No Digital Lead default.
+async function resolveSheetLeadSource(rawSource) {
+    const value = String(rawSource || '').trim();
+    if (!value) return { sourceName: '', registeredBy: null };
+
+    if (/^[a-fA-F0-9]{24}$/.test(value)) {
+        const byId = await Source.findById(value).select('_id name').lean();
+        if (byId) return { sourceName: byId.name || value, registeredBy: byId._id };
+    }
+
+    const byName = await Source.findOne({
+        name: { $regex: new RegExp(`^${escapeSourceRegex(value)}$`, 'i') },
+    }).select('_id name').lean();
+
+    if (byName) return { sourceName: byName.name, registeredBy: byName._id };
+    return { sourceName: value, registeredBy: null };
+}
 
 // ===================================
 // BATCH PROCESSOR CLASS - Queue Logic
@@ -863,16 +938,18 @@ const batchProcessor = new BatchProcessor();
 router.route("/addleaddandcourseapply")
     .post(async (req, res) => {
         try {
+            const incomingSource = pickIncomingSource(req.body);
             console.log('[DigitalLead] POST /addleaddandcourseapply →', {
                 name: req.body.FirstName,
                 mobile: req.body.MobileNumber,
                 courseId: req.body.courseId,
                 center: req.body.Field4,
-                source: req.body.source || 'Digital Lead'
+                source: incomingSource
             });
 
             // Basic validation only
-            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks, status,subStatus } = req.body;
+            let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, Remarks, status,subStatus } = req.body;
+            let source = incomingSource;
 
 
             if (!FirstName || !MobileNumber || !Gender || !Email || !courseId || !Field4 || !status || !subStatus) {
@@ -881,9 +958,9 @@ router.route("/addleaddandcourseapply")
                     msg: "All fields are required"
                 });
             }
-            if (!source) {
-                source = 'Digital Lead';
-            }
+            const resolvedSource = await resolveSheetLeadSource(source);
+            source = resolvedSource.sourceName;
+            const registeredBy = resolvedSource.registeredBy;
             if (MobileNumber) {
                 MobileNumber = MobileNumber.toString();
 
@@ -915,7 +992,6 @@ router.route("/addleaddandcourseapply")
             let sex = Gender;
             let dob = DateOfBirth;
             let email = Email;
-            let registeredBy = new mongoose.Types.ObjectId('68c16764eeda1e3f36a329d9');
 
             if (typeof courseId === 'string') {
                 courseId = new mongoose.Types.ObjectId(courseId);
@@ -968,6 +1044,10 @@ router.route("/addleaddandcourseapply")
 
             let existingCandidate = await CandidateProfile.findOne({ mobile });
             if (existingCandidate) {
+                if (source) {
+                    existingCandidate.source = source;
+                    await existingCandidate.save();
+                }
                 console.log('existingCandidate:', existingCandidate);
                 let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
                 console.log('alreadyApplied:', alreadyApplied);
@@ -978,7 +1058,7 @@ router.route("/addleaddandcourseapply")
                         course: courseId,
                         reEnquireDate: new Date(),
                         counselorName:  alreadyApplied.counsellor,
-                        source: source || 'Digital Lead',
+                        source: source || '',
                     });
                     await markLeadDuplicateOnReapply(alreadyApplied, source);
                     return res.json({
@@ -997,7 +1077,8 @@ router.route("/addleaddandcourseapply")
                         _course: courseId,
                         _center: selectedCenter,
                         _leadStatus: statusId._id,
-                        _leadSubStatus: subStatusId._id
+                        _leadSubStatus: subStatusId._id,
+                        ...(registeredBy ? { registeredBy, registeredByModel: 'Source' } : {}),
                     });
 
                     console.log('[DigitalLead] AppliedCourses created ←', {
@@ -1063,7 +1144,7 @@ router.route("/addleaddandcourseapply")
                     _candidate: candidate._id,
                     _course: courseId,
                     _center: selectedCenter,
-                    registeredBy: registeredBy,
+                    ...(registeredBy ? { registeredBy, registeredByModel: 'Source' } : {}),
                     remarks:Remarks || "",
                     _leadStatus: statusId._id,
                     _leadSubStatus: subStatusId._id
@@ -1082,7 +1163,7 @@ router.route("/addleaddandcourseapply")
 
 
             const newLogEntry = {
-                action: `Lead added with ${status.title} and ${subStatus.title} from digital lead`, // Combine all actions in one log message
+                action: `Lead added with ${status.title} and ${subStatus.title}${source ? ` from ${source}` : ''}`, // Combine all actions in one log message
                 remarks: Remarks || '', // Optional remarks in the log
                 timestamp: new Date() // Add timestamp if your schema supports it
             };
@@ -1799,9 +1880,11 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
         let leads = [];
         if (selectedLeadIds.length) {
             const byId = new Map(pool.map((row) => [String(row.lead_id), row]));
+            // A chosen source (Data Lead / Digital Lead) only calls leads in that pool.
             leads = selectedLeadIds
                 .slice(0, maxSend)
-                .map((id) => byId.get(id) || { lead_id: id });
+                .map((id) => byId.get(id) || (leadSourceFilter ? null : { lead_id: id }))
+                .filter(Boolean);
         } else {
             leads = pool.slice(0, maxSend);
         }

@@ -14,7 +14,7 @@
               <div class="content-header-left col-md-9 col-12 mb-2">
                 <div class="row breadcrumbs-top">
                   <div class="col-12">
-                    <h3 class="content-header-title float-left mb-0">Job Details</h3>
+                    <h3 class="content-header-title float-left mb-0">Jobs &amp; responses</h3>
                     <div class="breadcrumb-wrapper col-12">
                       <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
@@ -35,158 +35,49 @@
                   <div class="card mt-1 mb-5">
                     <div class="card-header border border-top-0 border-left-0 border-right-0 pb-1 px-0">
                       <div class="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6">
-                        <h4 class="card-title">All Job Details</h4>
+                        <h4 class="card-title">Your job postings</h4>
                       </div>
                       <div class="col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 text-right">
                         <% if(canAdd && isExist) {%>
-                          <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs" class="btn btn-primary">+ Add JD</a>
+                          <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs" class="btn btn-primary">+ Post a job</a>
                           <%} else if(!canAdd&&isExist){%>
-                            <a href="javascript:;" class="btn btn-primary" data-toggle="modal" data-target="#popup" data-dismiss="modal">+ Add JD</a>
+                            <a href="javascript:;" class="btn btn-primary" data-toggle="modal" data-target="#popup" data-dismiss="modal">+ Post a job</a>
                             <%}%>
                       </div>
                     </div>
                     <div class="card-content">
                       <div class="table-responsive">
-                        <table class="table table-hover-animation mb-0 table-hover">
-
-                          <thead>
-                            <tr>
-                              <th class="company-jd-head">Company Name</th>
-                              <th class="company-jd-head">Title</th>
-                              <th class="inyears">Experience (In Years)</th>
-                              <th class="company-jd-head">Qualification</th>
-                              <th class="shortlisted">Shortlisted</th>
-                              <th class="company-jd-head-date">Date of posting</th>
-                              <th>Edit</th>
-                              <th>Copy</th>
-                              <th>Active</th>
-                              <th class="action-width ">ACTIONS</th>
-                            </tr>
-                          </thead>
-                          <tbody id="table-body">
-                            <%if (jd?.length>0) { %>
-                              <% jd.forEach((curr, i)=> {%>
-                                <%if(moment(curr.validity).utcOffset("+05:30") < moment().startOf("day")){%>
-                                <tr class="disable_button">
-                                  <td style="font-size:12.5px !important;color:#000;">
-                                    <%= (curr && curr.displayCompanyName) || 'NA' %>
-                                  </td>
-                                  <td style="font-size:12.5px !important;color:#000;">
-                                    <%= (curr && curr.title) || 'NA' %>
-                                  </td>
-                                  <td style="font-size:12.5px !important;color:#000;">
-                                    <%= (curr && curr.experience) || 'Fresher' %>
-                                  </td>
-                                  <td style="font-size:12.5px !important;color:#000;">
-                                    <%= (curr && curr._qualification?.name ) || 'NA' %>
-                                  </td>
-                                  <td style="font-size:12.5px !important;color:#000;">
-                                    <%= shortlistedCandCount.find(elem=> elem._id?.job.toString() == curr._id.toString())?.count || '0' %>
-                                  </td>
-                                  <td style="font-size:12.5px !important;color:#000;">
-                                    <%= moment(curr.createdAt).format('MMM DD YYYY') %>
-                                  </td>
-                                  <td>
-                                    <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= jd[i]._id %>"><i class="fas fa-edit disable_button" style="color:black;"></i></a>
-                                  </td>
-                                  <td>
-                                    <% if(canAdd) {%>
-                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs/<%= jd[i]._id %>"><i class="fas fa-copy disable_button"  style="color:black;"></i></a>
-                                      <%} else{%>
-                                        <a href="javascript:;" data-toggle="modal" data-target="#popup" data-dismiss="modal"><i class="fas fa-copy disable_button" style="color:black;"></i></a>
-                                        <%}%>
-                                  </td>
-                                  <td>
-                                    <div class="custom-control custom-switch custom-control-inline">
-                                      <% if(curr.status) { %>
-                                        <input type="checkbox"
-                                          onclick="myOnOffFunc('<%= curr._id %>', '<%= curr.status %>');"
-                                          class="custom-control-input " id="customSwitch<%= i %>" checked />
-                                        <label class="custom-control-label" for="customSwitch<%= i %>">
-                                        </label>
-                                        <% } else { %>
-                                          <input type="checkbox"
-                                            onclick="myOnOffFunc('<%= curr._id %>', '<%= curr.status %>');"
-                                            class="custom-control-input" id="customSwitch<%= i %>" />
-                                          <label class="custom-control-label" for="customSwitch<%= i %>">
-                                          </label>
-                                          <% } %>
-                                    </div>
-                                  </td>
-                                  <td class="px-0">
-                                    <%if(moment(curr.validity).utcOffset("+05:30") < moment().startOf("day")){%>
-                                     <span class="offer-valid bg-danger ml-1" >
-                                      Expired
-                                  </span>
-                                  <%}%>
-                                  </td>
-                                </tr> 
-                                <% } else { %>
-                                  <tr>
-                                    <td>
-                                      <%= (curr && curr.displayCompanyName) || 'NA' %>
-                                    </td>
-                                    <td>
-                                      <%= (curr && curr.title) || 'NA' %>
-                                    </td>
-                                    <td>
-                                      <%= (curr && curr.experience) || 'Fresher' %>
-                                    </td>
-                                    <td>
-                                      <%= (curr && curr._qualification?.name ) || 'NA' %>
-                                    </td>
-                                    <td>
-                                      <%= shortlistedCandCount.find(elem=> elem._id?.job.toString() == curr._id.toString())?.count || '0' %>
-                                    </td>
-                                    <td>
-                                      <%= moment(curr.createdAt).format('MMM DD YYYY') %>
-                                    </td>
-                                    <td>
-                                      <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= jd[i]._id %>"><i class="fas fa-edit"></i></a>
-                                    </td>
-                                    <td>
-                                      <% if(canAdd) {%>
-                                        <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs/<%= jd[i]._id %>"><i class="fas fa-copy"></i></a>
-                                        <%} else{%>
-                                          <a href="javascript:;" data-toggle="modal" data-target="#popup" data-dismiss="modal"><i class="fas fa-copy"></i></a>
-                                          <%}%>
-                                    </td>
-                                    <td>
-                                      <div class="custom-control custom-switch custom-control-inline">
-                                        <% if(curr.status) { %>
-                                          <input type="checkbox"
-                                            onclick="myOnOffFunc('<%= curr._id %>', '<%= curr.status %>');"
-                                            class="custom-control-input" id="customSwitch<%= i %>" checked />
-                                          <label class="custom-control-label" for="customSwitch<%= i %>">
-                                          </label>
-                                          <% } else { %>
-                                            <input type="checkbox"
-                                              onclick="myOnOffFunc('<%= curr._id %>', '<%= curr.status %>');"
-                                              class="custom-control-input" id="customSwitch<%= i %>" />
-                                            <label class="custom-control-label" for="customSwitch<%= i %>">
-                                            </label>
-                                            <% } %>
-                                      </div>
-                                    </td>
-                                    <td><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/jobs/<%= jd[i]._id %>" class="btn btn-primary btn-sm">View</a>
-                                      <%if(moment(curr.validity).utcOffset("+05:30") < moment().startOf("day")){%>
-                                       <span class="badge bg-danger ml-1" style="position: relative;">
-                                        Expired
-                                    </span>
-                                    <%}%>
-                                    </td>
-                                  </tr> 
-                                  <% }})}else{%>
-                                  <tr>
-                                    <td class="text-center" colspan="9">
-                                      No record found
-                                    </td>
-                                  </tr>
-                                  <%}%>
-
-                          </tbody>
-
-                        </table>
+                        <div class="recruiter-job-list" id="table-body">
+                          <% if(jd?.length) { jd.forEach(function(job, index) {
+                            const expired = moment(job.validity).utcOffset('+05:30') < moment().startOf('day');
+                            const shortlistedCount = shortlistedCandCount.find(function(item) { return String(item._id?.job) === String(job._id); })?.count || 0;
+                          %>
+                            <article class="recruiter-jobrow">
+                              <div class="recruiter-job-summary">
+                                <h3><%= job.title || 'Job requirement' %></h3>
+                                <p><%= job.displayCompanyName || company?.name || 'Company' %> &middot; <%= job.experience ? job.experience + ' years experience' : 'Fresher' %> &middot; <%= job._qualification?.name || 'Qualification not specified' %></p>
+                                <span class="recruiter-badge <%= expired || !job.status ? 'recruiter-badge-gray' : '' %>"><%= expired ? 'Expired' : job.status ? 'Active' : 'Closed' %></span>
+                                <span class="recruiter-muted" style="font-size:12px;margin-left:8px">Posted <%= moment(job.createdAt).format('DD MMM YYYY') %></span>
+                              </div>
+                              <div class="recruiter-job-actions">
+                                <div class="recruiter-job-count"><strong><%= shortlistedCount %></strong><span class="recruiter-muted">shortlisted</span></div>
+                                <div class="recruiter-job-buttons">
+                                  <% if(!expired) { %>
+                                    <a class="btn btn-outline-primary btn-sm" href="<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= job._id %>">Edit</a>
+                                    <% if(canAdd) { %><a class="btn btn-outline-primary btn-sm" href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs/<%= job._id %>">Copy</a><% } else { %><button class="btn btn-outline-primary btn-sm" type="button" data-toggle="modal" data-target="#popup">Copy</button><% } %>
+                                    <a class="btn btn-primary btn-sm" href="<%= process.env.MIPIE_BACKEND_URL %>/company/jobs/<%= job._id %>">View job &rarr;</a>
+                                  <% } %>
+                                </div>
+                                <div class="custom-control custom-switch custom-control-inline mr-0">
+                                  <input type="checkbox" class="custom-control-input" id="customSwitch<%= index %>" data-job-id="<%= job._id %>" data-job-status="<%= job.status %>" onclick="myOnOffFunc(this.dataset.jobId,this.dataset.jobStatus)" <%= job.status ? 'checked' : '' %> <%= expired ? 'disabled' : '' %>>
+                                  <label class="custom-control-label" for="customSwitch<%= index %>">Active</label>
+                                </div>
+                              </div>
+                            </article>
+                          <% }); } else { %>
+                            <div class="recruiter-empty"><i class="feather icon-file-text" aria-hidden="true"></i><h3>No job postings yet</h3><p>Your job requirements will appear here.</p></div>
+                          <% } %>
+                        </div>
                         <% if (totalPages> 1) { %>
                           <ul class="pagination justify-content-end ml-2 mb-2">
                             <% let first=1 %>

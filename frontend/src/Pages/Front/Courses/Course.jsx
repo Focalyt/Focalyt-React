@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import moment from "moment";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import CourseDetailsModal from "./CourseDetailsModal";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import FrontLayout from "../../../Component/Layouts/Front";
@@ -10,8 +11,9 @@ import { buildCourseApplyTarget, usePublicApply } from "../../../Component/Publi
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.jpg";
 
-export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback }) {
+export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback, onLearnMore }) {
   const { openApply } = usePublicApply();
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const thumb = resolveMediaUrl(bucketUrl, course?.thumbnail) || THUMB_FALLBACK;
   const videoUrl =
     course?.videos?.[0] ? resolveMediaUrl(bucketUrl, course.videos[0]) : "";
@@ -115,16 +117,30 @@ export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestC
       </div>
 
       <div className="course_card_footer">
-        <Link to={`/coursedetails/${course._id}`} className="course-learn-more">
+        <button
+          type="button"
+          className="course-learn-more"
+          onClick={() => (onLearnMore ? onLearnMore(course) : setDetailsOpen(true))}
+        >
           <span className="learnn">Learn More</span>
           <img src="/Assets/public_assets/images/link.png" alt="" className="course-learn-more__icon" />
-        </Link>
+        </button>
       </div>
+      {detailsOpen ? (
+        <CourseDetailsModal
+          courseId={course._id}
+          previewCourse={course}
+          bucketUrl={bucketUrl}
+          onClose={() => setDetailsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
 function Course() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedCourseId = searchParams.get("course");
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -416,6 +432,19 @@ function Course() {
             )}
           </div>
         </section>
+
+        {linkedCourseId ? (
+          <CourseDetailsModal
+            courseId={linkedCourseId}
+            previewCourse={courses.find((item) => String(item._id) === String(linkedCourseId)) || null}
+            bucketUrl={bucketUrl}
+            onClose={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("course");
+              setSearchParams(next, { replace: true });
+            }}
+          />
+        ) : null}
 
         <div className="modal fade event-video-modal" id="videoModal" tabIndex="-1" aria-hidden="true">
           <div className="modal-dialog modal-dialog-centered">
@@ -855,6 +884,12 @@ function Course() {
   justify-content: center;
   gap: 6px;
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 .foc-courses-page .course-learn-more .learnn {
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;

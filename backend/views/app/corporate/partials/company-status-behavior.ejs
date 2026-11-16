@@ -1,0 +1,135 @@
+<script>
+(function () {
+  if (!document.querySelector('.company-lead-status-open')) return;
+  const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; };
+  let statuses = null;
+  let dialog;
+
+  async function request(url, payload) {
+    const headers = { Accept: 'application/json' };
+    const token = localStorage.getItem('token');
+    if (token) headers['x-auth'] = token;
+    if (payload) headers['Content-Type'] = 'application/json';
+    const response = await fetch(url, { method: payload ? 'POST' : 'GET', headers, credentials: 'same-origin', ...(payload ? { body: JSON.stringify(payload) } : {}) });
+    if (response.redirected || response.status === 401 || response.status === 403) throw new Error('Please sign in again to update status.');
+    if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('Unable to update status. Please try again.');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to update status.');
+    return data;
+  }
+
+  function selectedSubstatus(statusId, subStatusId) {
+    const status = (statuses || []).find((item) => item._id === statusId);
+    return status ? (status.substatuses || []).find((item) => item._id === subStatusId) || null : null;
+  }
+
+  async function openStatus(card) {
+    const panel = card.querySelector('.company-student-performance');
+    if (!dialog) { dialog = el('dialog', 'company-followup-dialog'); document.body.appendChild(dialog); }
+    dialog.replaceChildren();
+    const header = el('div', 'company-followup-dialog-header');
+    const heading = el('h2', '', 'Update status');
+    heading.id = 'company-status-heading';
+    dialog.setAttribute('aria-labelledby', heading.id);
+    const close = el('button', 'company-student-icon', '×');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close');
+    close.addEventListener('click', () => dialog.close());
+    header.append(heading, close);
+    dialog.appendChild(header);
+    const content = el('div', 'company-followup-dialog-content');
+    dialog.appendChild(content);
+    const message = el('div', 'company-followup-message', 'Loading statuses…');
+    message.setAttribute('role', 'status');
+    content.appendChild(message);
+    dialog.showModal();
+    try { if (!statuses) statuses = (await request('/company/lead-statuses')).statuses || []; }
+    catch (error) { message.textContent = error.message; return; }
+    message.textContent = '';
+    if (!statuses.length) { message.textContent = 'No statuses yet. Add them from the Status page.'; return; }
+    const form = el('form', 'company-followup-form company-status-form');
+    const statusSelect = el('select', 'form-control');
+    statusSelect.appendChild(new Option('Select status', ''));
+    statuses.forEach((status) => statusSelect.appendChild(new Option(status.title, status._id)));
+    statusSelect.value = panel.dataset.leadStatus || '';
+    const statusLabel = el('label', '', 'Status');
+    statusLabel.appendChild(statusSelect);
+    const subSelect = el('select', 'form-control');
+    const subLabel = el('label', '', 'Sub-Status');
+    subLabel.appendChild(subSelect);
+    const remark = el('textarea', 'form-control');
+    remark.rows = 3;
+    remark.maxLength = 2000;
+    const remarkLabel = el('label', 'company-followup-full', 'Comment');
+    remarkLabel.hidden = true;
+    remarkLabel.appendChild(remark);
+    const typeSelect = el('select', 'form-control');
+    typeSelect.append(new Option('Call', 'Call'), new Option('Visit', 'Visit'));
+    const typeLabel = el('label', '', 'Follow-up type');
+    typeLabel.hidden = true;
+    typeLabel.appendChild(typeSelect);
+    const when = el('input', 'form-control');
+    when.type = 'datetime-local';
+    const whenLabel = el('label', '', 'Next action date');
+    whenLabel.hidden = true;
+    whenLabel.appendChild(when);
+    const actions = el('div', 'company-followup-full');
+    actions.style.display = 'flex';
+    actions.style.justifyContent = 'flex-end';
+    actions.style.gap = '8px';
+    const cancel = el('button', 'company-followup-link', 'Close');
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => dialog.close());
+    const submit = el('button', 'company-followup-submit', 'Update status');
+    submit.type = 'submit';
+    actions.append(cancel, submit);
+    form.append(statusLabel, subLabel, remarkLabel, typeLabel, whenLabel, actions);
+    content.appendChild(form);
+
+    function fillSubstatuses() {
+      const status = statuses.find((item) => item._id === statusSelect.value);
+      const current = subSelect.value || panel.dataset.leadSubstatus || '';
+      subSelect.replaceChildren(new Option('Select sub-status', ''));
+      (status ? status.substatuses : []).forEach((item) => subSelect.appendChild(new Option(item.title, item._id)));
+      subSelect.value = (status && status.substatuses.some((item) => item._id === current)) ? current : '';
+      const sub = selectedSubstatus(statusSelect.value, subSelect.value);
+      remarkLabel.hidden = !(sub && sub.hasRemarks);
+      typeLabel.hidden = whenLabel.hidden = !(sub && sub.hasFollowup);
+      remark.required = !!(sub && sub.hasRemarks);
+      when.required = !!(sub && sub.hasFollowup);
+    }
+    statusSelect.addEventListener('change', () => { subSelect.value = ''; fillSubstatuses(); });
+    subSelect.addEventListener('change', fillSubstatuses);
+    fillSubstatuses();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const sub = selectedSubstatus(statusSelect.value, subSelect.value);
+      if (!statusSelect.value) { message.textContent = 'Please select a status.'; return; }
+      const chosen = statuses.find((item) => item._id === statusSelect.value);
+      if (chosen && chosen.substatuses.length && !subSelect.value) { message.textContent = 'Please select a sub-status.'; return; }
+      submit.disabled = true;
+      message.textContent = '';
+      try {
+        await request('/company/application/' + encodeURIComponent(card.dataset.applicationId) + '/lead-status', {
+          statusId: statusSelect.value,
+          subStatusId: subSelect.value,
+          remark: remark.value.trim(),
+          followupType: typeSelect.value,
+          followupDate: sub && sub.hasFollowup && when.value ? new Date(when.value).toISOString() : '',
+        });
+        window.location.reload();
+      } catch (error) {
+        message.textContent = error.message;
+        submit.disabled = false;
+      }
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.company-lead-status-open');
+    if (!button) return;
+    const card = button.closest('.company-student-card');
+    if (card && card.dataset.applicationId) openStatus(card);
+  });
+})();
+</script>

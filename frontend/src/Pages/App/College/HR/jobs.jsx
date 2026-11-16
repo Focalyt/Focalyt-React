@@ -15,6 +15,7 @@ import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/
 import useWebsocket from '../../../../utils/websocket';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
+import HiringInterviewPanel from './HiringInterviewPanel';
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
@@ -94,6 +95,11 @@ const toHrFilterYmd = (value) => {
 };
 
 const isHrDepartmentLabel = (label) => String(label || '').trim().toLowerCase() === 'hr';
+
+const statusScopeParams = (cycle = {}) => ({
+  ...(cycle.department ? { department: cycle.department } : {}),
+  ...(cycle.project ? { project: cycle.project } : {}),
+});
 
 const getHrDepartmentIds = (verticalOptions = []) => new Set(
   (verticalOptions || [])
@@ -330,6 +336,8 @@ const mapHrLeadToB2cProfile = (lead) => {
   return {
     _id: lead?._id,
     isHrJobLead: true,
+    companyId: lead?.companyId || null,
+    corporateHiringStatus: lead?.corporateHiringStatus || null,
     source: lead?.source || '',
     _candidate: {
       _id: lead?.candidate,
@@ -1979,7 +1987,7 @@ const CRMDashboard = () => {
       return;
     }
     if (aiCallSource === 'untouch-new-lead' && !aiCallLeadSource) {
-      toast.info('Pick Data Lead or Digital Lead first');
+      toast.info('Pick a lead source first');
       return;
     }
     if (!numValue || numValue < 1) {
@@ -1996,11 +2004,12 @@ const CRMDashboard = () => {
       return;
     }
 
-    const sourceLabel = aiCallLeadSource === 'data-lead'
-      ? 'Data Lead'
-      : aiCallLeadSource === 'digital-lead'
-        ? 'Digital Lead'
-        : aiCallLabel;
+    const sourceLabel = (sources || []).find((source) => String(source._id) === String(aiCallLeadSource))?.name
+      || (aiCallLeadSource === 'data-lead'
+        ? 'Data Lead'
+        : aiCallLeadSource === 'digital-lead'
+          ? 'Digital Lead'
+          : aiCallLabel);
     const confirmed = window.confirm(
       `Send ${idsToSend.length || numValue} ${sourceLabel} lead(s) to AI call?`
     );
@@ -2042,7 +2051,7 @@ const CRMDashboard = () => {
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
+  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, sources, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -3270,6 +3279,24 @@ const CRMDashboard = () => {
     [sources]
   );
 
+  const aiCallSourceOptions = useMemo(() => {
+    const rank = (name) => {
+      const value = String(name || '').trim();
+      if (/^data\s*leads?$/i.test(value)) return 0;
+      if (/^digital\s*lead$/i.test(value)) return 1;
+      return 2;
+    };
+    const rows = (sources || [])
+      .filter((source) => source && source._id && source.status !== false && !/^meta\s*job\s*leads?$/i.test(String(source.name || '').trim()))
+      .map((source) => ({ id: String(source._id), label: source.name || 'Untitled' }))
+      .sort((a, b) => rank(a.label) - rank(b.label) || a.label.localeCompare(b.label));
+    if (rows.length) return rows;
+    return [
+      { id: 'data-lead', label: 'Data Lead' },
+      { id: 'digital-lead', label: 'Digital Lead' },
+    ];
+  }, [sources]);
+
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
@@ -4110,7 +4137,7 @@ const CRMDashboard = () => {
     if (seletectedStatus || filterData.statuses) {
       fetchSubStatus()
     }
-  }, [seletectedStatus, filterData.statuses]);
+  }, [seletectedStatus, filterData.statuses, cycleFilters.department, cycleFilters.project]);
 
 
 
@@ -4743,17 +4770,17 @@ const CRMDashboard = () => {
         return;
       }
       const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       });
 
 
       if (response.data.success) {
-        const status = response.data.data;
-
-
-        setSubStatuses(response.data.data);
-
-
+        const list = Array.isArray(response.data.data) ? response.data.data : [];
+        setSubStatuses(list);
+        setSelectedSubStatus((current) => (
+          current?._id && list.some((item) => String(item._id) === String(current._id)) ? current : null
+        ));
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -15806,6 +15833,7 @@ useEffect(() => {
       if (value) {
         axios.get(`${backendUrl}/college/status/${value}/substatus`, {
           headers: { 'x-auth': token },
+          params: statusScopeParams(cycleFilters),
         })
           .then((response) => {
             setBulkUploadSubStatuses(response.data?.success ? (response.data.data || []) : []);
@@ -16131,6 +16159,7 @@ useEffect(() => {
     axios
       .get(`${backendUrl}/college/status/${crossSaleForm.leadStatus}/substatus`, {
         headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       })
       .then((response) => {
         if (cancelled) return;
@@ -16149,7 +16178,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token]);
+  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token, cycleFilters.department, cycleFilters.project]);
 
   const kycDocStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -18081,10 +18110,7 @@ useEffect(() => {
                                     <div className="ai-call-date-modal__source">
                                       <span>Send to VoiceX</span>
                                       <div className="ai-call-date-modal__presets ai-call-date-modal__presets--source">
-                                        {[
-                                          { id: 'data-lead', label: 'Data Lead' },
-                                          { id: 'digital-lead', label: 'Digital Lead' },
-                                        ].map((option) => (
+                                        {aiCallSourceOptions.map((option) => (
                                           <button
                                             key={option.id}
                                             type="button"
@@ -19833,6 +19859,7 @@ useEffect(() => {
 
                             {/* Lead Card (same design as B2B) */}
                             <div className={`lead-card${showPopup === profileIndex ? ' lead-card--actions-open' : ''}${approvalEditProfileId === profile._id ? ' lead-card--approval-open' : ''}`}>
+                              <div className="lead-job-toolbar">
                               {group.leads.length > 0 && (
                                 <div className="lead-project-tabs" role="tablist" aria-label="Jobs for this candidate">
                                   {group.leads.map((courseLead) => {
@@ -19874,6 +19901,23 @@ useEffect(() => {
                                   )}
                                 </div>
                               )}
+                              {profile.isHrJobLead && (
+                                <HiringInterviewPanel
+                                  key={profile._id}
+                                  profile={profile}
+                                  backendUrl={backendUrl}
+                                  token={token}
+                                  onSaved={(hiring, companyId) => {
+                                    setAllProfiles(previous => previous.map(row => (
+                                      row.isHrJobLead
+                                      && String(row._candidate?._id) === String(profile._candidate?._id)
+                                      && String(row.companyId) === String(companyId)
+                                        ? { ...row, corporateHiringStatus: hiring } : row
+                                    )));
+                                  }}
+                                />
+                              )}
+                              </div>
                               {isMobile ? (
                                 <div className="lead-header lead-header-v2">
                                   {/* Floating labeled actions (mobile) */}
@@ -32473,7 +32517,58 @@ max-width: 600px;
           overflow: hidden;
         }
 
-        .lead-card > .lead-project-tabs + .lead-header.lead-header-v2 {
+        .lead-job-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px 16px;
+          padding: 8px 12px;
+          background: linear-gradient(180deg, #fff9fb 0%, #fff 100%);
+        }
+
+        .lead-job-toolbar > .lead-project-tabs {
+          flex: 1 1 160px;
+          min-width: 0;
+          padding: 0;
+          background: transparent;
+        }
+
+        .lead-job-toolbar > .hr-hiring-panel {
+          flex: 0 1 auto;
+          width: auto;
+          max-width: 100%;
+          margin: 0 0 0 auto;
+          padding: 0;
+          gap: 8px;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          font-size: 12px;
+        }
+
+        .lead-job-toolbar .hr-hiring-panel__manage {
+          margin-left: 0;
+          padding: 5px 10px;
+          font-size: 12px;
+        }
+
+        .lead-job-toolbar .hr-hiring-panel__stage {
+          padding: 4px 9px;
+        }
+
+        @media (max-width: 600px) {
+          .lead-job-toolbar > .hr-hiring-panel {
+            flex-basis: 100%;
+            margin-left: 0;
+          }
+
+          .lead-job-toolbar .hr-hiring-panel__heading,
+          .lead-job-toolbar .hr-hiring-panel__date {
+            flex-basis: auto;
+          }
+        }
+
+        .lead-card > .lead-job-toolbar + .lead-header.lead-header-v2 {
           margin-top: 8px;
         }
 

@@ -123,6 +123,32 @@ async function getStatusProjectScope(user) {
 }
 
 /**
+ * Projects used to decide which statuses and substatuses a screen may show.
+ * No department and no project keeps the caller's own access (admins see every status).
+ * A department or project limits the list to that selection, still inside the caller's access.
+ */
+async function resolveStatusProjectIds(user, { departmentId, projectId } = {}) {
+	const scope = await getStatusProjectScope(user);
+	const wantsProject = isValidId(projectId);
+	const wantsDepartment = isValidId(departmentId);
+	if (!wantsProject && !wantsDepartment) return scope;
+
+	const collegeId = user?.college?._id || user?.college;
+	const query = {};
+	if (isValidId(collegeId)) query.college = collegeId;
+	if (wantsProject) query._id = String(projectId);
+	if (wantsDepartment) query.vertical = String(departmentId);
+
+	const projects = await Project.find(query).select('_id').lean();
+	let ids = projects.map((project) => String(project._id));
+	if (scope) {
+		const allowed = new Set(scope.map(String));
+		ids = ids.filter((id) => allowed.has(id));
+	}
+	return ids;
+}
+
+/**
  * Map<statusId, Set<substatusId>> of what the given projects are assigned.
  */
 async function getAssignedForProjects(collegeId, projectIds = []) {
@@ -185,6 +211,7 @@ module.exports = {
 	getAssignmentState,
 	saveAssignmentState,
 	getStatusProjectScope,
+	resolveStatusProjectIds,
 	getAssignedForProjects,
 	findLeadsBlockedForStatus,
 };

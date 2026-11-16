@@ -76,6 +76,7 @@ const {
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
+const { jobProfileMatchMessage } = require("../../../helpers/jobProfileMatch");
 const users = require("../../models/users");
 const multer = require('multer');
 const crypto = require("crypto");
@@ -626,6 +627,9 @@ router
         creditLeft: coins?.candidateCoins,
         personalInfo,
         highestQualification: highestQualification && highestQualification.trim() !== '' ? highestQualification : undefined,
+        qualifications: highestQualification && highestQualification.trim() !== ''
+          ? [{ education: highestQualification }]
+          : [],
         isExperienced: isExperienced !== undefined && isExperienced !== null ? isExperienced : undefined
         
       };
@@ -2392,6 +2396,11 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   
   if (!candidate) {
     return res.send({ status: false, msg: "Candidate not found!" });
+  }
+
+  const profileMismatch = jobProfileMatchMessage(vacancy, candidate);
+  if (profileMismatch) {
+    return res.send({ status: false, msg: profileMismatch });
   }
 
   let referrerId = candidate?.referredBy;

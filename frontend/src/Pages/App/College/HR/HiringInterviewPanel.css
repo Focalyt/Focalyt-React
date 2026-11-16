@@ -1,0 +1,40 @@
+.hr-hiring-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; width: 100%; padding: 14px 18px; margin: 0 0 12px; border: 1px solid #dce5f1; border-left: 4px solid #fa4d7d; border-radius: 12px; background: #fff; color: #24344b; font-size: 13px; }
+.hr-hiring-panel__heading { font-weight: 700; }
+.hr-hiring-panel__heading i { margin-right: 6px; color: #fa4d7d; }
+.hr-hiring-panel__stage { padding: 5px 11px; border-radius: 20px; background: #eef4ff; color: #2853ac; font-weight: 600; }
+.hr-hiring-panel__stage--interview-due { background: #fff2d8; color: #805600; }
+.hr-hiring-panel__stage--hired { background: #ddf8ec; color: #126444; }
+.hr-hiring-panel__stage--rejected { background: #ffebee; color: #ad263e; }
+.hr-hiring-panel__date { color: #627086; }
+.hr-hiring-panel__manage { margin-left: auto; padding: 8px 14px; border: 1px solid #fa4d7d; border-radius: 8px; background: #fff; color: #ce2e5b; font-weight: 600; }
+.hr-hiring-panel__success { flex-basis: 100%; color: #126444; }
+.hr-hiring-dialog { width: 680px; max-width: calc(100vw - 28px); max-height: calc(100dvh - 40px); margin: auto; padding: 0; overflow: auto; border: 0; border-radius: 16px; background: #fff; color: #24344b; box-shadow: 0 24px 80px #17233d40; }
+.hr-hiring-dialog::backdrop { background: #17233d80; }
+.hr-hiring-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 26px; border-bottom: 1px solid #e5eaf1; }
+.hr-hiring-dialog__header small { color: #c92d59; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.hr-hiring-dialog__header h2 { margin: 6px 0; font-size: 23px; font-weight: 700; color: #24344b; }
+.hr-hiring-dialog__header p { margin: 0; color: #627086; }
+.hr-hiring-dialog__header button { padding: 0 8px; border: 0; background: transparent; color: #627086; font-size: 28px; }
+.hr-hiring-dialog__body { padding: 22px 26px; }
+.hr-hiring-dialog__context { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.hr-hiring-dialog__note { margin: 10px 0 16px; color: #627086; font-size: 12px; line-height: 1.6; }
+.hr-hiring-dialog__fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.hr-hiring-dialog__fields label { display: flex; flex-direction: column; gap: 7px; margin: 0; color: #34445b; font-size: 13px; font-weight: 600; }
+.hr-hiring-dialog__fields input, .hr-hiring-dialog__fields select, .hr-hiring-dialog__fields textarea { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #d6dfeb; border-radius: 8px; background: #fff; color: #24344b; font: inherit; font-weight: 400; }
+.hr-hiring-dialog__fields textarea { resize: vertical; }
+.hr-hiring-dialog__full { grid-column: 1 / -1; }
+.hr-hiring-dialog__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #e5eaf1; }
+.hr-hiring-dialog__actions button, .hr-hiring-dialog__error button { padding: 10px 16px; border: 1px solid #d6dfeb; border-radius: 8px; background: #fff; color: #34445b; font-weight: 600; }
+.hr-hiring-dialog__actions button[type=submit] { border-color: #fa4d7d; background: #fa4d7d; color: #fff; }
+.hr-hiring-dialog__error { margin-bottom: 16px; padding: 12px; border-radius: 8px; background: #fff0f2; color: #a52643; }
+.hr-hiring-dialog__error button { margin-left: 10px; }
+.hr-hiring-dialog button:disabled { opacity: .6; cursor: wait; }
+.hr-hiring-panel button:focus-visible, .hr-hiring-dialog :is(button, input, select, textarea):focus-visible { outline: 2px solid #fa4d7d; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .hr-hiring-panel { gap: 10px; padding: 12px; }
+  .hr-hiring-panel__heading { flex-basis: 100%; }
+  .hr-hiring-panel__date { flex-basis: 100%; }
+  .hr-hiring-panel__manage { margin-left: 0; }
+  .hr-hiring-dialog__header, .hr-hiring-dialog__body { padding: 18px; }
+  .hr-hiring-dialog__fields { grid-template-columns: 1fr; }
+}

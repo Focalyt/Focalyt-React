@@ -13,14 +13,18 @@ const {
   resolveProjectSelection,
   getAssignmentState,
   saveAssignmentState,
-  getStatusProjectScope,
+  resolveStatusProjectIds,
   getAssignedForProjects,
 } = require('../../../helpers/b2cStatusAssignment');
 
-// Admins see every status. Other users see only statuses, and substatuses,
-// assigned to their B2C projects.
+// Admins see every status until a department or project is requested.
+// Other users see only statuses, and substatuses, assigned to their B2C projects.
+// A department or project on the query limits that list to the selection.
 const filterStatusesForUser = async (req, statuses) => {
-  const projectIds = await getStatusProjectScope(req.user);
+  const projectIds = await resolveStatusProjectIds(req.user, {
+    departmentId: req.query?.department,
+    projectId: req.query?.project,
+  });
   if (!projectIds) return statuses;
   const assigned = await getAssignedForProjects(req.user.college._id, projectIds);
   return statuses

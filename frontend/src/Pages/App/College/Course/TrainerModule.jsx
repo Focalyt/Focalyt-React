@@ -1624,13 +1624,24 @@ const SessionFormSelect = ({ label, value, onChange, options = [], placeholder =
 
 
 
-const SessionEmptyState = () => (
+const SessionEmptyState = ({ filtered = false }) => (
   <div className="tm-empty tm-empty--session-create">
     <i className="fas fa-laptop" />
-    <p>No sessions assigned to you yet.</p>
-    <p className="tm-empty__hint">
-      Session plans are created by Academic Coordinator, referred to Senior Trainer, then assigned to you.
-    </p>
+    {filtered ? (
+      <>
+        <p>No sessions for this filter.</p>
+        <p className="tm-empty__hint">
+          Sessions show when a plan exists for the selected course. A batch also includes plans saved on that batch, plans referred to it, and course plans that are not saved on another batch.
+        </p>
+      </>
+    ) : (
+      <>
+        <p>No sessions assigned to you yet.</p>
+        <p className="tm-empty__hint">
+          Session plans are created by Academic Coordinator, referred to Senior Trainer, then assigned to you.
+        </p>
+      </>
+    )}
   </div>
 );
 
@@ -2988,22 +2999,6 @@ const getPendingTotQuestions = (session = {}) => {
   return (session.totQuestionBank || []).filter((question, index) => !answered.has(getTotQuestionId(question, index)));
 };
 
-const sessionHasTotAssignment = (session = {}) => (
-  Array.isArray(session.totQuestionBank) && session.totQuestionBank.length > 0
-);
-
-const hasTrainerPassedTot = (session = {}) => {
-  if (String(session.totStatus || '').toLowerCase() === 'passed') return true;
-  if (session.totAssignmentSubmission?.pass === true) return true;
-  return getTotSubmissionHistory(session).some((item) => item.pass === true);
-};
-
-const isSessionTotUnlocked = (session = {}) => (
-  !sessionHasTotAssignment(session) || hasTrainerPassedTot(session)
-);
-
-const TOT_LOCK_MESSAGE = 'Pass the ToT assignment for this session first.';
-
 const TotMcqAssignmentModal = ({ session, notify, token, backendUrl, onSubmitted, onClose }) => {
   const history = getTotSubmissionHistory(session);
   const questions = getPendingTotQuestions(session);
@@ -3226,6 +3221,7 @@ const SessionCard = ({
   onOpenAttendance,
   onAssignmentSubmitted,
   onMarkSessionDone,
+  onSessionDateChange,
   isCoordinatorPlan = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -3240,7 +3236,43 @@ const SessionCard = ({
   const [doneRemark, setDoneRemark] = useState('');
   const [doneSubmitting, setDoneSubmitting] = useState(false);
   const [selectedStudyDoc, setSelectedStudyDoc] = useState(null);
+  const [sessionDateInput, setSessionDateInput] = useState('');
+  const [sessionDateSaving, setSessionDateSaving] = useState(false);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
+  const dateValueOf = (value) => {
+    const raw = String(value?.sessionDate || '');
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+    const label = String(value?.date || '');
+    const match = label.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return match ? `${match[3]}-${match[2]}-${match[1]}` : '';
+  };
+  useEffect(() => {
+    setSessionDateInput(dateValueOf(activeSession));
+  }, [activeSession.id, activeSession.sessionDate, activeSession.date]);
+
+  const saveSessionDate = async (value) => {
+    const previous = sessionDateInput;
+    setSessionDateInput(value);
+    if (!value || !activeSession?.id || !token) return;
+    const [year, month, day] = value.split('-');
+    const label = `${day}/${month}/${year}`;
+    setSessionDateSaving(true);
+    try {
+      await axios.patch(
+        `${backendUrl}/college/session-plans/${activeSession.id}`,
+        { sessionDate: value, date: label },
+        { headers: { 'x-auth': token } }
+      );
+      onSessionDateChange?.({ ...activeSession, sessionDate: value, date: label });
+      notify('Session date updated');
+    } catch (error) {
+      setSessionDateInput(previous);
+      notify(error?.response?.data?.message || error?.message || 'Failed to update session date');
+    } finally {
+      setSessionDateSaving(false);
+    }
+  };
+
   const sessionMeta = useMemo(
     () => getSessionAttendanceMeta(activeSession),
     [activeSession]
@@ -3262,7 +3294,7 @@ const SessionCard = ({
     ['fa-clock', 'Class time', formatSessionTimeRange(activeSession), 'blue'],
     ['fa-graduation-cap', 'Course / trade', activeSession.courseTrade || basicDetails.courseTrade, 'pink'],
     ['fa-hashtag', 'Batch code', activeSession.batchCode || basicDetails.batchCode, 'pink'],
-    ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
+    ['fa-user', 'Trainer', activeSession.trainerName || activeSession.fieldTrainerName || '-', 'pink'],
   ]), [activeSession, basicDetails]);
   const statItems = useMemo(() => ([
     { icon: 'fa-users', val: liveStats.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
@@ -3319,28 +3351,11 @@ const SessionCard = ({
     };
   }, [actionsMenuOpen]);
 
-  const totUnlocked = isSessionTotUnlocked(activeSession);
-  const totLockTitle = totUnlocked ? '' : TOT_LOCK_MESSAGE;
   const attendanceDone = isSessionAttendanceDone(activeSession);
-  const canMarkAttendance = totUnlocked && sessionMeta.countable;
-  const canViewAttendance = totUnlocked;
-  const canMarkSessionDone = totUnlocked && (
-    attendanceDone || activeSession.status === 'Completed' || activeSession.workflowStatus === 'Completed'
-  );
-  const displayStatItems = totUnlocked
-    ? statItems
-    : [
-      { icon: 'fa-users', val: '0', lbl: 'Total Candidates', cls: 'blue' },
-      { icon: 'fa-check-circle', val: '0', lbl: 'Present', cls: 'green' },
-      { icon: 'fa-times-circle', val: '0', lbl: 'Absent', cls: 'red' },
-      { icon: 'fa-percentage', val: '0%', lbl: 'Attendance', cls: 'amber' },
-    ];
-
-  useEffect(() => {
-    if (!totUnlocked && (activeTab === 'evidence' || activeTab === 'standard' || activeTab === 'trainer')) {
-      setActiveTab('details');
-    }
-  }, [totUnlocked, activeTab]);
+  const canMarkAttendance = sessionMeta.countable;
+  const canViewAttendance = true;
+  const canMarkSessionDone = attendanceDone || activeSession.status === 'Completed' || activeSession.workflowStatus === 'Completed';
+  const displayStatItems = statItems;
 
   const closeDoneModal = () => {
     setDoneModalOpen(false);
@@ -3354,7 +3369,7 @@ const SessionCard = ({
       return;
     }
     if (!canMarkSessionDone) {
-      notify(totUnlocked ? 'Save attendance before marking this session done.' : TOT_LOCK_MESSAGE);
+      notify('Save attendance before marking this session done.');
       return;
     }
     if (typeof onMarkSessionDone !== 'function') {
@@ -3407,16 +3422,8 @@ const SessionCard = ({
             className="sc-actions-item"
             role="menuitem"
             disabled={!canMarkAttendance}
-            title={
-              !totUnlocked
-                ? totLockTitle
-                : (sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label)
-            }
+            title={sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label}
             onClick={() => {
-              if (!totUnlocked) {
-                notify(TOT_LOCK_MESSAGE);
-                return;
-              }
               if (!sessionMeta.countable) {
                 notify(sessionMeta.label || 'Attendance cannot be marked on Sunday.');
                 return;
@@ -3433,12 +3440,8 @@ const SessionCard = ({
             className="sc-actions-item"
             role="menuitem"
             disabled={!canViewAttendance}
-            title={totUnlocked ? 'View attendance for this session' : totLockTitle}
+            title="View attendance for this session"
             onClick={() => {
-              if (!totUnlocked) {
-                notify(TOT_LOCK_MESSAGE);
-                return;
-              }
               closeActionsMenu();
               onOpenAttendance(activeSession, 'register');
             }}
@@ -3451,16 +3454,8 @@ const SessionCard = ({
             className="sc-actions-item"
             role="menuitem"
             disabled={!canMarkSessionDone}
-            title={
-              !totUnlocked
-                ? totLockTitle
-                : (canMarkSessionDone ? 'Mark this session done' : 'Save attendance before marking this session done')
-            }
+            title={canMarkSessionDone ? 'Mark this session done' : 'Save attendance before marking this session done'}
             onClick={() => {
-              if (!totUnlocked) {
-                notify(TOT_LOCK_MESSAGE);
-                return;
-              }
               if (!canMarkSessionDone) {
                 notify('Save attendance before marking this session done.');
                 return;
@@ -3588,9 +3583,9 @@ const SessionCard = ({
           </div>
         </div>
 
-        <div className="sc-stats" title={totUnlocked ? undefined : totLockTitle}>
+        <div className="sc-stats">
           {displayStatItems.map(({ icon, val, lbl, cls }) => (
-            <div key={lbl} className={`sc-stat${totUnlocked ? '' : ' sc-stat--locked'}`}>
+            <div key={lbl} className="sc-stat">
               <div className={`sc-stat__icon sc-stat__icon--${cls}`}>
                 <i className={`fas ${icon}`} />
               </div>
@@ -3665,30 +3660,26 @@ const SessionCard = ({
             >
               <i className="far fa-list-alt" /> Session Details
             </button>
-            {totUnlocked && (
-              <button
-                type="button"
-                className={`sc-tab${activeTab === 'standard' ? ' sc-tab--active' : ''}`}
-                onClick={() => setActiveTab('standard')}
-              >
-                <i className="fas fa-book" /> Senior Trainer (Standard TLM)
-                {standardTlmDocs.length > 0 && (
-                  <span className="sc-tab-count">{uploadedStandardCount}/{standardTlmDocs.length}</span>
-                )}
-              </button>
-            )}
-            {totUnlocked && (
-              <button
-                type="button"
-                className={`sc-tab${activeTab === 'trainer' ? ' sc-tab--active' : ''}`}
-                onClick={() => setActiveTab('trainer')}
-              >
-                <i className="fas fa-file-alt" /> Flexible (Trainer-based TLM)
-                {trainerTlmDocs.length > 0 && (
-                  <span className="sc-tab-count">{uploadedTrainerCount}/{trainerTlmDocs.length}</span>
-                )}
-              </button>
-            )}
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'standard' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('standard')}
+            >
+              <i className="fas fa-book" /> Senior Trainer (Standard TLM)
+              {standardTlmDocs.length > 0 && (
+                <span className="sc-tab-count">{uploadedStandardCount}/{standardTlmDocs.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'trainer' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('trainer')}
+            >
+              <i className="fas fa-file-alt" /> Flexible (Trainer-based TLM)
+              {trainerTlmDocs.length > 0 && (
+                <span className="sc-tab-count">{uploadedTrainerCount}/{trainerTlmDocs.length}</span>
+              )}
+            </button>
             <button
               type="button"
               className={`sc-tab${activeTab === 'tlm' ? ' sc-tab--active' : ''}`}
@@ -3711,7 +3702,18 @@ const SessionCard = ({
                       <span className={`sc-detail-icon sc-detail-icon--${tone || 'blue'}`}>
                         <i className={`fas ${icon}`} />
                       </span>
-                      <span className="sc-detail-value">{value || '-'}</span>
+                      {label === 'Session date' ? (
+                        <input
+                          type="date"
+                          className="sc-date-input"
+                          value={sessionDateInput}
+                          disabled={sessionDateSaving}
+                          aria-label="Session date"
+                          onChange={(event) => saveSessionDate(event.target.value)}
+                        />
+                      ) : (
+                        <span className="sc-detail-value">{value || '-'}</span>
+                      )}
                     </strong>
                   </div>
                 ))}
@@ -3737,12 +3739,12 @@ const SessionCard = ({
             </div>
           )}
 
-          {totUnlocked && activeTab === 'standard' && renderMaterialTab(
+          {activeTab === 'standard' && renderMaterialTab(
             standardTlmDocs,
             'No Standard TLM added for this session yet.'
           )}
 
-          {totUnlocked && activeTab === 'trainer' && renderMaterialTab(
+          {activeTab === 'trainer' && renderMaterialTab(
             trainerTlmDocs,
             'No trainer-based TLM added for this session yet.'
           )}
@@ -3791,7 +3793,11 @@ const TrainerModule = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const classDetailsRef = useRef(null);
   const handleScheduleLoaded = useCallback((rows) => {
-    setSelectedBooking((previous) => previous ? rows.find((row) => row._id === previous._id) || null : null);
+    setSelectedBooking((previous) => {
+      if (!previous) return null;
+      if (previous.fromSessionDate) return previous;
+      return rows.find((row) => row._id === previous._id) || null;
+    });
   }, []);
   const handleTimetableClass = (booking) => {
     setSelectedBooking(booking);
@@ -3821,7 +3827,11 @@ const TrainerModule = () => {
   const [allCentersMeta, setAllCentersMeta] = useState([]);
   const [quickSearch, setQuickSearch] = useState('');
   const [mainTab, setMainTab] = useState('session');
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreMenuRef = useRef(null);
   const [sessions, setSessions] = useState([]);
+  const [filterPlanSessions, setFilterPlanSessions] = useState([]);
+  const [filterPlansLoading, setFilterPlansLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [session, setSession] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
@@ -3902,6 +3912,17 @@ const TrainerModule = () => {
   );
 
   const notify = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const closeMore = (event) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
+        setMoreOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeMore);
+    return () => document.removeEventListener('mousedown', closeMore);
+  }, [moreOpen]);
 
   const updateMap = useCallback((setter, id, field, val) => {
     setter((prev) => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
@@ -4212,6 +4233,65 @@ const TrainerModule = () => {
   }, [backendUrl, token]);
 
   const trainerId = userData._id || userData.id;
+  const filterActive = Boolean(
+    filters.department || filters.project || filters.center || filters.course || filters.batch
+  );
+
+  useEffect(() => {
+    if (!token || !filterActive) {
+      setFilterPlanSessions([]);
+      setFilterPlansLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const loadFilterSessions = async () => {
+      setFilterPlansLoading(true);
+      try {
+        const params = new URLSearchParams();
+        ['department', 'project', 'center', 'course', 'batch'].forEach((key) => {
+          if (filters[key]) params.set(key, filters[key]);
+        });
+        const res = await axios.get(`${backendUrl}/college/trainer/filter-sessions?${params.toString()}`, {
+          headers: { 'x-auth': token },
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        const plans = Array.isArray(res.data?.data) ? res.data.data : [];
+        setFilterPlanSessions(plans);
+        if (filters.batch) {
+          const [feedback, attendance] = await Promise.all([
+            fetchBatchSessionFeedback(filters.batch, controller.signal),
+            fetchBatchAttendance(filters.batch, controller.signal),
+          ]);
+          if (controller.signal.aborted) return;
+          setSessionFeedbackBySession((prev) => ({ ...prev, ...(feedback || {}) }));
+          setAttendanceRecordsBySession((prev) => ({ ...prev, ...(attendance || {}) }));
+        }
+      } catch (err) {
+        if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+          console.error('Failed to load sessions for the selected filter', err);
+          setFilterPlanSessions([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setFilterPlansLoading(false);
+      }
+    };
+
+    loadFilterSessions();
+    return () => controller.abort();
+  }, [
+    filterActive,
+    filters.department,
+    filters.project,
+    filters.center,
+    filters.course,
+    filters.batch,
+    backendUrl,
+    token,
+    fetchBatchSessionFeedback,
+    fetchBatchAttendance,
+  ]);
 
   const reloadAssignedSessions = useCallback(async (signal) => {
     if (!trainerId || !token) {
@@ -4499,15 +4579,20 @@ const TrainerModule = () => {
     });
   };
 
-  const displaySessions = useMemo(() => sessions, [sessions]);
+  const displaySessions = useMemo(
+    () => (filterActive ? filterPlanSessions : sessions),
+    [filterActive, filterPlanSessions, sessions]
+  );
 
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
     return displaySessions.filter((session) => {
-      if (selectedBooking && String(session.assignmentId) !== selectedBooking.assignmentId) return false;
-      if (filters.batch && session.batch && String(session.batch) !== String(filters.batch)) return false;
-      if (filters.course && session.course && String(session.course) !== String(filters.course)) return false;
-      if (filters.center && session.center && String(session.center) !== String(filters.center)) return false;
+      if (!filterActive && selectedBooking && String(session.assignmentId) !== selectedBooking.assignmentId) return false;
+      if (!filterActive && filters.department && session.department && String(session.department) !== String(filters.department)) return false;
+      if (!filterActive && filters.project && session.project && String(session.project) !== String(filters.project)) return false;
+      if (!filterActive && filters.batch && session.batch && String(session.batch) !== String(filters.batch)) return false;
+      if (!filterActive && filters.course && session.course && String(session.course) !== String(filters.course)) return false;
+      if (!filterActive && filters.center && session.center && String(session.center) !== String(filters.center)) return false;
       if (!query) return true;
       return (
         session.title?.toLowerCase().includes(query)
@@ -4524,7 +4609,7 @@ const TrainerModule = () => {
       date: new Date(`${selectedBooking.dateKey}T12:00:00`).toLocaleDateString('en-IN'),
       batchCode: selectedBooking.batchName,
     } : session);
-  }, [displaySessions, quickSearch, filters.batch, filters.course, filters.center, selectedBooking]);
+  }, [displaySessions, quickSearch, filterActive, filters.department, filters.project, filters.batch, filters.course, filters.center, selectedBooking]);
 
   useEffect(() => {
     if (!filteredSessions.length) {
@@ -4554,9 +4639,24 @@ const TrainerModule = () => {
       center: student.center && student.center !== '-'
         ? student.center
         : activeBasicDetails.centerName,
-    })),
-    [students, activeBasicDetails]
+    })).filter((student) => {
+      if (filters.batch && student.batchId && String(student.batchId) !== String(filters.batch)) return false;
+      if (filters.course && student.courseId && String(student.courseId) !== String(filters.course)) return false;
+      if (filters.center && student.centerId && String(student.centerId) !== String(filters.center)) return false;
+      return true;
+    }),
+    [students, activeBasicDetails, filters.batch, filters.course, filters.center]
   );
+  const moreBatchOptions = useMemo(() => {
+    const options = new Map(batchOptions.map((option) => [String(option.value), option]));
+    sessions.forEach((item) => {
+      const id = String(item.batch || '');
+      if (!id || options.has(id)) return;
+      options.set(id, { value: id, label: item.batchCode || 'Batch' });
+    });
+    return [...options.values()];
+  }, [batchOptions, sessions]);
+  const activeMoreFilters = ['department', 'project', 'center', 'course', 'batch'].filter((key) => filters[key]).length;
   const referBatchLabel = useMemo(
     () => getOptionLabel(batchOptions, filters.batch),
     [batchOptions, filters.batch]
@@ -4892,10 +4992,6 @@ const TrainerModule = () => {
     }
   };
   const openAttendanceModal = async (session, view = 'summary') => {
-    if (!isSessionTotUnlocked(session)) {
-      notify(TOT_LOCK_MESSAGE);
-      return;
-    }
     const meta = getSessionAttendanceMeta(session);
     if (!meta.countable && view === 'summary') {
       notify(meta.label || 'Attendance cannot be marked on Sunday.');
@@ -5074,7 +5170,8 @@ const TrainerModule = () => {
         </div>
       </header>
 
-      <div className="dbr-main-tabs">
+      <div className="dbr-tab-row">
+        <div className="dbr-main-tabs">
             {MAIN_TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -5085,13 +5182,84 @@ const TrainerModule = () => {
                 {tab.label}
               </button>
             ))}
-          </div>
+        </div>
+        <div className="dbr-more" ref={moreMenuRef}>
+          <button
+            type="button"
+            className={`dbr-more-btn${moreOpen ? ' dbr-more-btn--open' : ''}`}
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-expanded={moreOpen}
+            aria-haspopup="true"
+          >
+            <i className="fas fa-filter" />
+            More
+            {activeMoreFilters > 0 && <span className="dbr-more-btn__count">{activeMoreFilters}</span>}
+            <i className={`fas fa-chevron-${moreOpen ? 'up' : 'down'}`} />
+          </button>
+          {moreOpen && (
+            <div className="dbr-more-panel">
+              <div className="dbr-more-panel__head">
+                <strong>Filters</strong>
+                <button type="button" onClick={handleSessionPathReset}>Clear</button>
+              </div>
+              <div className="dbr-more-panel__grid">
+                <label>
+                  <span>Department</span>
+                  <select value={filters.department} onChange={(e) => handleFilterChange('department', e.target.value)}>
+                    <option value="">All</option>
+                    {verticalOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Project</span>
+                  <select value={filters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
+                    <option value="">All</option>
+                    {(filters.department ? filterProjectOptions : projectOptions).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Center</span>
+                  <select value={filters.center} onChange={(e) => handleFilterChange('center', e.target.value)}>
+                    <option value="">All</option>
+                    {(filters.project ? filterCenterOptions : centerOptions).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Course</span>
+                  <select value={filters.course} onChange={(e) => handleFilterChange('course', e.target.value)}>
+                    <option value="">All</option>
+                    {(filters.center && filters.project ? filterCourseOptions : courseOptions).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Batch</span>
+                  <select value={filters.batch} onChange={(e) => handleFilterChange('batch', e.target.value)}>
+                    <option value="">All</option>
+                    {moreBatchOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
           {mainTab === 'session' && (
             <>
               <TrainerTimetable
                 backendUrl={backendUrl}
                 token={token}
+                sessions={filterActive ? filterPlanSessions : sessions}
                 onSelect={handleTimetableClass}
                 onScheduleLoaded={handleScheduleLoaded}
               />
@@ -5143,7 +5311,12 @@ const TrainerModule = () => {
 
               <div className="tm-workspace">
                 <div className="tm-main">
-                  {filteredSessions.length > 0 ? (
+                  {filterPlansLoading ? (
+                    <div className="tm-empty tm-empty--inline">
+                      <i className="fas fa-spinner fa-spin" />
+                      <p>Loading sessions for this filter...</p>
+                    </div>
+                  ) : filteredSessions.length > 0 ? (
                     <>
                       {studentsLoading && (
                         <div className="tm-empty tm-empty--inline">
@@ -5182,6 +5355,15 @@ const TrainerModule = () => {
                                 : item
                             )));
                           }}
+                          onSessionDateChange={(updated) => {
+                            const applyDate = (item) => (
+                              String(item.id) === String(updated.id)
+                                ? { ...item, sessionDate: updated.sessionDate, date: updated.date }
+                                : item
+                            );
+                            setSessions((prev) => prev.map(applyDate));
+                            setFilterPlanSessions((prev) => prev.map(applyDate));
+                          }}
                           isCoordinatorPlan={isCoordinatorPlanSession(session)}
                         />
                       ))}
@@ -5194,7 +5376,7 @@ const TrainerModule = () => {
                           <p>Loading batch students...</p>
                         </div>
                       )}
-                      <SessionEmptyState />
+                      <SessionEmptyState filtered={filterActive} />
                     </>
                   )}
                 </div>
@@ -5420,7 +5602,37 @@ const PORTAL_CSS = `
   .dbr-filter-select { width: 100%; border: none; background: transparent; font-size: 13px; font-weight: 700; outline: none; cursor: pointer; color: #0f172a; }
 
   /* Main tabs */
-  .dbr-main-tabs { display: flex; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 12px; max-width: 360px; }
+  .dbr-tab-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .dbr-main-tabs { display: flex; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; width: 360px; max-width: 100%; flex: 0 0 auto; }
+  .dbr-more { position: relative; flex: 0 0 auto; }
+  .dbr-more-btn {
+    display: inline-flex; align-items: center; gap: 6px; background: #fff; color: ${PINK};
+    border: 1.5px solid ${PINK}; border-radius: 6px; padding: 8px 16px; font-size: 13px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .dbr-more-btn--open { background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%); color: #fff; }
+  .dbr-more-btn__count {
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: ${PINK}; color: #fff;
+    font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .dbr-more-btn--open .dbr-more-btn__count { background: #fff; color: ${PINK}; }
+  .dbr-more-panel {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: min(640px, calc(100vw - 48px));
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px;
+    box-shadow: 0 18px 40px rgba(15,23,42,0.14);
+  }
+  .dbr-more-panel__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .dbr-more-panel__head strong { font-size: 14px; color: #0f172a; }
+  .dbr-more-panel__head button {
+    border: none; background: transparent; color: ${PINK}; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .dbr-more-panel__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dbr-more-panel__grid label { display: flex; flex-direction: column; gap: 4px; }
+  .dbr-more-panel__grid span { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+  .dbr-more-panel__grid select {
+    width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 13px;
+    font-weight: 600; color: #0f172a; background: #fff;
+  }
   .dbr-main-tab { flex: 1; padding: 10px 16px; border: none; background: #fff; font-size: 13px; font-weight: 700; color: ${BLUE}; cursor: pointer; transition: 0.15s; }
   .dbr-main-tab:not(:last-child) { border-right: 1px solid #e2e8f0; }
   .dbr-main-tab--active { background: ${PINK}; color: #fff; }
@@ -6645,6 +6857,12 @@ const PORTAL_CSS = `
     word-break: break-word;
     min-width: 0;
   }
+  .sc-date-input {
+    border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px 6px;
+    font-size: 12px; font-weight: 700; color: #0f172a; background: #fff;
+    width: 100%; min-width: 0;
+  }
+  .sc-date-input:focus { outline: none; border-color: ${BLUE}; box-shadow: 0 0 0 2px rgba(37,99,235,0.12); }
   .sc-detail-icon {
     width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
     display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
@@ -8248,6 +8466,10 @@ const PORTAL_CSS = `
 
   @media (max-width: 640px) {
     .dbr-portal, .tm-portal { padding: 12px 12px 100px; }
+    .dbr-tab-row { align-items: stretch; }
+    .dbr-main-tabs { width: auto; flex: 1; }
+    .dbr-more-panel { width: min(640px, calc(100vw - 24px)); }
+    .dbr-more-panel__grid { grid-template-columns: 1fr; }
     .dbr-filter-pill { max-width: 100%; }
     .dbr-session-picker__item { min-width: 100%; max-width: 100%; }
     .dbr-points-grid { grid-template-columns: 1fr; }

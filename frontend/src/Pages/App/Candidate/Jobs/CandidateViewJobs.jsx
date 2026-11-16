@@ -1902,6 +1902,11 @@ const CandidateViewJobs = () => {
         }
       });
 
+      if (!response.data.status) {
+        alert(response.data.msg || response.data.message || "Unable to apply for this job.");
+        return;
+      }
+
       if (response.data.status) {
         const refCodeKey = JobId ? `refCode:${JobId}` : 'refCode';
         localStorage.removeItem(refCodeKey);

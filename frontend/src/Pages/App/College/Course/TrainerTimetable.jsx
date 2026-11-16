@@ -15,7 +15,7 @@ const addDays = (value, count) => {
   return date;
 };
 
-export default function TrainerTimetable({ backendUrl, token, onSelect, onScheduleLoaded }) {
+export default function TrainerTimetable({ backendUrl, token, sessions = [], onSelect, onScheduleLoaded }) {
   const [week, setWeek] = useState(() => mondayOf(new Date()));
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,8 +59,36 @@ export default function TrainerTimetable({ backendUrl, token, onSelect, onSchedu
     return () => { window.removeEventListener('focus', update); window.clearInterval(timer); };
   }, []);
 
-  const batches = [...new Map(bookings.map((row) => [row.batchId, row.batchName])).entries()];
-  const visible = bookings.filter((row) => !batch || row.batchId === batch);
+  const schedule = useMemo(() => {
+    const planClasses = (sessions || []).flatMap((session) => {
+      const raw = String(session.sessionDate || '');
+      const sessionDay = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : '';
+      if (!sessionDay || sessionDay < from || sessionDay > to || !session.startTime || !session.endTime) return [];
+      return [{
+        _id: `plan-${session.id || session._id}-${sessionDay}-${session.startTime}`,
+        assignmentId: session.assignmentId || '',
+        sessionId: String(session.id || session._id || ''),
+        title: session.title || 'Untitled session',
+        topic: session.topicCovered || session.title || '',
+        batchId: String(session.batch || ''),
+        batchName: session.batchCode || 'Batch',
+        dateKey: sessionDay,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        track: session.timetableType || 'course',
+        period: 'Session',
+        fromSessionDate: true,
+      }];
+    });
+    const booked = new Set(bookings.map((row) => `${row.sessionId}|${row.dateKey}|${row.startTime}`));
+    return [
+      ...bookings,
+      ...planClasses.filter((row) => !booked.has(`${row.sessionId}|${row.dateKey}|${row.startTime}`)),
+    ];
+  }, [bookings, sessions, from, to]);
+
+  const batches = [...new Map(schedule.map((row) => [row.batchId, row.batchName])).entries()];
+  const visible = schedule.filter((row) => !batch || row.batchId === batch);
   const ranges = [...new Set(visible.map((row) => `${row.startTime}|${row.endTime}`))].sort();
   const today = dateKey(new Date());
   const changeWeek = (offset) => { setWeek((value) => addDays(value, offset)); setBatch(''); };

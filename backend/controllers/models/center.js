@@ -9,7 +9,11 @@ const centerSchema = new Schema({
   address: {
     type: String,
   },
- 
+  hostelName: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   status: {
     type: Boolean,
     default: true,

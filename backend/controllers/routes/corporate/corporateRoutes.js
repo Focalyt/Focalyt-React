@@ -39,6 +39,7 @@ const candidateServices = require('../services/candidate')
 const users = require("../../models/users");
 const multer = require('multer');
 const templates = require("../../models/templates")
+const CompanyStatus = require("../../models/companyStatus")
 const {
   bucketName,
   msg91ShortlistedTemplate,
@@ -107,7 +108,7 @@ router.route("/dashboard").get(isCompany, async (req, res) => {
   try {
     const company = await Company.findOne({
       _concernPerson: req.session.user._id,
-    }).select('_id availableCredit unmasked name creditLeft');
+    }).select('_id availableCredit unmasked name creditLeft companyExecutives');
 
     const vacancyCount = await Vacancy.find({
       _company: company._id,
@@ -128,39 +129,163 @@ router.route("/dashboard").get(isCompany, async (req, res) => {
       isDeleted: false
     }).countDocuments();
 
-    let jobs = await Vacancy.find({ _company: company._id, status: true }).select('_id');
+    let jobs = await Vacancy.find({ _company: company._id, status: true }).select('_id title').sort({ createdAt: -1 });
+    const applicationCount = await AppliedJobs.countDocuments({ _company: company._id, isDeleted: false });
+
+    const allowedExperience = ['0', '1', '3', '5'];
+    const allowedDates = ['today', 'yesterday', 'prev3days', 'thisMonth', 'custom'];
+    const filters = {
+      qualification: mongoose.Types.ObjectId.isValid(req.query.qualification) ? String(req.query.qualification) : '',
+      experience: allowedExperience.includes(String(req.query.experience || '')) ? String(req.query.experience) : '',
+      job: mongoose.Types.ObjectId.isValid(req.query.job) ? String(req.query.job) : '',
+      date: allowedDates.includes(String(req.query.date || '')) ? String(req.query.date) : '',
+      from: /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.from || '')) ? String(req.query.from) : '',
+      to: /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.to || '')) ? String(req.query.to) : '',
+      status: mongoose.Types.ObjectId.isValid(req.query.status) ? String(req.query.status) : '',
+    };
+
+    const applicationQuery = { _company: company._id, isDeleted: false };
+    if (filters.job) applicationQuery._job = filters.job;
+
+    const nowIst = moment().utcOffset('+05:30');
+    let appliedFrom = null;
+    let appliedTo = null;
+    if (filters.date === 'today') {
+      appliedFrom = nowIst.clone().startOf('day');
+      appliedTo = nowIst.clone().endOf('day');
+    } else if (filters.date === 'yesterday') {
+      appliedFrom = nowIst.clone().subtract(1, 'day').startOf('day');
+      appliedTo = nowIst.clone().subtract(1, 'day').endOf('day');
+    } else if (filters.date === 'prev3days') {
+      appliedFrom = nowIst.clone().subtract(2, 'day').startOf('day');
+      appliedTo = nowIst.clone().endOf('day');
+    } else if (filters.date === 'thisMonth') {
+      appliedFrom = nowIst.clone().startOf('month');
+      appliedTo = nowIst.clone().endOf('day');
+    } else if (filters.date === 'custom' && filters.from && filters.to) {
+      appliedFrom = moment(filters.from, 'YYYY-MM-DD', true).utcOffset('+05:30', true).startOf('day');
+      appliedTo = moment(filters.to, 'YYYY-MM-DD', true).utcOffset('+05:30', true).endOf('day');
+      if (appliedFrom.isValid() && appliedTo.isValid() && appliedFrom.isAfter(appliedTo)) {
+        const swap = appliedFrom.clone();
+        appliedFrom = appliedTo.clone().startOf('day');
+        appliedTo = swap.clone().endOf('day');
+      }
+    }
+    if (appliedFrom && appliedTo && appliedFrom.isValid() && appliedTo.isValid()) {
+      applicationQuery.createdAt = { $gte: appliedFrom.toDate(), $lte: appliedTo.toDate() };
+    }
+
+    if (filters.qualification || filters.experience) {
+      const candidateQuery = {};
+      if (filters.qualification) candidateQuery.highestQualification = filters.qualification;
+      if (filters.experience === '0') {
+        candidateQuery.$or = [{ isExperienced: false }, { totalExperience: { $gte: 0 } }];
+      } else if (filters.experience) {
+        candidateQuery.totalExperience = { $gte: Number(filters.experience) };
+      }
+      const appliedCandidateIds = await AppliedJobs.distinct('_candidate', { _company: company._id, isDeleted: false });
+      candidateQuery._id = { $in: appliedCandidateIds };
+      const matchingCandidates = await Candidate.find(candidateQuery).select('_id');
+      applicationQuery._candidate = { $in: matchingCandidates.map((candidate) => candidate._id) };
+    }
+
+    const performanceStatuses = await CompanyStatus.find({ company: company._id })
+      .sort({ index: 1, createdAt: 1 })
+      .select('title')
+      .lean();
+    const performanceCounts = await AppliedJobs.aggregate([
+      { $match: applicationQuery },
+      { $group: { _id: '$leadStatus', count: { $sum: 1 } } },
+    ]);
+    const performanceCountByStatus = new Map(performanceCounts.map((row) => [String(row._id), row.count]));
+    const performanceChips = performanceStatuses.map((status) => ({
+      _id: String(status._id),
+      title: status.title,
+      count: performanceCountByStatus.get(String(status._id)) || 0,
+    }));
+    const performanceTotal = performanceCounts.reduce((sum, row) => sum + row.count, 0);
+    if (!performanceChips.some((chip) => chip._id === filters.status)) filters.status = '';
+    if (filters.status) applicationQuery.leadStatus = filters.status;
 
     let populate = [
       {
         path: '_job',
-        select: 'title'
+        select: 'title displayCompanyName'
       },
       {
         path: '_candidate',
-        select: 'name totalExperience highestQualification qualifications',
+        select: 'name mobile email whatsapp sex totalExperience isExperienced highestQualification',
         populate: {
           path: 'highestQualification',
           select: 'name',
           model: 'Qualification'
         }
+      },
+      {
+        path: 'leadStatus',
+        select: 'title milestone substatuses',
+        model: 'CompanyStatus',
+        populate: { path: 'milestone', select: 'title', model: 'CompanyMilestone' },
       }
     ];
 
 
-    let appliedCandidates = await AppliedJobs.find({ _company: company._id })
+    let appliedCandidates = await AppliedJobs.find(applicationQuery)
       .populate(populate)
       .sort({ createdAt: -1 })
       .limit(5);
-    let qualifications = await Qualification.find({ status: true, isDeleted: false }).select('_id name');
+
+    const candidateIds = appliedCandidates
+      .map((application) => application._candidate && application._candidate._id)
+      .filter(Boolean);
+    const hiringRows = candidateIds.length
+      ? await HiringStatus.find({
+        company: company._id,
+        candidate: { $in: candidateIds },
+        isDeleted: false,
+      }).select('candidate status job comment eventDate concernedPerson')
+      : [];
+    const hiringByCandidate = new Map(hiringRows.map((row) => [String(row.candidate), row]));
+    appliedCandidates = appliedCandidates.map((application) => {
+      const hiringStatus = application._candidate
+        ? hiringByCandidate.get(String(application._candidate._id))
+        : null;
+      const plain = application.toObject ? application.toObject() : application;
+      const statusDoc = plain.leadStatus && plain.leadStatus.title ? plain.leadStatus : null;
+      const subStatus = statusDoc && plain.leadSubstatus
+        ? (statusDoc.substatuses || []).find((item) => String(item._id) === String(plain.leadSubstatus))
+        : null;
+      return {
+        ...plain,
+        hiringStatus: hiringStatus || null,
+        hiringDate: hiringStatus && hiringStatus.eventDate ? moment(hiringStatus.eventDate).utcOffset('+05:30').format('YYYY-MM-DD') : '',
+        masked: !hiringStatus,
+        performance: {
+          statusId: statusDoc ? String(statusDoc._id) : '',
+          status: statusDoc ? statusDoc.title : 'Not set',
+          aiStatus: 'N/A',
+          subStatusId: subStatus ? String(subStatus._id) : '',
+          subStatus: subStatus ? subStatus.title : 'N/A',
+          milestone: statusDoc && statusDoc.milestone && statusDoc.milestone.title ? statusDoc.milestone.title : '',
+        },
+      };
+    });
+
+    let qualifications = await Qualification.find({ status: true, isDeleted: false }).select('_id name').sort({ name: 1 });
     const menu = "dashboard";
     res.render(`${req.vPath}/app/corporate/dashboard`, {
       company,
       menu,
       vacancyCount,
+      jobs,
+      applicationCount,
       ongoingCandidates,
       shortlistedCandidates,
       appliedCandidates,
-      qualifications
+      qualifications,
+      filters,
+      performanceChips,
+      performanceTotal,
     });
   } catch (error) {
     console.log(error);
@@ -298,8 +423,9 @@ router
   });
 
 router.get("/search-candidates", isCompany, async (req, res) => {
-  const menu = "search-candidates";
-  res.render(`${req.vPath}/app/corporate/searchCandidates`, { menu });
+  const queryStart = req.originalUrl.indexOf('?');
+  const search = queryStart === -1 ? '' : req.originalUrl.slice(queryStart);
+  return res.redirect('/company/list-candidates' + search);
 });
 router.get("/list-candidates", isCompany, async (req, res) => {
   let data = req.query;
@@ -390,6 +516,7 @@ router.get("/list-candidates", isCompany, async (req, res) => {
   let template = await templates.find({ status: true }).select("name templateId categories message")
 
   res.render(`${req.vPath}/app/corporate/listCandidates`, {
+    cache: false,
     menu,
     candidates,
     state,
@@ -730,6 +857,12 @@ router.get(
     });
   }
 );
+router.get('/candidate/:candidateId/card-details', [isCompany], require('./candidateCardDetails'));
+const companyFollowups = require('./companyFollowups');
+router.get('/candidate/:candidateId/followups', [isCompany], companyFollowups.list);
+router.post('/candidate/:candidateId/followups', [isCompany], companyFollowups.create);
+router.patch('/candidate/:candidateId/followups/:followupId', [isCompany], companyFollowups.complete);
+
 router.get("/candidate/:candidateId", [isCompany], async (req, res) => {
   let menu
   let { src } = req.query
@@ -1666,6 +1799,52 @@ router
     }
   });
 
+router.post('/candidate/hiring-stage', isCompany, async (req, res) => {
+  const stages = ['shortlisted', 'interview due', 'interviewed', 'on hold', 'offer letter rollout', 'hiring on hold', 'hired', 'rejected'];
+  const status = String(req.body.status || '').trim().toLowerCase();
+  const candidateId = String(req.body.candidate || '');
+  if (!stages.includes(status) || !mongoose.Types.ObjectId.isValid(candidateId)) {
+    return res.status(400).json({ message: 'Select a hiring status.' });
+  }
+  try {
+    const company = await Company.findOne({ _concernPerson: req.companyUser, isDeleted: { $ne: true } }).select('_id name');
+    if (!company) return res.status(404).json({ message: 'Company not found.' });
+    let person = await Candidate.findOne({ _id: candidateId, isDeleted: false }).select('name mobile');
+    if (!person) person = await CandidateProfile.findOne({ _id: candidateId }).select('name mobile');
+    if (!person) return res.status(404).json({ message: 'Candidate not found.' });
+    const jobId = mongoose.Types.ObjectId.isValid(req.body.job) ? req.body.job : '';
+    if (jobId) {
+      const job = await Vacancy.findOne({ _id: jobId, _company: company._id }).select('_id');
+      if (!job) return res.status(400).json({ message: 'Select one of your jobs.' });
+    }
+    const eventDate = req.body.eventDate ? new Date(req.body.eventDate) : null;
+    const update = {
+      status,
+      isDeleted: false,
+      isRejected: status === 'rejected',
+      comment: String(req.body.comment || '').trim().slice(0, 2000),
+      concernedPerson: String(req.body.concernedPerson || '').trim().slice(0, 120),
+    };
+    if (jobId) update.job = jobId;
+    if (eventDate && !Number.isNaN(eventDate.getTime())) update.eventDate = eventDate;
+    await HiringStatus.findOneAndUpdate(
+      { company: company._id, candidate: candidateId, isDeleted: false },
+      { $set: update, $setOnInsert: { candidate: candidateId, company: company._id } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    await sendNotification({
+      title: 'Candidate Status Update',
+      message: `You have ${status} for ${person.name || 'a candidate'}`,
+      _company: company._id,
+      source: 'System',
+    });
+    return res.json({ ok: true, status });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Unable to update hiring status.' });
+  }
+});
+
 router.post("/candidate/statusUpdate", [isCompany, authenti], async (req, res) => {
   const user = req.companyUser;
   const { candidate, status, job, comment, eventDate, concernedPerson } = req.body;
@@ -2576,5 +2755,7 @@ appliedCandidates = appliedCandidatesWithMasked;
 //   return res.status(200).send({ status: true, msg: data.type });
 // });
 
+
+router.use(require('./companyCatalog'));
 
 module.exports = router;

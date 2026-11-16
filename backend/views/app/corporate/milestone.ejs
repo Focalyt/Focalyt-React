@@ -1,0 +1,57 @@
+<% include ./partials/header %>
+<body class="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
+  <% include ./partials/navbar %>
+  <% include ./partials/leftpane %>
+  <div class="app-content content">
+    <div class="content-wrapper">
+      <main class="content-body">
+        <div class="recruiter-head">
+          <div>
+            <div class="recruiter-eyebrow">COMPANY HIRING SETUP</div>
+            <h1>Milestones</h1>
+            <p>Create the hiring milestones for <%= company?.name || 'your company' %>.</p>
+          </div>
+        </div>
+        <% if (notice) { %><div class="alert alert-success"><%= notice %></div><% } %>
+        <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+        <section class="card recruiter-panel">
+          <h2>Add a milestone</h2>
+          <form method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/milestone">
+            <div class="row">
+              <div class="col-md-4 mb-1">
+                <label for="milestone-title">Name</label>
+                <input id="milestone-title" class="form-control" name="title" maxlength="80" required placeholder="Offer accepted">
+              </div>
+              <div class="col-md-6 mb-1">
+                <label for="milestone-description">Description</label>
+                <input id="milestone-description" class="form-control" name="description" maxlength="300" placeholder="Optional note">
+              </div>
+              <div class="col-md-2 mb-1 d-flex align-items-end">
+                <button class="btn btn-primary" type="submit">Add milestone</button>
+              </div>
+            </div>
+          </form>
+        </section>
+        <section class="card recruiter-panel">
+          <div class="recruiter-bar"><h2>Your milestones</h2><span class="recruiter-muted"><%= milestones.length %></span></div>
+          <% if (milestones.length) { milestones.forEach(function(item) { %>
+            <form class="recruiter-jobrow" method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/milestone/<%= item._id %>">
+              <div class="recruiter-job-summary">
+                <label for="milestone-name-<%= item._id %>">Name</label>
+                <input id="milestone-name-<%= item._id %>" class="form-control mb-1" name="title" maxlength="80" required value="<%= item.title %>">
+                <label for="milestone-note-<%= item._id %>">Description</label>
+                <input id="milestone-note-<%= item._id %>" class="form-control" name="description" maxlength="300" value="<%= item.description || '' %>">
+              </div>
+              <div class="recruiter-job-buttons">
+                <button class="btn btn-outline-primary btn-sm" type="submit">Save</button>
+                <button class="btn btn-outline-primary btn-sm" type="submit" formaction="<%= process.env.MIPIE_BACKEND_URL %>/company/milestone/<%= item._id %>/delete" formmethod="POST" onclick="return confirm('Delete this milestone?')">Delete</button>
+              </div>
+            </form>
+          <% }); } else { %>
+            <div class="recruiter-empty">No milestones yet. Add the first one above.</div>
+          <% } %>
+        </section>
+      </main>
+    </div>
+  </div>
+  <% include ./partials/footer %>

@@ -1,0 +1,229 @@
+<% include ./partials/header %>
+<body class="vertical-layout vertical-menu-modern 2-columns navbar-floating footer-static" data-open="click" data-menu="vertical-menu-modern" data-col="2-columns">
+  <% include ./partials/navbar %>
+  <% include ./partials/leftpane %>
+  <div class="app-content content">
+    <div class="content-wrapper">
+      <main class="content-body lead-flow">
+        <% if (notice) { %><div class="lead-flow__notice"><%= notice %></div><% } %>
+        <% if (error) { %><div class="lead-flow__error"><%= error %></div><% } %>
+        <div class="lead-flow__head">
+          <h1>Lead Status Flow</h1>
+          <button type="button" class="lead-flow__add" id="openStatusModal">
+            <span>+</span> Add New Status
+          </button>
+        </div>
+        <div class="lead-flow__board">
+          <% if (statuses.length) { %>
+            <div class="lead-flow__row">
+              <% statuses.forEach(function(status, index) { %>
+                <div class="lead-flow__item">
+                  <form method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/status/<%= status._id %>/move">
+                    <input type="hidden" name="direction" value="left">
+                    <button class="lead-flow__move" type="submit" <%= index === 0 ? 'disabled' : '' %> title="Move Left">← Move Left</button>
+                  </form>
+                  <div class="lead-flow__column">
+                    <article class="lead-flow__card">
+                      <div class="lead-flow__card-top">
+                        <span>Position: <%= index + 1 %></span>
+                        <span>
+                          <button type="button" class="lead-flow__icon" title="Edit status" data-edit-status data-id="<%= status._id %>" data-title="<%= status.title %>" data-description="<%= status.description || '' %>" data-milestone="<%= status.milestone?._id || '' %>">✏️</button>
+                          <form class="lead-flow__inline" method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/status/<%= status._id %>/delete" onsubmit="return confirm('Delete this status?')">
+                            <button class="lead-flow__icon lead-flow__icon--danger" type="submit" title="Delete status">🗑️</button>
+                          </form>
+                        </span>
+                      </div>
+                      <div class="lead-flow__title"><%= status.title %></div>
+                      <% if (status.description) { %><div class="lead-flow__desc"><%= status.description %></div><% } %>
+                      <% if (status.milestone?.title) { %><div class="lead-flow__desc"><%= status.milestone.title %></div><% } %>
+                      <button type="button" class="lead-flow__toggle" data-sub-toggle aria-expanded="true">Hide Substatus ▲</button>
+                    </article>
+                    <div class="lead-flow__stem" data-sub-stem></div>
+                    <div class="lead-flow__subs" data-sub-panel>
+                      <div class="lead-flow__subs-label">Substatus</div>
+                      <% if (status.substatuses && status.substatuses.length) { status.substatuses.forEach(function(sub) { %>
+                        <div class="lead-flow__sub">
+                          <div>
+                            <div class="lead-flow__sub-title"><%= sub.title %></div>
+                            <% if (sub.description) { %><div class="lead-flow__sub-desc"><%= sub.description %></div><% } %>
+                            <div class="lead-flow__badges">
+                              <% if (sub.hasRemarks) { %><span class="lead-flow__badge" style="background:#e6fffa;color:#0f766e">Remarks</span><% } %>
+                              <% if (sub.hasFollowup) { %><span class="lead-flow__badge" style="background:#fff7ed;color:#c2410c">Followup</span><% } %>
+                              <% if (sub.hasAttachment) { %><span class="lead-flow__badge" style="background:#f3e8ff;color:#6b21a8">Attachment</span><% } %>
+                            </div>
+                          </div>
+                          <div>
+                            <button type="button" class="lead-flow__icon" title="Edit substatus" data-edit-sub data-status-id="<%= status._id %>" data-sub-id="<%= sub._id %>" data-title="<%= sub.title %>" data-description="<%= sub.description || '' %>" data-remarks="<%= sub.hasRemarks ? '1' : '' %>" data-followup="<%= sub.hasFollowup ? '1' : '' %>" data-attachment="<%= sub.hasAttachment ? '1' : '' %>">✏️</button>
+                            <form class="lead-flow__inline" method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/status/<%= status._id %>/substatus/<%= sub._id %>/delete" onsubmit="return confirm('Delete this substatus?')">
+                              <button class="lead-flow__icon lead-flow__icon--danger" type="submit" title="Delete substatus">🗑️</button>
+                            </form>
+                          </div>
+                        </div>
+                      <% }); } else { %>
+                        <div class="lead-flow__empty">No substatus available</div>
+                      <% } %>
+                      <button type="button" class="lead-flow__add-sub" data-add-sub data-status-id="<%= status._id %>">+ Add New Substatus</button>
+                    </div>
+                  </div>
+                  <form method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/status/<%= status._id %>/move">
+                    <input type="hidden" name="direction" value="right">
+                    <button class="lead-flow__move" type="submit" <%= index === statuses.length - 1 ? 'disabled' : '' %> title="Move Right">→ Move Right</button>
+                  </form>
+                </div>
+                <% if (index < statuses.length - 1) { %><div class="lead-flow__arrow" aria-hidden="true"></div><% } %>
+              <% }); %>
+            </div>
+          <% } else { %>
+            <div class="lead-flow__empty">No statuses yet. Add the first one.</div>
+          <% } %>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="lead-flow__modal" id="statusModal" hidden>
+    <form class="lead-flow__dialog" id="statusForm" method="POST" action="<%= process.env.MIPIE_BACKEND_URL %>/company/status">
+      <h3 id="statusModalTitle">Add New Status</h3>
+      <div class="lead-flow__field" id="statusMilestoneField">
+        <label for="statusMilestone">Milestone</label>
+        <select id="statusMilestone" name="milestone">
+          <option value="">None</option>
+          <% milestones.forEach(function(item) { %>
+            <option value="<%= item._id %>"><%= item.title %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="lead-flow__field">
+        <label for="statusName" id="statusNameLabel">Status Name</label>
+        <input id="statusName" name="title" maxlength="80" required placeholder="Example: In Review">
+      </div>
+      <div class="lead-flow__field">
+        <label for="statusDescription" id="statusDescriptionLabel">Status Description</label>
+        <input id="statusDescription" name="description" maxlength="300" placeholder="Example: Needs manager approval">
+      </div>
+      <div class="lead-flow__options" id="statusOptions" hidden>
+        <div>Additional Options</div>
+        <label><input type="checkbox" name="hasRemarks"> Remarks Required</label>
+        <label><input type="checkbox" name="hasFollowup"> Followup Required</label>
+        <label><input type="checkbox" name="hasAttachment"> Attachment Required</label>
+      </div>
+      <div class="lead-flow__actions">
+        <button type="button" class="lead-flow__cancel" id="closeStatusModal">Cancel</button>
+        <button type="submit" class="lead-flow__save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <style>
+    .lead-flow { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 8px 0 24px; }
+    .lead-flow__head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+    body:has(.recruiter-sidebar) .lead-flow__head h1 { margin: 0; font-size: 24px; font-weight: 600; color: #333; letter-spacing: 0; }
+    .lead-flow__add { display: inline-flex; align-items: center; gap: 8px; background: #3b82f6; color: #fff; border: 0; border-radius: 4px; padding: 10px 20px; font-weight: 500; cursor: pointer; }
+    .lead-flow__add span { font-size: 18px; }
+    .lead-flow__notice, .lead-flow__error { margin-bottom: 12px; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+    .lead-flow__notice { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .lead-flow__error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+    .lead-flow__board { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; overflow-x: auto; }
+    .lead-flow__row { display: flex; align-items: flex-start; padding: 20px 16px; min-width: max-content; }
+    .lead-flow__item { display: flex; align-items: flex-start; min-width: 220px; margin: 0 4px; }
+    .lead-flow__move { background: none; border: 0; color: #4299e1; font-size: 14px; cursor: pointer; margin-top: 48px; padding: 0 4px; }
+    .lead-flow__move:disabled { color: #cbd5e0; cursor: not-allowed; }
+    .lead-flow__column { display: flex; flex-direction: column; align-items: center; width: 220px; }
+    .lead-flow__card { width: 220px; min-height: 140px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; display: flex; flex-direction: column; }
+    .lead-flow__card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #4a5568; font-weight: 500; }
+    .lead-flow__inline { display: inline; }
+    .lead-flow__icon { background: none; border: 0; color: #4299e1; cursor: pointer; font-size: 14px; padding: 0 4px; }
+    .lead-flow__icon--danger { color: #f56565; }
+    .lead-flow__title { text-align: center; font-weight: 500; margin-top: 12px; font-size: 16px; color: #333; white-space: normal; padding: 0 8px; }
+    .lead-flow__desc { text-align: center; font-size: 14px; color: #666; margin-top: 6px; white-space: normal; padding: 0 8px; }
+    .lead-flow__toggle { margin-top: auto; width: 100%; padding: 8px; border: 0; border-top: 1px solid #f0f0f0; background: #fff; color: #4299e1; font-size: 14px; cursor: pointer; }
+    .lead-flow__stem { width: 3px; height: 15px; background: #cbd5e0; }
+    .lead-flow__subs { width: 90%; border: 1px solid #e2e8f0; border-radius: 4px; background: #f9fafb; padding: 12px; margin-top: 5px; white-space: normal; }
+    .lead-flow__subs-label { margin-bottom: 12px; font-weight: 500; color: #4a5568; font-size: 14px; }
+    .lead-flow__sub { display: flex; justify-content: space-between; gap: 8px; padding: 10px; background: #fff; border-radius: 4px; margin-bottom: 6px; }
+    .lead-flow__sub-title { font-weight: 500; font-size: 14px; color: #1f2937; }
+    .lead-flow__sub-desc { font-size: 12px; color: #718096; }
+    .lead-flow__badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .lead-flow__badge { border-radius: 999px; padding: 2px 6px; font-size: 10px; font-weight: 700; }
+    .lead-flow__empty { text-align: center; color: #a0aec0; font-size: 13px; padding: 16px; }
+    .lead-flow__add-sub { display: flex; align-items: center; justify-content: center; width: 100%; padding: 8px; background: #fff; color: #4299e1; border: 1px dashed #4299e1; border-radius: 4px; font-size: 13px; cursor: pointer; }
+    .lead-flow__arrow { width: 80px; min-width: 80px; height: 1px; background: #ccc; margin: 70px -4px 0; position: relative; }
+    .lead-flow__arrow::after { content: ""; position: absolute; right: 0; top: -4px; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 8px solid #ccc; }
+    .lead-flow__modal { position: fixed; inset: 0; z-index: 1200; background: rgba(0,0,0,.5); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+    .lead-flow__modal[hidden] { display: none; }
+    .lead-flow__dialog { background: #fff; border-radius: 8px; width: 400px; max-width: 100%; padding: 24px; margin: auto 0; }
+    body:has(.recruiter-sidebar) .lead-flow__dialog h3 { margin: 0 0 20px; font-size: 18px; font-weight: 600; color: #333; }
+    .lead-flow__field { margin-bottom: 16px; }
+    body:has(.recruiter-sidebar) .lead-flow__field label, .lead-flow__options label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #333; }
+    .lead-flow__field input, .lead-flow__field select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-height: 38px; background: #fff; color: #333; }
+    .lead-flow__options { margin: 8px 0 20px; padding: 12px 0; border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; color: #4a5568; }
+    .lead-flow__options label { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+    .lead-flow__actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .lead-flow__cancel { background: #fff; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+    .lead-flow__save { background: #3b82f6; color: #fff; border: 0; border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+    .lead-flow__column.is-collapsed .lead-flow__stem, .lead-flow__column.is-collapsed .lead-flow__subs { display: none; }
+  </style>
+  <script>
+    (function () {
+      var modal = document.getElementById('statusModal');
+      var form = document.getElementById('statusForm');
+      var base = '<%= process.env.MIPIE_BACKEND_URL %>/company/status';
+      function openModal(mode) {
+        form.reset();
+        document.getElementById('statusMilestone').value = '';
+        var sub = mode === 'sub';
+        document.getElementById('statusModalTitle').textContent = sub
+          ? (mode === 'sub-edit' ? 'Edit Substatus' : 'Add New Substatus')
+          : (mode === 'edit' ? 'Edit Status' : 'Add New Status');
+        document.getElementById('statusNameLabel').textContent = sub ? 'Substatus Name' : 'Status Name';
+        document.getElementById('statusDescriptionLabel').textContent = sub ? 'Substatus Description' : 'Status Description';
+        document.getElementById('statusMilestoneField').hidden = sub;
+        document.getElementById('statusOptions').hidden = !sub;
+        modal.hidden = false;
+      }
+      document.getElementById('openStatusModal').addEventListener('click', function () {
+        openModal('create');
+        form.action = base;
+        document.getElementById('statusModalTitle').textContent = 'Add New Status';
+      });
+      document.getElementById('closeStatusModal').addEventListener('click', function () { modal.hidden = true; });
+      modal.addEventListener('click', function (event) { if (event.target === modal) modal.hidden = true; });
+      document.querySelectorAll('[data-edit-status]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          openModal('edit');
+          form.action = base + '/' + button.dataset.id;
+          document.getElementById('statusName').value = button.dataset.title || '';
+          document.getElementById('statusDescription').value = button.dataset.description || '';
+          document.getElementById('statusMilestone').value = button.dataset.milestone || '';
+        });
+      });
+      document.querySelectorAll('[data-add-sub]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          openModal('sub');
+          form.action = base + '/' + button.dataset.statusId + '/substatus';
+          document.getElementById('statusModalTitle').textContent = 'Add New Substatus';
+        });
+      });
+      document.querySelectorAll('[data-edit-sub]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          openModal('sub');
+          form.action = base + '/' + button.dataset.statusId + '/substatus/' + button.dataset.subId;
+          document.getElementById('statusModalTitle').textContent = 'Edit Substatus';
+          document.getElementById('statusName').value = button.dataset.title || '';
+          document.getElementById('statusDescription').value = button.dataset.description || '';
+          form.hasRemarks.checked = button.dataset.remarks === '1';
+          form.hasFollowup.checked = button.dataset.followup === '1';
+          form.hasAttachment.checked = button.dataset.attachment === '1';
+        });
+      });
+      document.querySelectorAll('[data-sub-toggle]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var column = button.closest('.lead-flow__column');
+          var collapsed = column.classList.toggle('is-collapsed');
+          button.textContent = collapsed ? 'Show Substatus ▼' : 'Hide Substatus ▲';
+          button.setAttribute('aria-expanded', String(!collapsed));
+        });
+      });
+    })();
+  </script>
+  <% include ./partials/footer %>

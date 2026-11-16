@@ -1,0 +1,100 @@
+<% const student = studentCard.student || {};
+   const profileUrl = student._id ? process.env.MIPIE_BACKEND_URL + '/company/' + (studentCard.profileRoute || 'newcandidate/') + encodeURIComponent(String(student._id)) + (studentCard.profileQuery || '') : '';
+   const phone = String(student.mobile || '').trim();
+   const whatsapp = String(student.whatsapp || '').replace(/\D/g, '');
+   const contactVisible = studentCard.contactVisible === true && studentCard.masked !== true;
+   const needsUnmask = studentCard.masked === true && !!student._id;
+   const detailsId = 'student-details-' + String(studentCard.recordId || student._id || 'unavailable').replace(/[^a-zA-Z0-9_-]/g, '-');
+   const cardCompanyName = studentCard.companyName || (typeof company !== 'undefined' && company ? company.name : '');
+%>
+<article class="company-student-card" data-candidate-id="<%= student._id || '' %>" data-application-id="<%= studentCard.applicationId || '' %>" data-source="<%= studentCard.source || 'candidate' %>" aria-label="<%= student.name || 'Candidate' %>">
+  <% if(studentCard.bulkCandidate) { %><input type="hidden" class="candidateId" value="<%= student._id %>"><% } %>
+  <% if(cardCompanyName) { %>
+  <div class="company-student-company-header"><span class="company-student-company-badge" title="<%= cardCompanyName %>"><%= cardCompanyName %></span></div>
+  <% } %>
+  <div class="company-student-strip">
+    <section class="company-student-profile">
+      <div class="company-student-profile-head">
+        <span class="company-student-avatar"><%= (student.name || 'C').trim().slice(0,1).toUpperCase() %></span>
+        <div class="company-student-name"><% if(profileUrl) { %><button type="button" class="company-student-expand company-student-name-button" aria-expanded="false" aria-controls="<%= detailsId %>"><%= student.name || 'Candidate unavailable' %></button><% } else { %>Candidate unavailable<% } %></div>
+        <% if(profileUrl) { %><button type="button" class="company-student-icon company-student-open-documents" aria-label="Open candidate documents" aria-expanded="false" aria-controls="<%= detailsId %>"><i class="feather icon-file-text" aria-hidden="true"></i></button><% } %>
+      </div>
+      <div class="company-student-contact"><i class="feather icon-phone" aria-hidden="true"></i>
+        <% if(needsUnmask) { %><button type="button" class="company-student-unmask" data-candidate-id="<%= student._id %>" onclick="maskUnmask(this.dataset.candidateId)">Unmask contact</button><% } else if(contactVisible && phone) { %><span><%= phone %></span><% } else { %><span>Contact not available</span><% } %>
+        <% if(contactVisible && whatsapp) { const waNumber = whatsapp.length === 10 ? '91' + whatsapp : whatsapp; %><a class="company-student-whatsapp" href="https://wa.me/<%= waNumber %>" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp candidate"><img src="<%= process.env.MIPIE_BACKEND_URL %>/public_assets/images/whatsappicon.png" alt="" width="20" height="20"></a><% } %>
+      </div>
+      <div class="company-student-contact"><i class="feather icon-mail" aria-hidden="true"></i><span><%= contactVisible ? student.email || 'Email not available' : needsUnmask ? 'Email locked' : 'Email not available' %></span></div>
+      <div class="company-student-meta"><span>Gender</span><strong><%= student.sex || 'Not specified' %></strong></div>
+      <div class="company-student-meta"><span>Qualification</span><strong><%= studentCard.qualification || (student.highestQualification && student.highestQualification.name) || 'Not specified' %></strong></div>
+      <div class="company-student-meta"><span>Experience</span><strong><%= student.totalExperience ? student.totalExperience + ' years' : 'Fresher' %></strong></div>
+      <% if(studentCard.branch) { %><div class="company-student-meta"><span>Stream</span><strong><%= studentCard.branch %></strong></div><% } %>
+      <% if(studentCard.location) { %><div class="company-student-meta"><span>Location</span><strong><%= studentCard.location %></strong></div><% } %>
+    </section>
+    <div class="company-student-pair">
+      <section class="company-student-panel company-student-performance" data-lead-status="<%= (studentCard.performance && studentCard.performance.statusId) || '' %>" data-lead-substatus="<%= (studentCard.performance && studentCard.performance.subStatusId) || '' %>">
+        <% const performance = studentCard.performance || {}; const canUpdateStatus = !!studentCard.applicationId; %>
+        <h3><i class="feather icon-bar-chart-2" aria-hidden="true"></i> Performance<% if (canUpdateStatus) { %><button type="button" class="company-student-icon company-lead-status-open" aria-label="Update status"><i class="feather icon-edit-2" aria-hidden="true"></i></button><% } %></h3>
+        <div class="company-student-kv"><span>Status</span><% if (canUpdateStatus) { %><button type="button" class="company-student-kv-pill company-lead-status-open"><%= performance.status || 'Not set' %></button><% } else { %><strong><%= performance.status || 'Not set' %></strong><% } %></div>
+        <div class="company-student-kv"><span>AI Status</span><strong><%= performance.aiStatus || 'N/A' %></strong></div>
+        <div class="company-student-kv"><span>Sub-Status</span><% if (canUpdateStatus) { %><button type="button" class="company-student-kv-pill company-lead-status-open"><%= performance.subStatus || 'N/A' %></button><% } else { %><strong><%= performance.subStatus || 'N/A' %></strong><% } %></div>
+        <% if (performance.milestone) { %><div class="company-student-kv"><span>Milestone</span><strong><%= performance.milestone %></strong></div><% } %>
+      </section>
+      <section class="company-student-panel company-student-status">
+        <h3><i class="feather icon-check-circle" aria-hidden="true"></i> Hiring stage<% if (studentCard.hiringEditable && student._id) { %><button type="button" class="company-student-icon company-hiring-open" aria-label="Update hiring status" data-candidate-id="<%= student._id %>" data-hiring-status="<%= studentCard.hiringStatusValue || '' %>" data-hiring-job="<%= studentCard.hiringJob || '' %>" data-hiring-date="<%= studentCard.hiringDate || '' %>" data-hiring-person="<%= studentCard.hiringPerson || '' %>" data-hiring-comment="<%= studentCard.hiringComment || '' %>"><i class="feather icon-edit-2" aria-hidden="true"></i></button><% } %></h3>
+        <% if (studentCard.hiringEditable && student._id) { %><button type="button" class="company-student-status-pill company-hiring-open" data-candidate-id="<%= student._id %>" data-hiring-status="<%= studentCard.hiringStatusValue || '' %>" data-hiring-job="<%= studentCard.hiringJob || '' %>" data-hiring-date="<%= studentCard.hiringDate || '' %>" data-hiring-person="<%= studentCard.hiringPerson || '' %>" data-hiring-comment="<%= studentCard.hiringComment || '' %>"><%= studentCard.stage || 'Not shortlisted' %></button><% } else { %><span class="company-student-status-pill"><%= studentCard.stage || 'Not shortlisted' %></span><% } %>
+      </section>
+    </div>
+    <% ['Call', 'Visit'].forEach(function(followupType) {
+       const knownFollowups = Array.isArray(studentCard.companyFollowups);
+       const rows = (studentCard.companyFollowups || []).filter(item => item.type === followupType);
+       const bucket = item => item.status === 'planned' && new Date(item.followupDate) < new Date() ? 'missed' : item.status;
+       const upcoming = rows.filter(item => bucket(item) === 'planned').sort((a,b) => new Date(a.followupDate) - new Date(b.followupDate))[0];
+    %>
+    <section class="company-student-panel company-followup-panel <%= knownFollowups && !upcoming ? 'company-followup-panel--empty' : '' %>" data-followup-type="<%= followupType %>">
+      <h3><i class="feather icon-<%= followupType === 'Call' ? 'phone' : 'map-pin' %>" aria-hidden="true"></i>Follow-up <%= followupType %><button type="button" class="company-student-icon company-followup-open" aria-haspopup="dialog" aria-label="Manage <%= followupType.toLowerCase() %> follow-ups"><i class="feather icon-edit-2" aria-hidden="true"></i></button></h3>
+      <span class="company-followup-job" data-followup-job hidden></span>
+      <div class="company-followup-stats"><% ['done','planned','missed'].forEach(function(status) { %><div class="company-followup-stat company-followup-stat--<%= status %>"><span><%= status.charAt(0).toUpperCase() + status.slice(1) %></span><strong data-followup-count="<%= status %>"><%= knownFollowups ? String(rows.filter(item => bucket(item) === status).length).padStart(2,'0') : '—' %></strong></div><% }); %></div>
+      <div class="company-followup-next"><span>Next follow-up · IST</span><strong data-followup-next><%= upcoming ? new Date(upcoming.followupDate).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : knownFollowups ? 'Not scheduled' : 'Open to view follow-ups' %></strong></div>
+      <button class="company-followup-link company-followup-open" type="button" aria-haspopup="dialog">Manage follow-ups</button>
+    </section>
+    <% }); %>
+    <section class="company-student-panel company-student-actions">
+      <h3><i class="feather icon-grid" aria-hidden="true"></i> Actions
+        <span class="company-student-head-actions">
+          <% if(contactVisible && /^[+\d\s()-]+$/.test(phone)) { %><a class="company-student-icon" href="tel:<%= phone %>" aria-label="Call candidate"><i class="feather icon-phone" aria-hidden="true"></i></a><% } else if(needsUnmask) { %><button type="button" class="company-student-icon" data-candidate-id="<%= student._id %>" onclick="maskUnmask(this.dataset.candidateId)" aria-label="Unmask contact to call"><i class="feather icon-phone" aria-hidden="true"></i></button><% } else { %><button type="button" class="company-student-icon" disabled aria-label="Contact not available"><i class="feather icon-phone" aria-hidden="true"></i></button><% } %>
+          <span class="company-student-more">
+            <button type="button" class="company-student-icon company-student-more-toggle" aria-expanded="false" aria-haspopup="menu" aria-label="More actions"><i class="fas fa-ellipsis-v" aria-hidden="true"></i></button>
+            <div class="company-student-more-menu" role="menu" hidden>
+              <% if(profileUrl) { %><button type="button" class="company-student-expand" role="menuitem" aria-controls="<%= detailsId %>">View profile</button><% } %>
+              <% if(studentCard.latitude != null && studentCard.longitude != null) { %><button type="button" role="menuitem" data-latitude="<%= studentCard.latitude %>" data-longitude="<%= studentCard.longitude %>" onclick="openMap(this.dataset.latitude,this.dataset.longitude)">Location</button><% } %>
+              <% if(contactVisible && studentCard.resumeUrl) { %><a role="menuitem" href="<%= studentCard.resumeUrl %>" download>Download resume</a><% } %>
+              <% if(studentCard.applicationId) { %><button type="button" class="company-lead-status-open" role="menuitem">Update status</button><% } %>
+            </div>
+          </span>
+          <% if(profileUrl) { %><button class="company-student-icon company-student-expand company-student-chevron" type="button" aria-expanded="false" aria-controls="<%= detailsId %>" aria-label="Expand candidate details"><i class="feather icon-chevron-down" aria-hidden="true"></i></button><% } %>
+        </span>
+      </h3>
+      <div class="company-student-action-icons">
+        <% if(studentCard.latitude != null && studentCard.longitude != null) { %><button type="button" class="company-student-icon" data-latitude="<%= studentCard.latitude %>" data-longitude="<%= studentCard.longitude %>" onclick="openMap(this.dataset.latitude,this.dataset.longitude)" aria-label="Candidate location"><i class="feather icon-map-pin" aria-hidden="true"></i></button><% } %>
+        <% if(contactVisible && studentCard.resumeUrl) { %><a class="company-student-icon download-resume" href="<%= studentCard.resumeUrl %>" data-resume-url="<%= studentCard.resumeUrl %>" download aria-label="Download resume"><i class="feather icon-download" aria-hidden="true"></i></a><% } %>
+      </div>
+      <% if(profileUrl) { %><button type="button" class="company-student-profile-button company-student-expand" aria-expanded="false" aria-controls="<%= detailsId %>">View profile <i class="feather icon-chevron-down" aria-hidden="true"></i></button><% } %>
+      <% if(needsUnmask) { %><button type="button" class="company-student-unmask company-student-profile-button" data-candidate-id="<%= student._id %>" onclick="maskUnmask(this.dataset.candidateId)">Unmask details</button><% } %>
+    </section>
+  </div>
+  <% if(profileUrl) { %>
+  <div class="company-student-details" id="<%= detailsId %>" role="region" aria-label="Candidate details" hidden>
+    <div class="company-student-details-header">
+      <div class="company-student-tabs" role="tablist" aria-label="Candidate information">
+        <button type="button" id="<%= detailsId %>-profile-tab" role="tab" class="company-student-tab" data-student-tab="profile" aria-selected="true" aria-controls="<%= detailsId %>-profile">Profile</button>
+        <button type="button" id="<%= detailsId %>-documents-tab" role="tab" class="company-student-tab" data-student-tab="documents" aria-selected="false" aria-controls="<%= detailsId %>-documents" tabindex="-1">Documents</button>
+      </div>
+      <a href="<%= profileUrl %>" class="company-student-full-profile">Open full profile <i class="feather icon-external-link" aria-hidden="true"></i></a>
+    </div>
+    <div class="company-student-load-status" role="status" aria-live="polite"></div>
+    <section id="<%= detailsId %>-profile" role="tabpanel" aria-labelledby="<%= detailsId %>-profile-tab" data-student-panel="profile" class="company-student-detail-profile"></section>
+    <section id="<%= detailsId %>-documents" role="tabpanel" aria-labelledby="<%= detailsId %>-documents-tab" data-student-panel="documents" class="company-student-document-grid" hidden></section>
+  </div>
+  <% } %>
+</article>
+

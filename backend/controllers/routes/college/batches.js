@@ -361,19 +361,30 @@ router.get('/my-sessions', async (req, res) => {
 				match: { isDeleted: false, college: req.college._id },
 			})
 			.populate('batch', 'name')
+			.populate('trainer', 'name')
+			.populate('seniorTrainer', 'name')
 			.lean();
 
 		const data = assignments
 			.filter((assignment) => assignment.session)
 			.map((assignment) => {
 				const session = mapSessionToClient(assignment.session);
+				const trainerName = assignment.trainer?.name || session.fieldTrainerName || '';
+				const seniorTrainerName = assignment.seniorTrainer?.name || session.seniorTrainerName || '';
 				return {
 					...session,
 					assignmentId: String(assignment._id),
 					batch: assignment.batch?._id ? String(assignment.batch._id) : session.batch,
 					batchCode: assignment.batch?.name || session.batchCode || '',
-					seniorTrainerId: assignment.seniorTrainer ? String(assignment.seniorTrainer) : session.seniorTrainerId,
-					fieldTrainerId: assignment.trainer ? String(assignment.trainer) : session.fieldTrainerId,
+					trainerName,
+					fieldTrainerName: trainerName,
+					fieldTrainerId: assignment.trainer?._id
+						? String(assignment.trainer._id)
+						: session.fieldTrainerId,
+					seniorTrainerName,
+					seniorTrainerId: assignment.seniorTrainer?._id
+						? String(assignment.seniorTrainer._id)
+						: session.seniorTrainerId,
 				};
 			});
 

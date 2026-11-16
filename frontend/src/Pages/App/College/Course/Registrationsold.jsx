@@ -95,6 +95,11 @@ const toHrFilterYmd = (value) => {
 
 const isHrDepartmentLabel = (label) => String(label || '').trim().toLowerCase() === 'hr';
 
+const statusScopeParams = (cycle = {}) => ({
+  ...(cycle.department ? { department: cycle.department } : {}),
+  ...(cycle.project ? { project: cycle.project } : {}),
+});
+
 const getHrDepartmentIds = (verticalOptions = []) => new Set(
   (verticalOptions || [])
     .filter((opt) => isHrDepartmentLabel(opt.label))
@@ -1948,7 +1953,7 @@ const CRMDashboard = () => {
       return;
     }
     if (aiCallSource === 'untouch-new-lead' && !aiCallLeadSource) {
-      toast.info('Pick Data Lead or Digital Lead first');
+      toast.info('Pick a lead source first');
       return;
     }
     if (!numValue || numValue < 1) {
@@ -1965,11 +1970,12 @@ const CRMDashboard = () => {
       return;
     }
 
-    const sourceLabel = aiCallLeadSource === 'data-lead'
-      ? 'Data Lead'
-      : aiCallLeadSource === 'digital-lead'
-        ? 'Digital Lead'
-        : aiCallLabel;
+    const sourceLabel = (sources || []).find((source) => String(source._id) === String(aiCallLeadSource))?.name
+      || (aiCallLeadSource === 'data-lead'
+        ? 'Data Lead'
+        : aiCallLeadSource === 'digital-lead'
+          ? 'Digital Lead'
+          : aiCallLabel);
     const confirmed = window.confirm(
       `Send ${idsToSend.length || numValue} ${sourceLabel} lead(s) to AI call?`
     );
@@ -2011,7 +2017,7 @@ const CRMDashboard = () => {
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
+  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, sources, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -3252,6 +3258,24 @@ const CRMDashboard = () => {
     [sources]
   );
 
+  const aiCallSourceOptions = useMemo(() => {
+    const rank = (name) => {
+      const value = String(name || '').trim();
+      if (/^data\s*leads?$/i.test(value)) return 0;
+      if (/^digital\s*lead$/i.test(value)) return 1;
+      return 2;
+    };
+    const rows = (sources || [])
+      .filter((source) => source && source._id && source.status !== false && !/^meta\s*job\s*leads?$/i.test(String(source.name || '').trim()))
+      .map((source) => ({ id: String(source._id), label: source.name || 'Untitled' }))
+      .sort((a, b) => rank(a.label) - rank(b.label) || a.label.localeCompare(b.label));
+    if (rows.length) return rows;
+    return [
+      { id: 'data-lead', label: 'Data Lead' },
+      { id: 'digital-lead', label: 'Digital Lead' },
+    ];
+  }, [sources]);
+
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
@@ -4091,7 +4115,7 @@ const CRMDashboard = () => {
     if (seletectedStatus || filterData.statuses) {
       fetchSubStatus()
     }
-  }, [seletectedStatus, filterData.statuses]);
+  }, [seletectedStatus, filterData.statuses, cycleFilters.department, cycleFilters.project]);
 
 
 
@@ -4726,17 +4750,17 @@ const CRMDashboard = () => {
         return;
       }
       const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       });
 
 
       if (response.data.success) {
-        const status = response.data.data;
-
-
-        setSubStatuses(response.data.data);
-
-
+        const list = Array.isArray(response.data.data) ? response.data.data : [];
+        setSubStatuses(list);
+        setSelectedSubStatus((current) => (
+          current?._id && list.some((item) => String(item._id) === String(current._id)) ? current : null
+        ));
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -7533,6 +7557,8 @@ console.log('API Response:', response.data);
       .map((milestone) => ({
         ...milestone,
         count: Number(milestone.leadCount) || 0,
+        activeCount: Number(milestone.activeCount) || 0,
+        dropoutCount: Number(milestone.dropoutCount) || 0,
       }));
   }, [leadMilestones, milestoneProjectId]);
 
@@ -7844,29 +7870,58 @@ console.log('API Response:', response.data);
     return [...new Set(profiles.map((profile) => getProfileProject(profile).id).filter(Boolean))];
   };
 
-  const statusIsForLeadProjects = (status, projectIds) => {
-    if (!projectIds.length) return true;
-    const assigned = (status?.assignedProjects || []).map(String).filter(Boolean);
-    if (!assigned.length) return true;
-    const assignedSet = new Set(assigned);
-    return projectIds.every((id) => assignedSet.has(id));
+  // Header department/project decides the edit list. The lead's course project is only
+  // used when those filters are on All, because one course can still point at another department.
+  const headerStatusProjectIds = () => {
+    const deptId = cycleFilters.department ? String(cycleFilters.department) : '';
+    const belongsToDepartment = (opt) => !deptId || String(opt.vertical || '') === deptId;
+    if (cycleFilters.project) {
+      const selected = projectOptions.find((opt) => String(opt.value) === String(cycleFilters.project));
+      if (selected && belongsToDepartment(selected)) return [String(selected.value)];
+    }
+    if (deptId) {
+      return projectOptions
+        .filter(belongsToDepartment)
+        .map((opt) => String(opt.value))
+        .filter(Boolean);
+    }
+    return [];
   };
 
-  const substatusIsForLeadProjects = (sub, status, projectIds) => {
-    if (!projectIds.length) return true;
-    const statusAssigned = (status?.assignedProjects || []).map(String).filter(Boolean);
-    if (!statusAssigned.length) return true;
-    const assigned = new Set((sub?.assignedProjects || []).map(String));
-    return projectIds.every((id) => assigned.has(id));
+  const listedForProjects = (assignedIds, projectIds, match) => {
+    const assigned = new Set((assignedIds || []).map(String).filter(Boolean));
+    if (!assigned.size || !projectIds.length) return false;
+    return match === 'any'
+      ? projectIds.some((id) => assigned.has(id))
+      : projectIds.every((id) => assigned.has(id));
   };
 
-  const statusesForLead = statuses.filter((status) => status._id && statusIsForLeadProjects(status, getLeadProjectIds()));
+  const leadStatusScope = () => {
+    if (cycleFilters.department || cycleFilters.project) {
+      return { ids: headerStatusProjectIds(), match: 'any' };
+    }
+    return { ids: getLeadProjectIds(), match: 'every' };
+  };
+
+  const statusesForLead = (() => {
+    const scope = leadStatusScope();
+    if (!scope.ids.length) return scope.match === 'any' ? [] : statuses.filter((status) => status._id);
+    return statuses.filter((status) => {
+      if (!status._id) return false;
+      const assigned = (status.assignedProjects || []).map(String).filter(Boolean);
+      if (!assigned.length) return true;
+      return listedForProjects(assigned, scope.ids, scope.match);
+    });
+  })();
 
   const substatusesForLead = (() => {
-    const projectIds = getLeadProjectIds();
+    const scope = leadStatusScope();
     const status = statuses.find((item) => String(item._id) === String(seletectedStatus));
     if (!status || !Array.isArray(status.substatuses)) return subStatuses;
-    return status.substatuses.filter((sub) => substatusIsForLeadProjects(sub, status, projectIds));
+    const statusAssigned = (status.assignedProjects || []).map(String).filter(Boolean);
+    if (!statusAssigned.length) return status.substatuses;
+    if (!scope.ids.length) return scope.match === 'any' ? [] : status.substatuses;
+    return status.substatuses.filter((sub) => listedForProjects(sub.assignedProjects, scope.ids, scope.match));
   })();
 
   const closeLeadMilestones = () => {
@@ -8010,6 +8065,7 @@ console.log('API Response:', response.data);
         response.data.data?._milestone || profile._milestone,
         response.data.data?.milestoneHistory || []
       );
+      fetchLeadMilestones();
     } catch (error) {
       console.error('Error marking milestone dropout:', error);
       setLeadMilestoneError(error.response?.data?.message || 'Failed to mark dropout');
@@ -16209,6 +16265,7 @@ useEffect(() => {
     axios
       .get(`${backendUrl}/college/status/${crossSaleForm.leadStatus}/substatus`, {
         headers: { 'x-auth': token },
+        params: statusScopeParams(cycleFilters),
       })
       .then((response) => {
         if (cancelled) return;
@@ -16227,7 +16284,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token]);
+  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token, cycleFilters.department, cycleFilters.project]);
 
   const kycDocStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -16488,7 +16545,7 @@ useEffect(() => {
         </div>
       </div>
       <div className="b2b-dash-section mt-3">
-        <label className="b2b-dash-section__label" htmlFor="b2bMilestoneProject">Project</label>
+        <label className="b2b-dash-section__label" htmlFor="b2bMilestoneProject">Milestones</label>
         <div className="b2b-milestone-row d-flex flex-nowrap gap-2 align-items-center pt-1">
           <select
             id="b2bMilestoneProject"
@@ -16535,9 +16592,9 @@ useEffect(() => {
                   <button
                     key={milestone._id || index}
                     type="button"
-                    className="b2b-perf-chip"
+                    className="b2b-perf-chip b2b-milestone-chip"
                     style={{
-                      padding: '6px 14px',
+                      padding: '6px 10px',
                       fontSize: '12px',
                       fontWeight: 600,
                       borderRadius: '999px',
@@ -16547,8 +16604,19 @@ useEffect(() => {
                       border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
                     }}
                     onClick={() => handleMilestoneChipClick(milestone)}
+                    title={`${milestone.activeCount ?? 0} still in this milestone, ${milestone.dropoutCount ?? 0} dropped out`}
                   >
-                    {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                    <span className="b2b-milestone-chip__side" title="Not dropped out from this milestone">
+                      <span className="b2b-milestone-chip__sign" aria-hidden="true">+</span>
+                      <span className="b2b-milestone-chip__count">{milestone.activeCount ?? 0}</span>
+                    </span>
+                    <span className="b2b-milestone-chip__label">
+                      {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                    </span>
+                    <span className="b2b-milestone-chip__side" title="Dropped out from this milestone">
+                      <span className="b2b-milestone-chip__sign" aria-hidden="true">−</span>
+                      <span className="b2b-milestone-chip__count">{milestone.dropoutCount ?? 0}</span>
+                    </span>
                   </button>
                 );
               })}
@@ -17073,6 +17141,40 @@ useEffect(() => {
             min-width: 0;
             flex-wrap: nowrap;
             overflow-x: auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip {
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__side {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            min-width: 16px;
+            flex: 0 0 auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__sign {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__count {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__label {
+            flex: 1 1 auto;
+            text-align: center;
           }
           .b2b-crm-dashboard .b2b-dash-stat-card {
             border-radius: 8px;
@@ -18218,10 +18320,7 @@ useEffect(() => {
                                     <div className="ai-call-date-modal__source">
                                       <span>Send to VoiceX</span>
                                       <div className="ai-call-date-modal__presets ai-call-date-modal__presets--source">
-                                        {[
-                                          { id: 'data-lead', label: 'Data Lead' },
-                                          { id: 'digital-lead', label: 'Digital Lead' },
-                                        ].map((option) => (
+                                        {aiCallSourceOptions.map((option) => (
                                           <button
                                             key={option.id}
                                             type="button"

@@ -84,6 +84,7 @@ const updatedPermission = async () => {
         type: 'main',
         status: 'active',
         capacity: '',
+        hostelName: '',
         project: selectedProject ? [selectedProject._id] : []
     });
 
@@ -136,6 +137,7 @@ const updatedPermission = async () => {
             type: 'main',
             status: 'active',
             capacity: '',
+            hostelName: '',
             project: selectedProject?._id || ''
         });
     };
@@ -159,6 +161,7 @@ const updatedPermission = async () => {
         setFormData({
             name: center.name,
             address: center.address || center.location || '',
+            hostelName: center.hostelName || '',
             status: center.status === true ? 'active' : center.status === false ? 'inactive' : (center.status || 'active'),
         });
         setShowEditForm(true);
@@ -361,6 +364,7 @@ const updatedPermission = async () => {
                 const editPayload = {
                     name: formData.name?.trim(),
                     address: formData.address?.trim() || '',
+                    hostelName: formData.hostelName?.trim() || '',
                     status: formData.status === 'active',
                 };
                 const response = await fetch(`${backendUrl}/college/edit_center/${editingCenter._id}`, {
@@ -752,6 +756,17 @@ const updatedPermission = async () => {
                                                 <option value="inactive">Inactive</option>
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className="mb-3">
+                                        <label className="form-label">Hostel Name</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={formData.hostelName || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, hostelName: e.target.value }))}
+                                            placeholder="Enter hostel name"
+                                        />
                                     </div>
                                 </div>}
 

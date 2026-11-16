@@ -163,6 +163,7 @@ import StatusB2C from './Pages/App/College/Status/statusB2C'
 import MilestoneB2C from './Pages/App/College/Status/milestoneB2C'
 import MilestoneB2B from './Pages/App/College/Status/milestoneB2B'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
+import PrivacyPolicyPage from './Pages/App/College/Register/privacyPolicyPage';
 import DataDeletion from './Pages/App/College/Register/dataDeletion';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
 import Attendance from './Pages/App/College/Attendance/Attendance';
@@ -179,6 +180,8 @@ import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
 import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 import TrainerModule from './Pages/App/College/Course/TrainerModule';
+import DtrSettings from './Pages/App/College/Course/DtrSettings';
+import DailyReportPage from './Pages/App/College/Course/DailyReportPage';
 import AcademicCoordinatorModule from './Pages/App/College/Training/AcademicCoordinatorModule';
 import SeniorTrainerModule from './Pages/App/College/Training/SeniorTrainerModule';
 import Editcoursecopy from './Pages/App/College/Course/EditCoursecopy';
@@ -263,6 +266,7 @@ const Layout = () => {
         <Route exact path="/contact" element={<Contact />} />
         <Route exact path="/marketing" element={<Marketing />} />
         <Route exact path="/landing" element={<LandingPage />} />
+        <Route exact path="/jobs" element={<LandingPage mode="jobs" />} />
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/cmp/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />
@@ -325,6 +329,7 @@ const Layout = () => {
 
         <Route path="/institute/login" element={<CollegeLogin />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/privacypolicy" element={<PrivacyPolicyPage />} />
         <Route path="/data-deletion" element={<DataDeletion />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/institute/register" element={<CollegeRegister />} />
@@ -366,6 +371,7 @@ const Layout = () => {
           <Route path="institute/courses/edit/:id" element={<Editcoursecopy />} />
           <Route path="courses/edit/:id" element={<Editcoursecopy />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
+          <Route path='dtr-settings' element={<DtrSettings/>}/>
           <Route path='projectmanagment' element={<CandidateManagementPortal/>}/>
           <Route path='candidatemanagment_old' element={<CandidateManagementPortal_old/>}/>
           <Route path='approvalManagement' element={<ApprovalManagement/>}/>
@@ -414,6 +420,7 @@ const Layout = () => {
           <Route path='lrp-view' element={<LrpView/>}/>
           <Route path='video-timestamp' element={<VideoTimestamp/>}/>
           <Route path='training' element={<TrainerModule/>}/>
+          <Route path='daily-report' element={<DailyReportPage/>}/>
           <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
           <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
           <Route path='registration' element={<Regitrationsold/>}/>
