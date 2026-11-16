@@ -2592,6 +2592,8 @@ const STYLES = `
   scrollbar-width: thin;
   padding: 4px 4px 12px;
   margin: 0 -4px;
+  container-type: inline-size;
+  container-name: foc-carousel;
 }
 .course-carousel-viewport::-webkit-scrollbar {
   height: 6px;
@@ -4024,8 +4026,33 @@ const STYLES = `
   .csr-poster-hub { display: none; }
   .csr-poster-cta-strip { margin-left: 14px; margin-right: 14px; }
   .events-grid { grid-template-columns: 1fr; }
-  .course-carousel-track { padding: 0 44px; }
+  /* Centered single-card carousel on small screens */
+  .course-carousel {
+    padding: 0 16px;
+  }
+  .course-carousel-viewport {
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .course-carousel-track {
+    padding: 0;
+    gap: 0;
+  }
   .course-carousel-btn { width: 38px; height: 38px; font-size: 18px; }
+  .course-carousel-btn--prev { left: 18px; }
+  .course-carousel-btn--next { right: 18px; }
+  .course-carousel .course-card,
+  .course-carousel .course-carousel-item,
+  .event-carousel .course-carousel-track > .event-card,
+  .job-carousel .course-carousel-track > .course-card {
+    flex: 0 0 100cqw;
+    width: 100cqw;
+    max-width: 100cqw;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
   .footer-inner { grid-template-columns: 1fr; }
   .pillars { grid-template-columns: 1fr; }
   .hero-topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -5965,32 +5992,35 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [feeFilter, setFeeFilter] = useState("all");
   
+  const getCarouselStep = (el) => {
+    if (!el) return 0;
+    const card = el.querySelector(".course-card, .course-carousel-item, .event-card");
+    if (card) return Math.round(card.getBoundingClientRect().width) || el.clientWidth;
+    return el.clientWidth;
+  };
+
   const scrollCourseCarousel = (direction) => {
     const el = courseCarouselRef.current;
     if (!el) return;
-    const step = Math.max(240, Math.round(el.clientWidth * 0.72));
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    el.scrollBy({ left: direction * getCarouselStep(el), behavior: "smooth" });
   };
 
   const scrollJobCarousel = (direction) => {
     const el = jobCarouselRef.current;
     if (!el) return;
-    const step = Math.max(240, Math.round(el.clientWidth * 0.72));
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    el.scrollBy({ left: direction * getCarouselStep(el), behavior: "smooth" });
   };
 
   const scrollEventsCarousel = (direction) => {
     const el = eventsCarouselRef.current;
     if (!el) return;
-    const step = Math.max(240, Math.round(el.clientWidth * 0.72));
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    el.scrollBy({ left: direction * getCarouselStep(el), behavior: "smooth" });
   };
 
   const scrollExpiredEventsCarousel = (direction) => {
     const el = expiredEventsCarouselRef.current;
     if (!el) return;
-    const step = Math.max(240, Math.round(el.clientWidth * 0.72));
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    el.scrollBy({ left: direction * getCarouselStep(el), behavior: "smooth" });
   };
 
   const getJobThumbnailUrl = (job) => {
