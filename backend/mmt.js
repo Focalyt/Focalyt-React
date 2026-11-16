@@ -19,6 +19,7 @@ const { v4: uuidv4 } = require('uuid');
 const axios = require("axios");
 const AWS = require('aws-sdk');
 const { Server } = require("socket.io");
+const { setClubIo } = require("./helpers/clubSocket");
 
 const dns = require('dns');
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
@@ -71,6 +72,8 @@ const io = new Server(server, {
 	return total;
   };
 
+  setClubIo(io);
+
   io.on("connection", (socket) => {
 	let userId = socket.handshake.query.userId; // frontend se aaya hua
 
@@ -80,6 +83,19 @@ const io = new Server(server, {
   
 	if (!userSockets[userId]) userSockets[userId] = [];
 	userSockets[userId].push(socket.id);
+
+	socket.on("club:join", (clubId) => {
+		if (clubId) socket.join(`club:${String(clubId)}`);
+	});
+	socket.on("club:leave", (clubId) => {
+		if (clubId) socket.leave(`club:${String(clubId)}`);
+	});
+	socket.on("club-campus:join", (collegeId) => {
+		if (collegeId) socket.join(`club-campus:${String(collegeId)}`);
+	});
+	socket.on("club-campus:leave", (collegeId) => {
+		if (collegeId) socket.leave(`club-campus:${String(collegeId)}`);
+	});
   
 	const totalSockets = getTotalSockets();
 	console.log(`✅ Socket.io connected:`);

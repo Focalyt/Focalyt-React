@@ -4,6 +4,7 @@ const cron = require('node-cron');
 const { Parser } = require("json2csv");
 
 const { isCollege, isTrainer, auth1, authenti, getAllTeamMembers, sendMail } = require("../../../helpers");
+const { presentClubPermissions } = require("../../../helpers/clubAssignablePermissions");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
 const axios = require("axios");
 const mongoose = require('mongoose');
@@ -981,7 +982,7 @@ router.route("/login")
 
 			// If it's email
 			if (isEmail) {
-				query.$or.push({ email: userInput, role: 2 });
+				query.$or.push({ email: String(userInput).toLowerCase().trim(), role: 2 });
 			} else {
 				// Assume it's mobile — convert to number
 				const mobileNumber = Number(userInput);
@@ -1013,8 +1014,10 @@ router.route("/login")
 
 			};
 			// Extract isDefaultAdmin from _concernPerson
-			const concernPersonData = college._concernPerson.find(p => p._id.toString() === userId.toString());
-			const isDefaultAdmin = concernPersonData?.isDefaultAdmin || false;
+			const concernPersonData = (college._concernPerson || []).find(
+				(p) => p?._id && String(p._id) === String(userId)
+			);
+			const isDefaultAdmin = Boolean(concernPersonData?.isDefaultAdmin);
 			const token = await user.generateAuthToken();
 
 
@@ -1039,10 +1042,14 @@ router.route('/permission')
 			const projects_access = user.projects_access || [];
 			const verticals_access = user.verticals_access || [];
 			const b2c_projects_access = user.b2c_projects_access || [];
+			const presented = permissions?.toObject ? permissions.toObject() : permissions;
+			if (presented?.custom_permissions) {
+				presented.custom_permissions = presentClubPermissions(presented.custom_permissions);
+			}
 			return res.send({
 				status: true,
 				message: "Permission fetched successfully",
-				permissions,
+				permissions: presented,
 				departments_access,
 				projects_access,
 				verticals_access,

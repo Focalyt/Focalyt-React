@@ -5,6 +5,14 @@ const cors = require('cors');
 const router = express.Router();
 
 const { isCollege, auth1, authenti, logUserActivity, getAllTeamMembers } = require("../../../helpers");
+const {
+  CLUB_ROLE_FLAGS,
+  cmsRoleFromFlags,
+  cloneStoredClubPermissions,
+  clubAccessWouldChange,
+  presentClubPermissions,
+  sanitizeSavedClubPermissions,
+} = require("../../../helpers/clubAssignablePermissions");
 
 
 
@@ -66,6 +74,154 @@ const checkPermission = (permission) => {
   };
 };
 
+const CAMPUS_SELECT = 'name type location address place status isDeleted _concernPerson';
+
+const asObjectId = (id) => {
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+  return new mongoose.Types.ObjectId(id);
+};
+
+const concernEntries = (college) => {
+  if (!college?._concernPerson) return [];
+  return Array.isArray(college._concernPerson) ? college._concernPerson : [college._concernPerson];
+};
+
+const userOnCollege = (college, userId) =>
+  concernEntries(college).some((cp) => String(cp?._id) === String(userId));
+
+const userIsDefaultAdminOn = (college, userId) =>
+  concernEntries(college).some((cp) => String(cp?._id) === String(userId) && cp.defaultAdmin);
+
+const mapCampus = (college, targetUserId, managedIds) => ({
+  _id: college._id,
+  name: college.name,
+  type: college.type || '',
+  city: college.location?.city || '',
+  state: college.location?.state || '',
+  address: college.location?.fullAddress || college.address || college.place || '',
+  defaultAdmin: userIsDefaultAdminOn(college, targetUserId),
+  managedByYou: managedIds.has(String(college._id)),
+});
+
+const collegesForUser = (userId) =>
+  College.find({
+    isDeleted: { $ne: true },
+    $or: [{ '_concernPerson._id': userId }, { _concernPerson: userId }],
+  })
+    .select(CAMPUS_SELECT)
+    .sort({ name: 1 })
+    .lean();
+
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const realCampusQuery = (search = '') => {
+  const query = {
+    isDeleted: { $ne: true },
+    name: { $exists: true, $nin: [null, ''] },
+  };
+  const q = String(search || '').trim();
+  if (q) query.name = { $regex: escapeRegex(q), $options: 'i' };
+  return query;
+};
+
+const assignableColleges = async (req, excludeIds = [], search = '') => {
+  const exclude = excludeIds.map((id) => asObjectId(id)).filter(Boolean);
+  const query = realCampusQuery(search);
+  if (exclude.length) query._id = { $nin: exclude };
+  if (req.user?.permissions?.permission_type !== 'Admin') {
+    const managed = await collegesForUser(req.user._id);
+    query._id = query._id
+      ? { ...query._id, $in: managed.map((college) => college._id) }
+      : { $in: managed.map((college) => college._id) };
+  }
+  return College.find(query).select(CAMPUS_SELECT).sort({ name: 1 }).limit(500).lean();
+};
+
+const canControlCampus = (req, college) => {
+  if (req.user?.permissions?.permission_type === 'Admin') return true;
+  return userOnCollege(college, req.user._id);
+};
+
+const canAssignCampuses = (user) => user?.permissions?.permission_type === 'Admin';
+
+const isMainInstituteAdmin = (user) => user?.permissions?.permission_type === 'Admin';
+
+const sanitizeClubRoleFlags = (customPermissions = {}, { actorIsAdmin, previousCustom = {} } = {}) => {
+  const next = { ...(customPermissions || {}) };
+  if (!actorIsAdmin) {
+    CLUB_ROLE_FLAGS.forEach((flag) => {
+      next[flag] = Boolean(previousCustom[flag]);
+    });
+    next.club_permissions = cloneStoredClubPermissions(previousCustom.club_permissions);
+    return next;
+  }
+  const selected = CLUB_ROLE_FLAGS.filter((flag) => next[flag]);
+  if (selected.length > 1) {
+    const keep = next.can_be_club_admin
+      ? 'can_be_club_admin'
+      : next.can_be_club_sse
+        ? 'can_be_club_sse'
+        : 'can_be_club_se';
+    CLUB_ROLE_FLAGS.forEach((flag) => {
+      next[flag] = flag === keep;
+    });
+  }
+  const cmsRole = cmsRoleFromFlags(next);
+  next.club_permissions = cmsRole
+    ? sanitizeSavedClubPermissions(next.club_permissions, cmsRole)
+    : [];
+  return next;
+};
+
+const rejectUnauthorizedClubAccessChange = (req, res, incomingCustom, previousCustom, { isSelfEdit } = {}) => {
+  const actorIsAdmin = isMainInstituteAdmin(req.user);
+  if (actorIsAdmin && !isSelfEdit) return false;
+  if (!clubAccessWouldChange(incomingCustom || {}, previousCustom || {})) return false;
+  res.status(403).json({
+    success: false,
+    message: isSelfEdit
+      ? 'You cannot change your own Club role or permissions.'
+      : 'Only the main Institute Admin can assign Club roles and permissions.',
+  });
+  return true;
+};
+
+const clubStaffRoleLabel = (user) => {
+  const type = user?.permissions?.permission_type;
+  const custom = user?.permissions?.custom_permissions || {};
+  if (type === 'Admin' || custom.can_be_club_admin) return 'Club Administrator';
+  if (custom.can_be_club_sse) return 'Senior Sales Engineer';
+  if (custom.can_be_club_se) return 'Sales Engineer';
+  return '';
+};
+
+const isClubStaffUser = (user) => Boolean(clubStaffRoleLabel(user));
+
+const requireCampusAssigner = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+  if (!canAssignCampuses(req.user)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Only the main Institute Admin can assign Club campuses.',
+    });
+  }
+  next();
+};
+
+const assignUserToCampus = async (collegeId, targetUserId) =>
+  College.updateOne(
+    { _id: collegeId, '_concernPerson._id': { $ne: targetUserId } },
+    { $push: { _concernPerson: { _id: targetUserId, defaultAdmin: false } } }
+  );
+
+const unassignUserFromCampus = async (collegeId, targetUserId) =>
+  College.updateOne(
+    { _id: collegeId },
+    { $pull: { _concernPerson: { _id: targetUserId } } }
+  );
+
 /**
  * @route   POST /api/users/add
  * @desc    Add new user
@@ -95,8 +251,17 @@ router.get('/', isCollege, async (req, res) => {
     let users = await Promise.all(colleges.flatMap(college => college._concernPerson.map(concernPerson => concernPerson._id)));
 
     for (let user of users) {
-      user.my_team = await getAllTeamMembers(user?._id)
+      if (user?._id) user.my_team = await getAllTeamMembers(user._id);
     }
+
+    const seenUsers = new Set();
+    users = users.filter((listedUser) => {
+      if (!listedUser?._id) return false;
+      const id = String(listedUser._id);
+      if (seenUsers.has(id)) return false;
+      seenUsers.add(id);
+      return true;
+    });
 
     totalCount = users.length
 
@@ -224,7 +389,12 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
 
       case 'custom':
         permissionType = 'Custom';
-        customPermissions = permissions || {};
+        if (rejectUnauthorizedClubAccessChange(req, res, permissions || {}, {}, { isSelfEdit: false })) {
+          return;
+        }
+        customPermissions = sanitizeClubRoleFlags(permissions || {}, {
+          actorIsAdmin: isMainInstituteAdmin(user),
+        });
         break;
 
       default:
@@ -372,8 +542,6 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
     )
     // console.log('updatedCollege', updatedCollege)
 
-
-
     res.status(200).json({
       status: true,
       message: `User "${name}" added successfully with ${access_level} access`,
@@ -518,11 +686,21 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
           body.permissions.custom_permissions = {};
           break;
 
-        case 'custom':
+        case 'custom': {
+          const incomingCustom = body.permission || body.permissions || {};
+          const previousCustom = editUser.permissions?.custom_permissions || {};
+          const isSelfEdit = String(editUser._id) === String(user._id);
+          if (rejectUnauthorizedClubAccessChange(req, res, incomingCustom, previousCustom, { isSelfEdit })) {
+            return;
+          }
           body.permissions = {}
           body.permissions.permission_type = 'Custom';
-          body.permissions.custom_permissions = body.permission || {};
+          body.permissions.custom_permissions = sanitizeClubRoleFlags(incomingCustom, {
+            actorIsAdmin: isMainInstituteAdmin(user) && !isSelfEdit,
+            previousCustom,
+          });
           break;
+        }
 
         default:
           return res.status(400).json({
@@ -1002,9 +1180,14 @@ router.get('/users-details/:userId', [isCollege, checkPermission('can_view_users
         message: 'User not found'
       });
     }
+    const data = user.toObject ? user.toObject() : user;
+    data.my_team = my_team;
+    if (data.permissions?.custom_permissions) {
+      data.permissions.custom_permissions = presentClubPermissions(data.permissions.custom_permissions);
+    }
     res.status(200).json({
       status: true,
-      data: user
+      data
     });
   } catch (error) {
     console.error('Get User Details Error:', error);

@@ -236,6 +236,60 @@ console.log('college' , college)
   }
 };
 
+module.exports.isClub = async (req, res, next) => {
+  try {
+    const error = req.ykError("You are not authorized");
+    let user = null;
+    // ✅ Else check for token in headers (for React SPA project)
+    const token = req.header('x-auth');
+    if (!token) throw error;
+    const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+
+    user = await User.findById(decoded.id);
+    if (!user || user.role !== 5) throw error;
+    const college = await College.findOne({ '_concernPerson._id': user._id })
+    req.user = user
+    req.college = college
+    user.college = college
+    console.log('user', user)
+    console.log('college', college)
+    return next();
+  } catch (err) {
+    const userAgent = req.get('User-Agent');
+    const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
+    console.log("--- ERROR Club", ipAddress, userAgent, err);
+    req.flash("error", err.message);
+    return res.redirect("/club/login");
+  }
+};
+
+module.exports.isClubAdmin = async (req, res, next) => {
+  try {
+    const error = req.ykError("You are not authorized");
+    let user = req.session?.user || null;
+
+    if (!user) {
+      const token = req.header('x-auth');
+      if (token) {
+        const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+        user = await User.findById(decoded.id);
+      }
+    }
+
+    if (!user || user.role != 5) {
+      throw error;
+    }
+    req.user = user;
+    return next();
+  } catch (err) {
+    const userAgent = req.get('User-Agent');
+    const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
+    console.log("--- ERROR ClubAdmin ", ipAddress, userAgent, err);
+    req.flash("error", err.message);
+    return res.redirect("/club-admin/login");
+  }
+};
+
 module.exports.logUserActivity = (action) => {
   return async (req, res, next) => {
     try {

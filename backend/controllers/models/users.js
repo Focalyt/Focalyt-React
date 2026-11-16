@@ -86,6 +86,23 @@ const userSchema = new Schema(
 				can_be_senior_trainer: { type: Boolean, default: false },
 				can_be_trainer: { type: Boolean, default: false },
 
+				// Club Management
+				can_view_clubs: { type: Boolean, default: false },
+				can_be_club_admin: { type: Boolean, default: false },
+				can_be_club_sse: { type: Boolean, default: false },
+				can_be_club_se: { type: Boolean, default: false },
+				club_permissions: [{
+					_id: false,
+					key: { type: String },
+					allowed: { type: Boolean, default: false },
+				}],
+				can_create_clubs: { type: Boolean, default: false },
+				can_edit_clubs: { type: Boolean, default: false },
+				can_manage_club_members: { type: Boolean, default: false },
+				can_manage_club_positions: { type: Boolean, default: false },
+				can_manage_club_budgets: { type: Boolean, default: false },
+				can_manage_club_activities: { type: Boolean, default: false },
+
 				// User Management
 				can_view_users: { type: Boolean, default: false },
 				can_add_users: { type: Boolean, default: false },

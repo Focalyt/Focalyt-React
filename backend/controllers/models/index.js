@@ -162,3 +162,7 @@ module.exports.MetaForm = require('./metaForm');
 module.exports.MetaSyncRun = require('./metaSyncRun');
 module.exports.MetaFormMapping = require('./metaFormMapping');
 module.exports.MetaLeadEvent = require('./metaLeadEvent');
+
+// Club CMS Models
+const clubCmsModels = require('./clubCms');
+Object.assign(module.exports, clubCmsModels);

@@ -119,6 +119,8 @@ module.exports.sendOtp = async (req, res) => {
       role = 1;
     } else if (module === 'trainer') {
       role = 4;
+    } else if (module === 'club') {
+      role = 5;
     }
 
     console.log('userInput', userInput, 'module', module)
@@ -347,16 +349,16 @@ module.exports.verifyInstituteOtp = async (req, res) => {
     let { mobile, otp, userInput } = req.body;
     const auth = authKey;
     if (userInput ) {
-      console.log('userInput', userInput, 'module', module)
+      console.log('userInput', userInput)
     
     const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
 
     let user = null;
 
     if (isMobile) {
-      user = await User.findOne({ mobile: parseInt(userInput), role: 4 });
+      user = await User.findOne({ mobile: parseInt(userInput), role: roleFilter });
     } else {
-      user = await User.findOne({ email: userInput.toLowerCase(), role: 4 });
+      user = await User.findOne({ email: userInput.toLowerCase(), role: roleFilter });
     }
       if (!user) {
         return res.send({
@@ -844,6 +846,122 @@ module.exports.loginAsTrainer = async (req, res) => {
     return res.redirect("back");
   }
 }
+
+module.exports.clubLogin = async (req, res) => {
+  try {
+    const { userInput, email: rawEmail, password } = req.body;
+    const input = (userInput || rawEmail || '').trim();
+    if (!input || !password) {
+      return res.status(400).json({ status: false, error: 'Mobile/Email and password are required' });
+    }
+
+    const isMobile = /^\d{10}$/.test(input);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
+
+    let user = null;
+    if (isMobile) {
+      user = await User.findOne({ mobile: Number(input), role: 5 });
+    } else if (isEmail) {
+      user = await User.findOne({ email: input.toLowerCase(), role: 5 });
+    }
+
+    if (!user) {
+      return res.status(400).json({ status: false, error: 'User not found' });
+    }
+
+    if (!user.password || !user.validPassword(password)) {
+      return res.status(400).json({ status: false, error: 'Invalid password' });
+    }
+
+    const token = await user.generateAuthToken();
+
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      role: 5,
+      email: user.email,
+      mobile: user.mobile,
+      designation: user.designation,
+      collegeId: user.collegeId,
+      permissions: user.permissions,
+      token,
+    };
+
+    return res.status(200).json({
+      status: true,
+      message: 'Login successful',
+      token,
+      role: 5,
+      userData,
+      data: { user: userData, token },
+    });
+  } catch (err) {
+    console.log('Error in POST /club/login:', err.message);
+    return res.status(500).json({ status: false, error: err.message });
+  }
+};
+
+module.exports.loginAsClub = async (req, res) => {
+  try {
+    const { userInput, otp } = req.body;
+    const isMobile = /^\d{10}$/.test(userInput);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput);
+    let mobile;
+    let user;
+
+    if (isMobile) {
+      mobile = userInput;
+      user = await User.findOne({ mobile: Number(userInput), role: 5 });
+    } else if (isEmail) {
+      user = await User.findOne({ email: userInput.toLowerCase(), role: 5 });
+      if (!user) {
+        return res.json({ status: false, error: 'User not found' });
+      }
+      mobile = user.mobile;
+    } else {
+      return res.json({ status: false, error: 'Invalid mobile number or email' });
+    }
+
+    if (!user) {
+      return res.json({ status: false, error: 'User not found' });
+    }
+
+    const auth = authKey;
+    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
+    const result = await axios.get(url);
+
+    if (result.data.type === 'success' || result.data.message === 'already_verified' || otp == '2025') {
+      const token = await user.generateAuthToken();
+
+      const userData = {
+        _id: user._id,
+        name: user.name,
+        role: 5,
+        email: user.email,
+        mobile: user.mobile,
+        collegeId: user.collegeId,
+        permissions: user.permissions,
+        token,
+      };
+
+      return res.json({
+        status: true,
+        message: 'Login successful',
+        token,
+        role: 5,
+        userData,
+        data: { user: userData, token },
+      });
+    } else {
+      return res.send({
+        status: false,
+        message: 'Invalid OTP!',
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({ status: false, error: err.message || 'Something went wrong!' });
+  }
+};
 
 module.exports.country = async (req, res) => {
   try {

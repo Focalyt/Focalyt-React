@@ -163,6 +163,9 @@ commonRoutes.get("/app/version", async (req, res) => {
 commonRoutes.post("/sendOtptoAddLead", commonFunc.sendOtptoAddLead);
 commonRoutes.post("/otpCollegeLogin", commonFunc.loginAsCollege);
 commonRoutes.post("/otpTrainerLogin", commonFunc.loginAsTrainer);
+commonRoutes.post("/otpClubLogin", commonFunc.loginAsClub);
+commonRoutes.post("/clubLogin", commonFunc.clubLogin);
+commonRoutes.post("/clubRegister", commonFunc.clubRegister);
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
 commonRoutes.post("/publicApply", commonFunc.publicApply);
 commonRoutes.get("/sectorList", commonFunc.sectorList);

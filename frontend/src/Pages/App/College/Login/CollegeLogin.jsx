@@ -27,6 +27,9 @@ const getInstituteHomePath = (permissions) => {
     if (hasCollegePermission(permissions, 'can_view_leads_b2b')) {
         return '/institute/sales';
     }
+    if (hasCollegePermission(permissions, 'can_be_club')) {
+        return '/institute/club/dashboard';
+    }
     return '/institute/registration';
 };
 
@@ -513,6 +516,7 @@ const CollegeLogin = () => {
                                         )}
 
                                         {showOtpField && (
+                                            <>
                                             <div className="input-field">
                                                 <span className="input-icon">
                                                     <i className="fa-regular fa-key"></i>
@@ -526,6 +530,8 @@ const CollegeLogin = () => {
                                                     onKeyPress={handleKeyPress}
                                                 />
                                             </div>
+                                            
+                                            </>
                                         )}
 
                                         <div className="otp-btn-container">

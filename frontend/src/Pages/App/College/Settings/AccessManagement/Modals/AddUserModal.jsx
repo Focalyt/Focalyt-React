@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios'
+import { isMainInstituteAdmin } from '../../../../../../config/club/clubAuthSession';
+import {
+  ClubManagementRoles,
+  applyClubPermissionToggle,
+  applyClubPermissionsPatch,
+  applyClubRoleChange,
+} from './ClubManagementRoles';
 
 const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -7,6 +14,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
   const token = userData.token;
 
   const user = JSON.parse(sessionStorage.getItem('user'));
+  const isMainAdmin = isMainInstituteAdmin(userData);
   const [b2bDepartments, setB2bDepartments] = useState([]);
   const [b2bProjects, setB2bProjects] = useState([]);
   const [b2cVerticals, setB2cVerticals] = useState([]);
@@ -68,6 +76,18 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_be_senior_trainer: false,
       can_be_trainer: false,
 
+      // Club Management
+      can_view_clubs: false,
+      can_be_club_admin: false,
+      can_be_club_sse: false,
+      can_be_club_se: false,
+      can_create_clubs: false,
+      can_edit_clubs: false,
+      can_manage_club_members: false,
+      can_manage_club_positions: false,
+      can_manage_club_budgets: false,
+      can_manage_club_activities: false,
+
       // User Management
       can_view_users: false,
       can_add_users: false,
@@ -81,7 +101,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_bulk_update: false,
       can_bulk_delete: false,
       can_bulk_communication: false
-    }
+    },
   });
 
   const getProjectDepartmentIds = (project) => {
@@ -204,6 +224,16 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_be_academic_coordinator: true,
         can_be_senior_trainer: true,
         can_be_trainer: true,
+        can_view_clubs: true,
+        can_be_club_admin: true,
+        can_be_club_sse: true,
+        can_be_club_se: true,
+        can_create_clubs: true,
+        can_edit_clubs: true,
+        can_manage_club_members: true,
+        can_manage_club_positions: true,
+        can_manage_club_budgets: true,
+        can_manage_club_activities: true,
         can_view_users: true,
         can_add_users: true,
         can_edit_users: true,
@@ -242,6 +272,16 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_be_academic_coordinator: false,
         can_be_senior_trainer: false,
         can_be_trainer: false,
+        can_view_clubs: true,
+        can_be_club_admin: false,
+        can_be_club_sse: false,
+        can_be_club_se: false,
+        can_create_clubs: false,
+        can_edit_clubs: false,
+        can_manage_club_members: false,
+        can_manage_club_positions: false,
+        can_manage_club_budgets: false,
+        can_manage_club_activities: false,
         can_view_users: true,
         can_add_users: false,
         can_edit_users: false,
@@ -410,6 +450,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         updatedPermissions.can_assign_batch = false;
       }
 
+      // Club Management roles are handled by ClubManagementRoles.
+
       // User Management Dependencies
       if (['can_add_users', 'can_edit_users', 'can_delete_users', 'can_manage_roles'].includes(permission) && value === true) {
         updatedPermissions.can_view_users = true;
@@ -445,6 +487,30 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
     });
   };
 
+  const handleClubRoleChange = (flag, checked) => {
+    if (!isMainAdmin) return;
+    setUserForm((prev) => ({
+      ...prev,
+      permissions: applyClubRoleChange(prev.permissions, flag, checked),
+    }));
+  };
+
+  const handleClubPermissionToggle = (key, checked) => {
+    if (!isMainAdmin) return;
+    setUserForm((prev) => ({
+      ...prev,
+      permissions: applyClubPermissionToggle(prev.permissions, key, checked),
+    }));
+  };
+
+  const handleClubPermissionsPatch = (patch) => {
+    if (!isMainAdmin) return;
+    setUserForm((prev) => ({
+      ...prev,
+      permissions: applyClubPermissionsPatch(prev.permissions, patch),
+    }));
+  };
+
   const handleSubmit = async () => {
     // Basic validation
     if (!userForm.name || !userForm.email || !userForm.mobile || !userForm.role_designation) {
@@ -471,14 +537,13 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
     }
 
     try {
-      console.log(userForm, 'userForm')
-      console.log(token, 'token')
-      const reponse = await axios.post(`${backendUrl}/college/users/add`, userForm, {
+      const reponse = await axios.post(`${backendUrl}/college/users/add`, {
+        ...userForm,
+      }, {
         headers: {
           'x-auth': token
         }
       })
-      console.log(reponse, 'reponse')
       if (reponse.status) {
         alert('User added successfully')
         onAddUser()
@@ -1103,6 +1168,14 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                   </div>
                 </div>
               </div>
+
+              <ClubManagementRoles
+                permissions={userForm.permissions}
+                isMainAdmin={isMainAdmin}
+                onRoleChange={handleClubRoleChange}
+                onPermissionToggle={handleClubPermissionToggle}
+                onPermissionsPatch={handleClubPermissionsPatch}
+              />
 
               {/* User Management */}
               <div className="card mb-3">

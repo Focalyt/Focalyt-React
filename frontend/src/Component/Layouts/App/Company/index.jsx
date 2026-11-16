@@ -240,6 +240,14 @@ function CompanyLayout({ children }) {
                 </Link>
               </li>
 
+              {/* Club */}
+              <li className={`nav-item ${isActiveMenuItem('/cmp/club') ? 'active' : ''}`}>
+                <Link to="/cmp/club/clubs" onClick={handleSidebarClose}>
+                  <FontAwesomeIcon icon={faUser} className="feather" />
+                  <span className="menu-title" data-i18n="Club">Club</span>
+                </Link>
+              </li>
+
             </ul>
           </div>
         </div>

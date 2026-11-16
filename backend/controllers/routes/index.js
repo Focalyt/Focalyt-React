@@ -33,6 +33,11 @@ const commonFunc = require('./functions/common');
 const publicLrpLeadRoutes = require('./publicLrpLead');
 const metaRoutes = require('./meta');
 const {
+  clubCmsRoutes,
+  clubAdminStaffRoutes,
+  companyClubStaffRoutes,
+} = require('./club');
+const {
   verifyMetaWebhook,
   receiveMetaWebhook,
 } = require('./meta/webhookHandlers');
@@ -47,12 +52,22 @@ router.post('/verifyOtp', commonFunc.verifyOtp);
 router.post('/otpCandidateLogin', commonFunc.otpCandidateLogin);
 router.post('/otpCompanyLogin', commonFunc.otpCompanyLogin);
 router.post('/otpTrainerLogin', commonFunc.loginAsTrainer);
+router.post('/otpClubLogin', commonFunc.loginAsClub);
+router.post('/club/login', commonFunc.clubLogin);
+router.post('/club-admin/login', commonFunc.clubLogin);
+router.post('/club/register', commonFunc.clubRegister);
+router.post('/club-admin/register', commonFunc.clubRegister);
+router.post('/sendOtptoRegister', commonFunc.sendOtptoRegister);
 router.post('/publicApply', commonFunc.publicApply);
 router.use('/public', publicLrpLeadRoutes);
 
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
+router.use('/api/club-cms', clubCmsRoutes);
+router.use('/club-cms', clubCmsRoutes);
+router.use('/club-admin', clubAdminStaffRoutes);
+router.use('/company/club-staff', companyClubStaffRoutes);
 router.use('/api/meta', metaRoutes);
 router.use('/api', apiRoutes);
 router.use('/api/certificates', certificatesApiRoutes);

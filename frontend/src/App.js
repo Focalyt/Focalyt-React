@@ -204,6 +204,9 @@ import Assignment from './Pages/App/Trainer/Assignment/Assignment';
 import CreateAssignment from './Pages/App/Trainer/Assignment/CreateAssignment';
 import StartLiveClass from './Pages/App/Trainer/LiveClass/StartLiveClass';
 
+// Club module
+import ClubApp, { ClubPublicRedirect } from './Pages/App/Club/ClubApp';
+
 const RedirectEditCourseCopy = () => {
   const { id } = useParams();
   return <Navigate to={`/institute/courses/edit/${id}`} replace />;
@@ -312,6 +315,7 @@ const Layout = () => {
           <Route path='jobOffer' element={<JobOffer/>}/>
           <Route path='newEnrolledCourses' element={<NewEnrolledCourses/>}/>
           <Route path='newEnrolledCourses/:courseId' element={<NewEnrolledCourses/>}/>
+          <Route path='club/*' element={<ClubApp mode="student" basePath="/candidate/club" />}/>
         </Route>
       
 
@@ -419,6 +423,7 @@ const Layout = () => {
           <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
           <Route path='myfollow' element={<MyFollowups/>}/>
           <Route path='jobs' element={<JobsCard/>}/>
+          <Route path='club/*' element={<ClubApp mode="admin" basePath="/institute/club" />}/>
         </Route>
 
         {/* company  */}
@@ -442,8 +447,18 @@ const Layout = () => {
         <Route path="list-candidates" element={<ListCandidate/>}/>
         <Route path="nearbyCandidates" element={<NearByCandidate/>}/>
         <Route path="Coins" element={<Coins/>}/>
+        <Route path="club/*" element={<ClubApp mode="company" basePath="/cmp/club" />}/>
 
         </Route>
+
+        {/* Legacy Club URLs redirect into Candidate / Institute portals */}
+        <Route path="/club/login" element={<Navigate to="/candidate/login?returnUrl=/candidate/club/discover" replace />} />
+        <Route path="/club/register" element={<Navigate to="/candidate/login?returnUrl=/candidate/club/discover" replace />} />
+        <Route path="/club-admin/login" element={<Navigate to="/institute/login?returnUrl=/institute/club/dashboard" replace />} />
+        <Route path="/club-admin/register" element={<Navigate to="/institute/login?returnUrl=/institute/club/dashboard" replace />} />
+        <Route path="/club-admin/*" element={<Navigate to="/institute/club/dashboard" replace />} />
+        <Route path="/club" element={<ClubPublicRedirect />} />
+        <Route path="/club/*" element={<ClubPublicRedirect />} />
 
         {/* Training Module  */}
         <Route path='/trainer/login' element={<TrainerLogin />}/>

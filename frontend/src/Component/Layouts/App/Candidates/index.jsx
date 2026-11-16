@@ -1149,6 +1149,14 @@ function CandidateLayout({ children }) {
                   <span className="menu-title">Notifications</span>
                 </Link>
               </li>
+
+              {/* Club */}
+              <li className={`nav-item ${location.pathname.startsWith('/candidate/club') ? 'active' : ''}`}>
+                <Link to="/candidate/club/discover" onClick={() => { handleSidebarClose(); }}>
+                  <FontAwesomeIcon icon={farUser} />
+                  <span className="menu-title">Club</span>
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

@@ -1,0 +1,4220 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Exo+2:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+.focalyt-club-root {
+  /* Focalyt Brand Theme (Pink-Rose #FC2B5A + Warm Blush + Deep Slate) */
+  --foc-cyan: #FC2B5A;
+  --foc-magenta: #E11D48;
+  --bg-main: #FFF8FA;
+  --bg-pink-light: #FFF0F4;
+  --bg-blush-card: #FFE4EC;
+  --primary-rose: #FC2B5A;
+  --primary-rose-hover: #E11D48;
+  --accent-magenta: #DB2777;
+  --text-plum: #1E1324;
+  --text-secondary: #5C4762;
+  --border-soft: rgba(252, 43, 90, 0.14);
+  --border-cyan: rgba(252, 43, 90, 0.38);
+  --surface-elevated: #FFFFFF;
+  --success-bg: #ECFDF5;
+  --success-text: #065F46;
+  --success-border: #A7F3D0;
+  --warning-bg: #FFFBEB;
+  --warning-text: #92400E;
+  --warning-border: #FDE68A;
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+  --shadow-xs: 0 2px 10px rgba(42, 8, 21, 0.05);
+  --shadow-sm: 0 8px 24px rgba(252, 43, 90, 0.08);
+  --shadow-md: 0 14px 36px rgba(252, 43, 90, 0.14);
+  --shadow-lg: 0 22px 52px rgba(42, 8, 21, 0.16);
+
+  font-family: var(--font-body);
+  background-color: var(--bg-main);
+  background-image:
+    radial-gradient(circle at 18% 12%, rgba(252, 43, 90, 0.08) 0%, transparent 55%),
+    radial-gradient(circle at 82% 24%, rgba(225, 29, 72, 0.06) 0%, transparent 60%),
+    radial-gradient(rgba(42, 8, 21, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 18px 18px;
+  background-attachment: fixed;
+  color: var(--text-plum);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Club lives inside candidate / institute dashboards — not the public website */
+.focalyt-club-root.club-in-portal {
+  min-height: auto;
+  background-attachment: scroll;
+  border-radius: 16px;
+  padding: 8px 4px 24px;
+}
+
+.focalyt-club-root.club-admin-standalone {
+  min-height: calc(100vh - 88px);
+  border-radius: 0;
+  padding: 0 0 32px;
+}
+
+.focalyt-club-root.club-admin-standalone .section-white {
+  padding-top: 0 !important;
+  background: transparent;
+}
+
+.focalyt-club-root.club-admin-standalone .club-container {
+  max-width: none !important;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.focalyt-club-root.club-admin-standalone .section-eyebrow {
+  display: none;
+}
+
+.focalyt-club-root.club-admin-standalone .section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.focalyt-club-root.club-admin-standalone .section-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.focalyt-club-root.club-admin-standalone .section-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.focalyt-club-root.club-admin-standalone .form-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: none;
+  padding: 16px 18px;
+}
+
+.focalyt-club-root.club-admin-standalone .admin-table-wrap {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.focalyt-club-root.club-admin-standalone .admin-table th {
+  background: #f8fafc;
+  color: #334155;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.focalyt-club-root.club-admin-standalone .admin-table tr:hover td {
+  background: #f8fafc;
+}
+
+.focalyt-club-root.club-admin-standalone .pill {
+  background: #f1f5f9;
+  color: #334155;
+  border: none;
+}
+
+.focalyt-club-root.club-admin-standalone .pill-Joined {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.focalyt-club-root.club-admin-standalone .pill-pending {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.focalyt-club-root.club-admin-standalone .filter-chip {
+  border-radius: 6px;
+  border-color: #e5e7eb;
+}
+
+.focalyt-club-root.club-admin-standalone .empty-state-box {
+  border: 1px dashed #e5e7eb;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.focalyt-club-root .club-portal-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-portal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px;
+  margin-bottom: 4px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(6, 20, 38, 0.04);
+}
+
+.focalyt-club-root .club-portal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.84rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.focalyt-club-root .club-more-wrap {
+  position: relative;
+}
+
+.focalyt-club-root .club-more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.focalyt-club-root .club-more-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-more-item:hover,
+.focalyt-club-root .club-more-item.active {
+  background: var(--bg-pink-light);
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .club-portal-tab:hover {
+  color: var(--foc-cyan);
+  background: var(--bg-pink-light);
+}
+
+.focalyt-club-root .club-portal-tab.active {
+  color: var(--text-plum);
+  background: #FFFFFF;
+  border-color: var(--foc-cyan);
+  box-shadow: 0 6px 18px rgba(252, 43, 90, 0.16);
+}
+
+.focalyt-club-root .admin-main.club-admin-embedded {
+  padding: 0;
+  background: transparent;
+}
+
+.focalyt-club-root .cms-demo-banner {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: rgba(255, 45, 170, 0.08);
+  border: 1px solid rgba(255, 45, 170, 0.18);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  margin-bottom: 8px;
+}
+
+.focalyt-club-root .cms-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.focalyt-club-root .cms-toolbar .demo-switch-group {
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .cms-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .cms-stat-card {
+  text-align: left;
+}
+
+.focalyt-club-root .cms-stat-value {
+  font-family: var(--font-heading);
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .cms-stat-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .cms-stat-hint {
+  font-size: 0.72rem;
+  color: var(--foc-magenta);
+  margin-top: 4px;
+}
+
+.focalyt-club-root .cms-chat-thread {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.focalyt-club-root .cms-chat-bubble {
+  background: var(--bg-pink-light);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.focalyt-club-root .cms-chat-bubble p {
+  margin-top: 4px;
+}
+
+.focalyt-club-root .cms-achievement-card {
+  background: linear-gradient(135deg, rgba(252, 43, 90, 0.12), rgba(255, 45, 170, 0.1));
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root.club-in-portal {
+    padding: 0 0 16px;
+    border-radius: 12px;
+  }
+  .focalyt-club-root .club-portal-tabs {
+    gap: 6px;
+    padding: 6px;
+  }
+  .focalyt-club-root .club-portal-tab {
+    padding: 7px 11px;
+    font-size: 0.66rem;
+  }
+}
+
+.focalyt-club-root *,
+.focalyt-club-root *::before,
+.focalyt-club-root *::after {
+  box-sizing: border-box;
+}
+
+.focalyt-club-root h1,
+.focalyt-club-root h2,
+.focalyt-club-root h3,
+.focalyt-club-root h4,
+.focalyt-club-root h5,
+.focalyt-club-root h6 {
+  font-family: var(--font-heading);
+  color: var(--text-plum);
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.focalyt-club-root p {
+  margin: 0;
+}
+
+.focalyt-club-root a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.focalyt-club-root button,
+.focalyt-club-root input,
+.focalyt-club-root select,
+.focalyt-club-root textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.focalyt-club-root :focus-visible {
+  outline: 2px solid var(--foc-cyan);
+  outline-offset: 2px;
+}
+
+/* Layout containers */
+.focalyt-club-root .club-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+@media (max-width: 768px) {
+  .focalyt-club-root .club-container {
+    padding: 0 16px;
+  }
+}
+
+@media (max-width: 400px) {
+  .focalyt-club-root .club-container {
+    padding: 0 12px;
+  }
+}
+
+/* Top Demo Bar */
+.focalyt-club-root .demo-topbar {
+  background: rgba(255, 240, 244, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 7px 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .demo-topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .demo-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.focalyt-club-root .demo-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.focalyt-club-root .demo-topbar-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.focalyt-club-root .demo-view-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.focalyt-club-root .demo-view-label {
+  font-weight: 700;
+  color: var(--text-plum);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.focalyt-club-root .demo-home-btn,
+.focalyt-club-root .demo-reset-btn {
+  padding: 4px 10px !important;
+  font-size: 0.7rem !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.focalyt-club-root .demo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(252, 43, 90, 0.12);
+  border: 1px solid rgba(252, 43, 90, 0.3);
+  color: var(--foc-cyan);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.focalyt-club-root .demo-switch-group {
+  display: inline-flex;
+  align-items: center;
+  background: #FFFFFF;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  gap: 2px;
+}
+
+.focalyt-club-root .demo-switch-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.focalyt-club-root .demo-switch-btn.active {
+  background: linear-gradient(90deg, var(--foc-cyan), var(--foc-magenta));
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(252, 43, 90, 0.28);
+}
+
+.focalyt-club-root .demo-switch-btn:hover:not(.active) {
+  color: var(--foc-cyan);
+  background: var(--bg-pink-light);
+}
+
+@media (max-width: 1220px) {
+  .focalyt-club-root .demo-topbar-desc {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root .demo-topbar {
+    padding: 6px 0;
+  }
+  .focalyt-club-root .demo-topbar-inner {
+    gap: 6px;
+  }
+  .focalyt-club-root .demo-badge,
+  .focalyt-club-root .demo-view-label {
+    display: none;
+  }
+  .focalyt-club-root .demo-topbar-right {
+    gap: 6px;
+  }
+  .focalyt-club-root .demo-switch-btn {
+    padding: 4px 9px;
+    font-size: 0.65rem;
+  }
+  .focalyt-club-root .demo-home-btn,
+  .focalyt-club-root .demo-reset-btn {
+    padding: 4px 8px !important;
+    font-size: 0.65rem !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .focalyt-club-root .demo-reset-text {
+    display: none;
+  }
+}
+
+/* Main Header (matches FrontHeader--cyber) */
+.focalyt-club-root .student-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(255, 248, 250, 0.95);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--border-soft);
+  box-shadow: 0 4px 20px rgba(6, 20, 38, 0.04);
+}
+
+.focalyt-club-root .student-header::after {
+  content: '';
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--foc-cyan), var(--foc-magenta), transparent);
+  opacity: 0.65;
+}
+
+.focalyt-club-root .student-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 70px;
+  gap: 12px;
+}
+
+.focalyt-club-root .brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.08rem;
+  color: var(--text-plum);
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .brand-logo-img {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .brand-logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.focalyt-club-root .brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--foc-cyan), var(--foc-magenta));
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(252, 43, 90, 0.28);
+}
+
+.focalyt-club-root .brand-subtitle {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.focalyt-club-root .nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.focalyt-club-root .nav-link-item {
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .nav-link-item:hover {
+  color: var(--foc-cyan);
+  background: #FFFFFF;
+  border-color: rgba(252, 43, 90, 0.3);
+}
+
+.focalyt-club-root .nav-link-item.active {
+  color: var(--text-plum);
+  background: #FFFFFF;
+  border-color: var(--foc-cyan);
+  box-shadow: 0 6px 18px rgba(252, 43, 90, 0.16);
+}
+
+.focalyt-club-root .nav-badge-count {
+  background: var(--primary-rose);
+  color: #FFFFFF;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  line-height: 1.3;
+}
+
+.focalyt-club-root .external-nav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-soft);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .external-nav-link {
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-heading);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .external-nav-link:hover {
+  color: var(--foc-magenta);
+  background: rgba(255, 45, 170, 0.08);
+}
+
+.focalyt-club-root .header-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1180px) {
+  .focalyt-club-root .brand-subtitle {
+    display: none;
+  }
+  .focalyt-club-root .nav-link-item {
+    padding: 6px 10px;
+    font-size: 0.68rem;
+  }
+  .focalyt-club-root .external-nav-link {
+    padding: 6px 8px;
+    font-size: 0.65rem;
+  }
+}
+
+/* Mobile Navigation Drawer */
+.focalyt-club-root .mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .focalyt-club-root .desktop-nav-only {
+    display: none !important;
+  }
+  .focalyt-club-root .mobile-menu-btn {
+    display: inline-flex;
+    padding: 7px 10px !important;
+  }
+  .focalyt-club-root .student-header-inner {
+    min-height: 62px;
+  }
+  .focalyt-club-root .brand-logo-img {
+    height: 30px;
+  }
+  .focalyt-club-root .brand-subtitle {
+    display: block;
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .focalyt-club-root .brand-subtitle {
+    display: none;
+  }
+  .focalyt-club-root .profile-trigger-btn {
+    padding: 6px 10px !important;
+    font-size: 0.68rem !important;
+  }
+}
+
+.focalyt-club-root .mobile-nav-drawer {
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  border-bottom: 1.5px solid var(--foc-cyan);
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 14px 32px rgba(6, 20, 38, 0.1);
+}
+
+.focalyt-club-root .mobile-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 460px) {
+  .focalyt-club-root .mobile-nav-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.focalyt-club-root .mobile-nav-item {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-soft);
+}
+
+.focalyt-club-root .mobile-nav-external {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Buttons */
+.focalyt-club-root .fc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.focalyt-club-root .fc-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.focalyt-club-root .fc-btn-primary {
+  background: linear-gradient(90deg, var(--foc-cyan), var(--foc-magenta));
+  color: #FFFFFF;
+  box-shadow: 0 10px 24px rgba(252, 43, 90, 0.24);
+}
+
+.focalyt-club-root .fc-btn-primary:hover:not(:disabled) {
+  color: #FFFFFF;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(255, 45, 170, 0.28);
+}
+
+.focalyt-club-root .fc-btn-secondary {
+  background: rgba(252, 43, 90, 0.1);
+  color: var(--foc-cyan);
+  border-color: rgba(252, 43, 90, 0.35);
+}
+
+.focalyt-club-root .fc-btn-secondary:hover:not(:disabled) {
+  background: var(--foc-cyan);
+  color: #FFFFFF;
+  border-color: var(--foc-cyan);
+}
+
+.focalyt-club-root .fc-btn-outline {
+  background: #FFFFFF;
+  color: var(--text-plum);
+  border-color: var(--border-soft);
+}
+
+.focalyt-club-root .fc-btn-outline:hover:not(:disabled) {
+  border-color: var(--foc-cyan);
+  color: var(--foc-cyan);
+  background: rgba(252, 43, 90, 0.06);
+}
+
+.focalyt-club-root .fc-btn-blush {
+  background: rgba(255, 45, 170, 0.1);
+  color: var(--foc-magenta);
+  border-color: rgba(255, 45, 170, 0.3);
+}
+
+.focalyt-club-root .fc-btn-blush:hover:not(:disabled) {
+  background: var(--foc-magenta);
+  color: #FFFFFF;
+}
+
+.focalyt-club-root .fc-btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+}
+
+.focalyt-club-root .fc-btn-ghost:hover:not(:disabled) {
+  background: rgba(252, 43, 90, 0.08);
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .fc-btn-sm {
+  padding: 8px 14px;
+  font-size: 0.72rem;
+}
+
+.focalyt-club-root .fc-btn-lg {
+  padding: 13px 26px;
+  font-size: 0.84rem;
+}
+
+/* Badges & Pills */
+.focalyt-club-root .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: var(--font-heading);
+  max-width: 100%;
+}
+
+.focalyt-club-root .pill-pink {
+  background: rgba(252, 43, 90, 0.1);
+  color: var(--foc-cyan);
+  border: 1px solid rgba(252, 43, 90, 0.3);
+}
+
+.focalyt-club-root .pill-blush {
+  background: rgba(255, 45, 170, 0.1);
+  color: var(--foc-magenta);
+  border: 1px solid rgba(255, 45, 170, 0.25);
+}
+
+.focalyt-club-root .pill-Joined,
+.focalyt-club-root .pill-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid var(--success-border);
+}
+
+.focalyt-club-root .pill-pending,
+.focalyt-club-root .pill-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+}
+
+.focalyt-club-root .pill-neutral {
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+
+/* Section wrappers */
+.focalyt-club-root .section-white {
+  background: transparent;
+  padding: 36px 0;
+}
+
+.focalyt-club-root .section-pink {
+  background: rgba(255, 240, 244, 0.65);
+  padding: 60px 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+@media (max-width: 768px) {
+  .focalyt-club-root .section-white,
+  .focalyt-club-root .section-pink {
+    padding: 36px 0;
+  }
+}
+
+.focalyt-club-root .section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--foc-cyan);
+  background: rgba(252, 43, 90, 0.08);
+  border: 1px solid rgba(252, 43, 90, 0.28);
+  padding: 5px 12px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.focalyt-club-root .section-title {
+  font-size: clamp(1.38rem, 2.5vw, 2.15rem);
+  font-weight: 800;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .section-subtitle {
+  color: var(--text-secondary);
+  font-size: clamp(0.92rem, 1.3vw, 1.02rem);
+  max-width: 600px;
+  margin-top: 6px;
+}
+
+/* Hero Section */
+.focalyt-club-root .discover-hero {
+  background: transparent;
+  padding: 48px 0 56px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.focalyt-club-root .discover-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  align-items: center;
+  max-width: 720px;
+}
+
+.focalyt-club-root .hero-title {
+  font-size: clamp(1.85rem, 3.8vw, 3.15rem);
+  font-weight: 900;
+  color: var(--text-plum);
+  line-height: 1.12;
+  margin-bottom: 18px;
+  letter-spacing: 0.02em;
+}
+
+.focalyt-club-root .hero-title-highlight {
+  background: linear-gradient(90deg, var(--foc-cyan), var(--foc-magenta));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.focalyt-club-root .hero-lead {
+  font-size: clamp(0.96rem, 1.4vw, 1.15rem);
+  color: var(--text-secondary);
+  margin-bottom: 26px;
+  max-width: 540px;
+}
+
+.focalyt-club-root .hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .hero-stats-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .hero-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.focalyt-club-root .hero-stat-value {
+  font-family: var(--font-heading);
+  color: var(--text-plum);
+  font-size: 1.05rem;
+}
+
+@media (max-width: 960px) {
+  .focalyt-club-root .discover-hero {
+    padding: 32px 0 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .focalyt-club-root .discover-hero {
+    padding: 24px 0 32px;
+  }
+  .focalyt-club-root .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .focalyt-club-root .hero-actions .fc-btn {
+    width: 100%;
+    padding: 13px 18px;
+  }
+  .focalyt-club-root .hero-stats-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 22px;
+    padding-top: 18px;
+  }
+  .focalyt-club-root .hero-stat-item {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 0.78rem;
+  }
+}
+
+/* Grids & Cards (Matching FUTURE READY SKILLS cards on homepage) */
+.focalyt-club-root .cards-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.focalyt-club-root .cards-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .focalyt-club-root .cards-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .focalyt-club-root .cards-grid-2 {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 680px) {
+  .focalyt-club-root .cards-grid-3,
+  .focalyt-club-root .cards-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+
+.focalyt-club-root .club-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(252, 43, 90, 0.2);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+  box-shadow: 0 4px 20px rgba(6, 20, 38, 0.05);
+  min-width: 0;
+}
+
+.focalyt-club-root .club-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+  border-color: rgba(252, 43, 90, 0.55);
+}
+
+.focalyt-club-root .club-card-student {
+  --ccs-primary: #E91E63;
+  --ccs-primary-deep: #C2185B;
+  --ccs-soft: #FCE4EC;
+  --ccs-bg: #FFF5F8;
+  height: auto;
+  padding: 14px 16px 14px;
+  gap: 8px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--ccs-primary) 22%, white);
+  background:
+    linear-gradient(90deg, var(--ccs-primary) 0%, var(--ccs-primary-deep) 100%) top / 100% 5px no-repeat,
+    linear-gradient(180deg, var(--ccs-soft) 0%, var(--ccs-bg) 42%, #FFFFFF 100%);
+  cursor: pointer;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ccs-primary-deep) 18%, transparent);
+}
+
+.focalyt-club-root .club-card-student:hover {
+  transform: translateY(-2px);
+  border-color: var(--ccs-primary);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ccs-primary-deep) 22%, transparent);
+}
+
+.focalyt-club-root .ccs-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: transparent;
+}
+
+.focalyt-club-root .ccs-category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid color-mix(in srgb, var(--ccs-primary) 22%, white);
+  color: var(--ccs-primary-deep);
+  font-family: 'Inter', var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.focalyt-club-root .ccs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: 'Inter', var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.focalyt-club-root .ccs-badge-featured {
+  background: #FFFFFF;
+  color: var(--ccs-primary-deep);
+  border: 1px solid color-mix(in srgb, var(--ccs-primary) 22%, white);
+}
+
+.focalyt-club-root .ccs-badge-joined {
+  background: #ECFDF5;
+  color: #047857;
+}
+
+.focalyt-club-root .ccs-badge-pending {
+  background: #FFFBEB;
+  color: #B45309;
+}
+
+.focalyt-club-root .ccs-badge-neutral {
+  background: #F1F5F9;
+  color: #475569;
+}
+
+.focalyt-club-root .ccs-title {
+  font-family: 'Inter', var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ccs-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: 2px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.focalyt-club-root .club-card-student:hover .ccs-title {
+  color: var(--ccs-primary-deep);
+}
+
+.focalyt-club-root .ccs-tagline {
+  font-family: 'Inter', var(--font-body);
+  color: #64748B;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.focalyt-club-root .ccs-meta {
+  font-family: 'Inter', var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94A3B8;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.focalyt-club-root .ccs-footer {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--ccs-primary) 16%, white);
+}
+
+.focalyt-club-root .ccs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-family: 'Inter', var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.focalyt-club-root .ccs-btn-join {
+  background: linear-gradient(90deg, var(--ccs-primary) 0%, var(--ccs-primary-deep) 100%);
+  color: #FFFFFF;
+}
+
+.focalyt-club-root .ccs-btn-join:hover {
+  background: var(--ccs-primary-deep);
+}
+
+.focalyt-club-root .ccs-btn-pending {
+  background: #FFFBEB;
+  color: #B45309;
+  border-color: #FDE68A;
+}
+
+.focalyt-club-root .ccs-btn-pending:hover {
+  background: #FEF3C7;
+}
+
+.focalyt-club-root .ccs-btn-leave {
+  background: #FFFFFF;
+  color: #64748B;
+  border-color: #E2E8F0;
+}
+
+.focalyt-club-root .ccs-btn-leave:hover {
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FECACA;
+}
+
+.focalyt-club-root .club-card-blush {
+  background:
+    linear-gradient(90deg, #FF4D8D 0%, #E91E63 48%, #C2185B 100%) top / 100% 5px no-repeat,
+    linear-gradient(180deg, #FCE4EC 0%, #FFF5F8 42%, #FFFFFF 100%);
+  border-color: rgba(233, 30, 99, 0.22);
+}
+
+.focalyt-club-root .club-card-visual {
+  position: relative;
+  height: 132px;
+  background: var(--bg-pink-light);
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .club-card-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.focalyt-club-root .club-card:hover .club-card-visual img {
+  transform: scale(1.03);
+}
+
+.focalyt-club-root .club-card-category-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  color: var(--text-plum);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: var(--font-heading);
+  border: 1px solid rgba(252, 43, 90, 0.35);
+}
+
+.focalyt-club-root .club-card-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .focalyt-club-root .club-card-visual {
+    height: 128px;
+  }
+  .focalyt-club-root .club-card-body {
+    padding: 14px;
+  }
+}
+
+.focalyt-club-root .club-card-title {
+  font-family: var(--font-body);
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--text-plum);
+  cursor: pointer;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.focalyt-club-root .club-card-title:hover {
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .club-card-desc {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.5em;
+}
+
+.focalyt-club-root .club-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-card-tag {
+  font-size: 0.72rem;
+  background: var(--bg-pink-light);
+  color: var(--text-secondary);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+}
+
+.focalyt-club-root .activity-card-meta-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--bg-pink-light);
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.focalyt-club-root .activity-card-meta-box span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.focalyt-club-root .club-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-card-footer .fc-btn-sm {
+  padding: 8px 12px;
+  font-size: 0.7rem;
+}
+
+.focalyt-club-root .club-activity-card {
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-activity-card:focus-visible {
+  outline: 2px solid var(--foc-cyan);
+  outline-offset: 2px;
+}
+
+.focalyt-club-root .club-activity-card .club-card-body {
+  gap: 6px;
+  padding-top: 14px;
+}
+
+.focalyt-club-root .club-activity-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-activity-card .club-card-save-btn {
+  position: static;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .club-activity-card .club-card-title {
+  -webkit-line-clamp: 2;
+  min-height: 2.45em;
+  line-height: 1.25;
+}
+
+.focalyt-club-root .club-card-save-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text-plum);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+}
+
+.focalyt-club-root .club-card-save-btn.is-saved {
+  background: var(--primary-rose);
+  color: #FFFFFF;
+  border-color: transparent;
+}
+
+.focalyt-club-root .club-activity-club {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.focalyt-club-root .club-activity-meta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-activity-meta span {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.focalyt-club-root .club-activity-meta svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .club-activity-card .club-card-footer {
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.focalyt-club-root .club-activity-seats {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.focalyt-club-root .club-activity-card .club-card-footer .fc-btn-sm {
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .club-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-quick-link {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-soft);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-quick-link:hover {
+  border-color: var(--foc-cyan);
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .club-portal-shell.is-student .section-white {
+  padding-top: 20px;
+}
+
+.focalyt-club-root .club-portal-shell.is-student .discover-hero {
+  padding: 20px 0 28px;
+}
+
+.focalyt-club-root .form-card {
+  border-radius: 16px;
+}
+
+/* Featured Activity Banner */
+.focalyt-club-root .featured-activity-card {
+  background: linear-gradient(135deg, rgba(252, 43, 90, 0.1) 0%, rgba(255, 45, 170, 0.08) 100%);
+  border: 1px solid rgba(252, 43, 90, 0.28);
+  border-radius: 16px;
+  padding: 22px;
+  display: block;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-sm);
+}
+
+.focalyt-club-root .featured-activity-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .focalyt-club-root .featured-activity-card {
+    padding: 22px;
+  }
+}
+
+@media (max-width: 560px) {
+  .focalyt-club-root .featured-activity-card {
+    padding: 16px;
+    border-radius: var(--radius-lg);
+  }
+  .focalyt-club-root .featured-activity-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .focalyt-club-root .featured-activity-actions .fc-btn {
+    width: 100%;
+  }
+}
+
+/* Interest Picker & Suggest Club Sections */
+.focalyt-club-root .interest-picker-box {
+  background: var(--bg-pink-light);
+  border: 1.5px solid rgba(252, 43, 90, 0.28);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+}
+
+.focalyt-club-root .suggest-club-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  gap: 36px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .focalyt-club-root .suggest-club-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .focalyt-club-root .interest-picker-box {
+    padding: 20px 16px;
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* My Space Hero Banner & Stats Grid */
+.focalyt-club-root .myspace-hero-banner {
+  background: linear-gradient(135deg, var(--bg-pink-light) 0%, var(--bg-blush-card) 100%);
+  border-radius: var(--radius-xl);
+  padding: 30px;
+  border: 1.5px solid rgba(252, 43, 90, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.focalyt-club-root .myspace-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 12px;
+}
+
+.focalyt-club-root .myspace-stat-box {
+  background: #FFFFFF;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .focalyt-club-root .myspace-hero-banner {
+    padding: 20px 16px;
+    border-radius: var(--radius-lg);
+  }
+  .focalyt-club-root .myspace-stats-grid {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+
+/* Filter chips & Search inputs */
+.focalyt-club-root .filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(10px);
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid rgba(252, 43, 90, 0.25);
+  box-shadow: var(--shadow-xs);
+}
+
+.focalyt-club-root .search-input-wrap {
+  position: relative;
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.focalyt-club-root .search-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--foc-cyan);
+  pointer-events: none;
+}
+
+.focalyt-club-root .search-input {
+  width: 100%;
+  padding: 11px 16px 11px 42px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: #FFFFFF;
+  color: var(--text-plum);
+  font-size: 0.92rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.focalyt-club-root .search-input:focus {
+  outline: none;
+  border-color: var(--foc-cyan);
+  box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.16);
+}
+
+.focalyt-club-root .chip-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .filter-chip {
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.84rem;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.focalyt-club-root .club-events-club-select {
+  width: auto;
+  min-width: 140px;
+  max-width: 180px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  padding: 9px 14px;
+  font-size: 0.87rem;
+}
+
+.focalyt-club-root .filter-chip:hover {
+  border-color: var(--foc-cyan);
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .filter-chip.active {
+  background: linear-gradient(90deg, var(--foc-cyan), var(--foc-magenta));
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(252, 43, 90, 0.25);
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root .filter-bar {
+    padding: 12px;
+    gap: 10px;
+  }
+  .focalyt-club-root .search-input-wrap {
+    flex: 1 1 100%;
+  }
+  .focalyt-club-root .filter-chip {
+    padding: 7px 12px;
+    font-size: 0.8rem;
+  }
+  .focalyt-club-root .club-events-club-select {
+    max-width: none;
+    flex: 1 1 140px;
+  }
+}
+
+/* Forms */
+.focalyt-club-root .form-card {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(252, 43, 90, 0.3);
+  border-radius: var(--radius-xl);
+  padding: 30px;
+  box-shadow: var(--shadow-sm);
+}
+
+.focalyt-club-root .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .focalyt-club-root .form-card {
+    padding: 18px 16px;
+    border-radius: var(--radius-lg);
+  }
+}
+
+.focalyt-club-root .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.focalyt-club-root .form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.focalyt-club-root .club-form-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.focalyt-club-root .club-form-section-title {
+  margin: 0 0 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-form-section-hint {
+  margin: -6px 0 12px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.focalyt-club-root .club-form-section .form-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.focalyt-club-root .club-form-check {
+  margin-top: 4px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.focalyt-club-root .fc-modal-header-copy h2 {
+  margin: 0;
+}
+
+.focalyt-club-root .fc-modal-header-copy p {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.focalyt-club-root .form-label {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .form-input,
+.focalyt-club-root .form-select,
+.focalyt-club-root .form-textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: #FFFFFF;
+  color: var(--text-plum);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.focalyt-club-root .form-input:focus,
+.focalyt-club-root .form-select:focus,
+.focalyt-club-root .form-textarea:focus {
+  outline: none;
+  border-color: var(--foc-cyan);
+  box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.14);
+}
+
+.focalyt-club-root .form-error {
+  color: var(--foc-magenta);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Modal / Dialog */
+.focalyt-club-root .fc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(6, 20, 38, 0.56);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.focalyt-club-root .fc-modal-panel {
+  background: #FFFFFF;
+  border: 2px solid var(--foc-cyan);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: fcModalAppear 0.18s ease-out;
+}
+
+.focalyt-club-root .fc-modal-panel-lg {
+  max-width: 820px;
+}
+
+.focalyt-club-root .club-event-sheet {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(86vh, 520px);
+}
+
+.focalyt-club-root .club-event-sheet .fc-modal-header {
+  position: static;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .club-event-sheet-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.focalyt-club-root .club-event-sheet-heading h2 {
+  font-size: 1.12rem;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.focalyt-club-root .club-event-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.focalyt-club-root .club-event-sheet-summary {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-event-sheet-line {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-event-sheet-footer {
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+}
+
+.focalyt-club-root .club-event-sheet-footer .club-card-save-btn {
+  position: static;
+}
+
+@keyframes fcModalAppear {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.focalyt-club-root .fc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  z-index: 2;
+}
+
+.focalyt-club-root .fc-modal-body {
+  padding: 24px;
+}
+
+.focalyt-club-root .fc-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-pink-light);
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-ops-modal {
+  max-width: 640px;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.2);
+}
+
+.focalyt-club-root .club-ops-modal .fc-modal-header {
+  background: #e11d48;
+  color: #ffffff;
+  border-bottom: 0;
+  padding: 14px 18px;
+  position: static;
+}
+
+.focalyt-club-root .club-ops-modal .fc-modal-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.focalyt-club-root .club-ops-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-ops-modal-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.focalyt-club-root .club-ops-modal .fc-modal-body {
+  padding: 18px 18px 8px;
+}
+
+.focalyt-club-root .club-ops-modal .form-grid {
+  gap: 14px 16px;
+}
+
+.focalyt-club-root .club-ops-modal .form-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.focalyt-club-root .club-ops-modal .form-input,
+.focalyt-club-root .club-ops-modal .form-select,
+.focalyt-club-root .club-ops-modal .form-textarea {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  box-shadow: none;
+}
+
+.focalyt-club-root .club-ops-modal .form-input:focus,
+.focalyt-club-root .club-ops-modal .form-select:focus,
+.focalyt-club-root .club-ops-modal .form-textarea:focus {
+  border-color: #e11d48;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+}
+
+.focalyt-club-root .club-ops-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #212529;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-ops-modal .fc-modal-footer {
+  background: #ffffff;
+  border-top: 1px solid #dee2e6;
+  padding: 12px 18px;
+}
+
+.focalyt-club-root .club-theme-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #212529;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-theme-trigger:hover,
+.focalyt-club-root .club-theme-trigger[aria-expanded='true'] {
+  border-color: #e11d48;
+}
+
+.focalyt-club-root .club-theme-trigger-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.focalyt-club-root .club-theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.focalyt-club-root .club-theme-option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-theme-option:hover {
+  border-color: #adb5bd;
+}
+
+.focalyt-club-root .club-theme-option.is-selected {
+  border-color: #e11d48;
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.16);
+}
+
+.focalyt-club-root .club-theme-swatch {
+  display: block;
+  height: 54px;
+  border-radius: 6px;
+}
+
+.focalyt-club-root .club-theme-option-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root .club-theme-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root .fc-modal-backdrop {
+    padding: 10px;
+    align-items: flex-end;
+  }
+  .focalyt-club-root .fc-modal-panel {
+    max-height: 92vh;
+    border-radius: var(--radius-lg);
+  }
+  .focalyt-club-root .fc-modal-header {
+    padding: 14px 16px;
+  }
+  .focalyt-club-root .fc-modal-body {
+    padding: 16px;
+  }
+  .focalyt-club-root .fc-modal-footer {
+    padding: 12px 16px;
+  }
+}
+
+/* Footer */
+.focalyt-club-root .club-footer {
+  background: var(--bg-pink-light);
+  border-top: 1px solid var(--border-soft);
+  padding: 36px 0 28px;
+  margin-top: auto;
+}
+
+.focalyt-club-root .club-footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.focalyt-club-root .club-footer-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .focalyt-club-root .club-footer {
+    padding: 28px 0 24px;
+  }
+  .focalyt-club-root .club-footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+}
+
+/* Admin Layout */
+.focalyt-club-root .admin-shell {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  min-height: calc(100vh - 45px);
+  background: transparent;
+}
+
+.focalyt-club-root .admin-sidebar {
+  background: rgba(255, 240, 244, 0.85);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid var(--border-soft);
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.focalyt-club-root .admin-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.focalyt-club-root .admin-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.18s ease;
+}
+
+.focalyt-club-root .admin-nav-link:hover {
+  background: #FFFFFF;
+  color: var(--foc-cyan);
+}
+
+.focalyt-club-root .admin-nav-link.active {
+  background: linear-gradient(90deg, var(--foc-cyan), var(--foc-magenta));
+  color: #FFFFFF;
+  box-shadow: 0 6px 16px rgba(252, 43, 90, 0.25);
+}
+
+.focalyt-club-root .admin-main {
+  padding: 32px 36px;
+  background: transparent;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .focalyt-club-root .admin-shell {
+    grid-template-columns: 1fr;
+  }
+  .focalyt-club-root .admin-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .focalyt-club-root .admin-nav-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .focalyt-club-root .admin-nav-link {
+    padding: 10px 12px;
+    font-size: 0.7rem;
+  }
+  .focalyt-club-root .admin-main {
+    padding: 22px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .focalyt-club-root .admin-nav-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Admin Tables / Cards */
+.focalyt-club-root .admin-table-wrap {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(252, 43, 90, 0.28);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: var(--shadow-xs);
+}
+
+.focalyt-club-root .admin-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.focalyt-club-root .admin-table th {
+  background: var(--bg-pink-light);
+  color: var(--text-plum);
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+
+.focalyt-club-root .admin-table td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.focalyt-club-root .admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.focalyt-club-root .admin-table tr:hover td {
+  background: rgba(252, 43, 90, 0.04);
+}
+
+.focalyt-club-root .perm-table-wrap {
+  margin-top: 4px;
+}
+
+.focalyt-club-root .perm-table {
+  min-width: 920px;
+}
+
+.focalyt-club-root .perm-table th,
+.focalyt-club-root .perm-table td.perm-check-cell {
+  text-align: center;
+}
+
+.focalyt-club-root .perm-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .perm-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #fc2b5a;
+}
+
+.focalyt-club-root .role-matrix-table {
+  min-width: 860px;
+}
+
+.focalyt-club-root .perm-fixed {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.focalyt-club-root .perm-fixed.is-yes {
+  color: #0f7a4a;
+}
+
+.focalyt-club-root .perm-fixed.is-no {
+  color: #9a4a63;
+}
+
+/* Empty State */
+.focalyt-club-root .empty-state-box {
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px dashed rgba(252, 43, 90, 0.38);
+  border-radius: var(--radius-lg);
+  padding: 32px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Toast Container */
+.focalyt-club-root .toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  left: auto;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  width: calc(100vw - 32px);
+}
+
+@media (max-width: 480px) {
+  .focalyt-club-root .toast-stack {
+    right: 16px;
+    left: 16px;
+    bottom: 16px;
+    max-width: none;
+  }
+}
+
+.focalyt-club-root .toast-card {
+  background: var(--text-plum);
+  color: #FFFFFF;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-left: 4px solid var(--foc-cyan);
+  animation: fcModalAppear 0.2s ease-out;
+}
+
+.focalyt-club-root .club-list-page {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px 22px 16px;
+}
+
+.focalyt-club-root .club-list-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.focalyt-club-root .club-list-page__header h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-list-page__header p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.focalyt-club-root .club-list-page__search {
+  min-width: 240px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-list-page__search:focus {
+  outline: none;
+  border-color: #fda4af;
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.08);
+}
+
+.focalyt-club-root .club-list-page .admin-table-wrap {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.focalyt-club-root .club-list-page .admin-table th {
+  background: #f8fafc;
+  color: #334155;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.focalyt-club-root .club-list-page .admin-table tr:hover td {
+  background: #f8fafc;
+}
+
+.focalyt-club-root .club-list-page__name {
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-list-page__meta {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.focalyt-club-root .club-list-page__pending {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.focalyt-club-root .club-list-page__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.focalyt-club-root .club-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #e11d48;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-link-btn:hover {
+  text-decoration: underline;
+}
+
+.focalyt-club-root .club-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 6px;
+  color: #475569;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-icon-btn:hover {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #e11d48;
+}
+
+.focalyt-club-root .club-switch {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.focalyt-club-root .club-switch span {
+  position: absolute;
+  inset: 0;
+  background: #d6d3d1;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+.focalyt-club-root .club-switch span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.focalyt-club-root .club-switch input:checked + span {
+  background: #059669;
+}
+
+.focalyt-club-root .club-switch input:checked + span::after {
+  transform: translateX(18px);
+}
+
+.focalyt-club-root .club-switch input:focus-visible + span {
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+}
+
+.focalyt-club-root .club-list-page__empty {
+  text-align: center;
+  color: #64748b;
+  padding: 28px 16px;
+}
+
+.focalyt-club-root .club-list-page__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-list-page__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.focalyt-club-root .club-list-page__select,
+.focalyt-club-root .club-list-page select.form-select {
+  min-width: 180px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 0.875rem;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-list-page__panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-list-page__panel h2,
+.focalyt-club-root .club-list-page__panel h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-list-page__section {
+  margin-top: 22px;
+}
+
+.focalyt-club-root .club-list-page__section h2 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-list-page__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.focalyt-club-root .club-list-page__stat {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-list-page__stat strong {
+  display: block;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-list-page__stat span {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.focalyt-club-root .club-list-page .form-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: none;
+  padding: 16px 18px;
+}
+
+.focalyt-club-root .club-list-page .form-label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.focalyt-club-root .club-venue-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-venue-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-venue-picker__row .form-input {
+  flex: 1;
+}
+
+.focalyt-club-root .club-venue-picker__icon {
+  color: #e11d48;
+  display: inline-flex;
+}
+
+.focalyt-club-root .club-venue-picker__map {
+  width: 100%;
+  height: 180px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.focalyt-club-root .club-campus-assign__row {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.focalyt-club-root .club-campus-assign__editor {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.focalyt-club-root .club-campus-assign__editor h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.focalyt-club-root tr.club-campus-assign__active td {
+  background: #fff1f2;
+}
+
+.pac-container {
+  z-index: 20000 !important;
+}
+
+@media (max-width: 860px) {
+  .focalyt-club-root .club-list-page__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .focalyt-club-root .club-list-page__search,
+  .focalyt-club-root .club-list-page__select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+.focalyt-club-root .club-earn-list {
+  display: grid;
+  gap: 10px;
+}
+
+.focalyt-club-root .club-earn-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.focalyt-club-root .club-earn-item > strong {
+  min-width: 44px;
+  color: #be123c;
+  font-size: 0.95rem;
+}
+
+.focalyt-club-root .club-badge-row,
+.focalyt-club-root .club-gift-grid,
+.focalyt-club-root .club-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.focalyt-club-root .club-gift-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.focalyt-club-root .club-badge-chip,
+.focalyt-club-root .club-gift-card,
+.focalyt-club-root .club-badge-tile {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-badge-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  min-height: 168px;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+button.focalyt-club-root .club-badge-tile,
+.focalyt-club-root button.club-badge-tile {
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-badge-tile strong {
+  font-size: 0.84rem;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-badge-tile span {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.focalyt-club-root .club-badge-tile.is-on {
+  border-color: var(--foc-magenta);
+  box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12);
+}
+
+.focalyt-club-root .club-badge-tile.is-locked {
+  opacity: 0.55;
+  filter: grayscale(0.7);
+}
+
+.focalyt-club-root .club-badge-tile.is-earned {
+  border-color: rgba(252, 43, 90, 0.28);
+  background: linear-gradient(180deg, #fff7f9 0%, #ffffff 70%);
+}
+
+.focalyt-club-root .club-badge-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.12);
+}
+
+.focalyt-club-root .club-badge-mark svg,
+.focalyt-club-root .club-badge-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.focalyt-club-root .club-badge-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-badge-mark-pick {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-soft);
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-badge-mark-pick.is-on {
+  border-color: var(--foc-magenta);
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-badge-award {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.focalyt-club-root .club-badge-award .form-select {
+  min-width: 220px;
+  flex: 1;
+}
+
+.focalyt-club-root .club-dash > .club-dash-stats + .club-dash-panel,
+.focalyt-club-root .club-dash > .club-dash-panel + .club-dash-panel {
+  margin-top: 16px;
+}
+
+.focalyt-club-root .club-badge-chip {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: #64748b;
+}
+
+.focalyt-club-root .club-badge-chip.is-earned {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #0f172a;
+}
+
+.focalyt-club-root .club-badge-chip span {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #be123c;
+}
+
+.focalyt-club-root .club-badge-chip strong,
+.focalyt-club-root .club-badge-chip small {
+  display: block;
+}
+
+.focalyt-club-root .club-badge-chip small {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.focalyt-club-root .club-gift-card .fc-btn {
+  margin-top: 12px;
+}
+
+.focalyt-club-root .club-dash {
+  padding: 4px 2px 12px;
+}
+
+.focalyt-club-root .club-dash-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.focalyt-club-root .club-dash-hero__eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--foc-magenta);
+}
+
+.focalyt-club-root .club-dash-hero h1 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-dash-hero__sub {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-dash-hero__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-dash-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.focalyt-club-root .club-dash-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-dash-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  background: #ffffff;
+  color: var(--text-plum);
+  border-radius: var(--radius-pill);
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-dash-tab span {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(252, 43, 90, 0.1);
+  color: var(--foc-magenta);
+  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focalyt-club-root .club-dash-tab.is-on {
+  background: var(--text-plum);
+  border-color: var(--text-plum);
+  color: #ffffff;
+}
+
+.focalyt-club-root .club-dash-tab.is-on span {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.focalyt-club-root .club-dash-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-dash button.club-dash-stat {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.focalyt-club-root .club-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.focalyt-club-root .club-dash-stat {
+  display: block;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.focalyt-club-root .club-dash-stat:hover {
+  transform: translateY(-1px);
+  border-color: rgba(252, 43, 90, 0.28);
+  box-shadow: var(--shadow-sm);
+}
+
+.focalyt-club-root .club-dash-stat.is-alert {
+  background: linear-gradient(180deg, #fff7f9 0%, #ffffff 70%);
+  border-color: rgba(252, 43, 90, 0.28);
+}
+
+.focalyt-club-root .club-dash-stat__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: rgba(252, 43, 90, 0.1);
+  color: var(--foc-magenta);
+}
+
+.focalyt-club-root .club-dash-stat strong {
+  display: block;
+  font-size: 1.55rem;
+  line-height: 1.1;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-dash-stat__label {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-dash-stat__hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.focalyt-club-root .club-dash-main,
+.focalyt-club-root .club-dash-side {
+  display: grid;
+  gap: 16px;
+}
+
+.focalyt-club-root .club-dash-panel {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 16px 16px 10px;
+}
+
+.focalyt-club-root .club-dash-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.focalyt-club-root .club-dash-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-dash-panel h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-dash-chip {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(252, 43, 90, 0.12);
+  color: var(--foc-magenta);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focalyt-club-root .club-dash-more {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--foc-magenta);
+  text-decoration: none;
+}
+
+.focalyt-club-root .club-dash-more:hover {
+  text-decoration: underline;
+}
+
+.focalyt-club-root .club-dash-empty {
+  margin: 8px 0 10px;
+  padding: 18px 8px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.focalyt-club-root .club-dash-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.focalyt-club-root .club-dash-row,
+.focalyt-club-root .club-dash-event,
+.focalyt-club-root .club-dash-quiet {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 2px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.focalyt-club-root .club-dash-rows .club-dash-row:first-child,
+.focalyt-club-root .club-dash-rows .club-dash-event:first-child,
+.focalyt-club-root .club-dash-panel--quiet .club-dash-quiet:first-child {
+  border-top: none;
+  padding-top: 8px;
+}
+
+.focalyt-club-root .club-dash-avatar {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fc2b5a, #e11d48);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.focalyt-club-root .club-dash-row__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.focalyt-club-root .club-dash-row__body strong,
+.focalyt-club-root .club-dash-event strong,
+.focalyt-club-root .club-dash-quiet strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-dash-row__body span,
+.focalyt-club-root .club-dash-event span,
+.focalyt-club-root .club-dash-quiet span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-dash-row__status {
+  flex: 0 0 auto;
+}
+
+.focalyt-club-root .club-dash-row__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.focalyt-club-root .club-dash-muted {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-dash-event__time {
+  flex: 0 0 64px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--foc-magenta);
+}
+
+.focalyt-club-root .club-dash-panel--quiet {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.focalyt-club-root .club-dash-quiet svg {
+  color: var(--foc-magenta);
+  flex: 0 0 auto;
+}
+
+.focalyt-club-root .club-dash-quiet div {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .focalyt-club-root .club-dash-stats,
+  .focalyt-club-root .club-dash-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .focalyt-club-root .club-dash-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .focalyt-club-root .club-dash-stats,
+  .focalyt-club-root .club-dash-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .focalyt-club-root .club-dash-row {
+    flex-wrap: wrap;
+  }
+
+  .focalyt-club-root .club-dash-row__actions {
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: 48px;
+  }
+}
+
+.focalyt-club-root .club-cert-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.72fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.focalyt-club-root .club-cert-workspace--solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.focalyt-club-root .club-cert-workspace__paper,
+.focalyt-club-root .club-cert-workspace__issue {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 14px;
+}
+
+.focalyt-club-root .club-cert-workspace__issue h2 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-cert-workspace__issue .form-field {
+  margin-bottom: 10px;
+}
+
+.focalyt-club-root .club-cert-workspace__issue .fc-btn {
+  width: 100%;
+  margin-top: 6px;
+  justify-content: center;
+}
+
+.focalyt-club-root .club-cert-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.focalyt-club-root .club-cert-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  background: #fff;
+  border-radius: var(--radius-pill);
+  padding: 7px 10px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.focalyt-club-root .club-cert-chip span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.focalyt-club-root .club-cert-chip strong {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-cert-chip em {
+  font-style: normal;
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-cert-chip.is-on {
+  border-color: var(--foc-magenta);
+  background: #fff7f9;
+  box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.1);
+}
+
+.focalyt-club-root .club-cert-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex: 0 0 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.focalyt-club-root .club-cert-swatch--classic {
+  background: linear-gradient(135deg, #1d3557 50%, #c9a44a 50%);
+}
+
+.focalyt-club-root .club-cert-swatch--honor {
+  background: linear-gradient(135deg, #b8860b 50%, #fff1c2 50%);
+}
+
+.focalyt-club-root .club-cert-swatch--modern {
+  background: linear-gradient(135deg, #fc2b5a 40%, #ffffff 40%);
+}
+
+.focalyt-club-root .club-cert-swatch--crest {
+  background: linear-gradient(135deg, #10233d 62%, #fc2b5a 62%);
+}
+
+.focalyt-club-root .club-cert-stage {
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(40, 16, 36, 0.12);
+}
+
+.focalyt-club-root .club-cert-issued-panel {
+  margin-top: 16px;
+}
+
+.focalyt-club-root .club-cert-issued__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.focalyt-club-root .club-cert-issued__actions .fc-btn,
+.focalyt-club-root .club-dash-row__actions .fc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.focalyt-club-root .club-cert-sheet {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.414 / 1;
+  overflow: hidden;
+  font-family: Georgia, 'Times New Roman', serif;
+  text-align: center;
+}
+
+.focalyt-club-root .club-cert-sheet::before {
+  content: '';
+  position: absolute;
+  inset: 4.5%;
+  pointer-events: none;
+}
+
+.focalyt-club-root .club-cert-sheet__inner {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8% 10% 6%;
+}
+
+.focalyt-club-root .club-cert-sheet__inner::before {
+  content: 'FOCALYT';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(2.4rem, 8vw, 5rem);
+  letter-spacing: 0.28em;
+  opacity: 0.045;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.focalyt-club-root .club-cert-sheet__org {
+  margin: 0;
+  letter-spacing: 0.42em;
+  font-size: clamp(0.5rem, 1.1vw, 0.72rem);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.focalyt-club-root .club-cert-sheet__campus {
+  margin: 4px 0 0;
+  font-size: clamp(0.55rem, 1.15vw, 0.78rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.focalyt-club-root .club-cert-sheet h3 {
+  margin: 8px 0 0;
+  font-size: clamp(0.72rem, 2vw, 1.2rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.focalyt-club-root .club-cert-sheet__flourish {
+  margin: 6px 0 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.35em;
+  opacity: 0.7;
+}
+
+.focalyt-club-root .club-cert-sheet__kicker,
+.focalyt-club-root .club-cert-sheet__award {
+  margin: 0;
+  font-size: clamp(0.58rem, 1.2vw, 0.82rem);
+  font-style: italic;
+  opacity: 0.82;
+}
+
+.focalyt-club-root .club-cert-sheet__name {
+  display: inline-block;
+  margin: 6px 0 8px;
+  font-size: clamp(1rem, 2.8vw, 1.7rem);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.15;
+  padding: 0 12px 5px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.focalyt-club-root .club-cert-sheet__title {
+  margin: 6px 0 0;
+  font-size: clamp(0.7rem, 1.5vw, 0.95rem);
+  font-weight: 700;
+}
+
+.focalyt-club-root .club-cert-sheet__extra {
+  margin: 4px 0 0;
+  font-size: clamp(0.58rem, 1.15vw, 0.78rem);
+  opacity: 0.75;
+}
+
+.focalyt-club-root .club-cert-sheet__footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4.5%;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-cert-sheet__footer div {
+  min-width: 22%;
+}
+
+.focalyt-club-root .club-cert-sheet__footer b {
+  display: block;
+  font-size: clamp(0.58rem, 1.15vw, 0.78rem);
+  font-weight: 650;
+}
+
+.focalyt-club-root .club-cert-sheet__footer small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.focalyt-club-root .club-cert-sheet__seal {
+  width: clamp(28px, 6vw, 46px);
+  height: clamp(28px, 6vw, 46px);
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  box-shadow: inset 0 0 0 4px currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.focalyt-club-root .club-cert-sheet__signs {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3.5%;
+  padding: 0 6%;
+}
+
+.focalyt-club-root .club-cert-sheet__signs span {
+  width: 28%;
+  border-top: 1px solid currentColor;
+  padding-top: 4px;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.focalyt-club-root .club-cert-sheet__corner {
+  position: absolute;
+  width: 7%;
+  height: 10%;
+  z-index: 2;
+}
+
+.focalyt-club-root .club-cert-sheet__corner--tl { top: 6.5%; left: 6.5%; border-top: 1.5px solid; border-left: 1.5px solid; }
+.focalyt-club-root .club-cert-sheet__corner--tr { top: 6.5%; right: 6.5%; border-top: 1.5px solid; border-right: 1.5px solid; }
+.focalyt-club-root .club-cert-sheet__corner--bl { bottom: 6.5%; left: 6.5%; border-bottom: 1.5px solid; border-left: 1.5px solid; }
+.focalyt-club-root .club-cert-sheet__corner--br { bottom: 6.5%; right: 6.5%; border-bottom: 1.5px solid; border-right: 1.5px solid; }
+
+.focalyt-club-root .club-cert-sheet__rail,
+.focalyt-club-root .club-cert-sheet__band {
+  display: none;
+}
+
+.focalyt-club-root .club-cert-sheet--classic {
+  color: #1d3557;
+  background: linear-gradient(180deg, #fffdf7 0%, #f4ead3 100%);
+}
+
+.focalyt-club-root .club-cert-sheet--classic::before {
+  border: 2px solid #1d3557;
+  box-shadow: inset 0 0 0 5px #c9a44a;
+}
+
+.focalyt-club-root .club-cert-sheet--classic .club-cert-sheet__corner {
+  border-color: #c9a44a;
+}
+
+.focalyt-club-root .club-cert-sheet--honor {
+  color: #6b4e16;
+  background: linear-gradient(180deg, #fff8e7 0%, #f3e0b0 100%);
+}
+
+.focalyt-club-root .club-cert-sheet--honor::before {
+  border: 3px solid #b8860b;
+  box-shadow: inset 0 0 0 5px #e6c35c;
+}
+
+.focalyt-club-root .club-cert-sheet--honor .club-cert-sheet__corner {
+  border-color: #b8860b;
+}
+
+.focalyt-club-root .club-cert-sheet--honor h3,
+.focalyt-club-root .club-cert-sheet--honor .club-cert-sheet__name {
+  color: #5b3f0c;
+}
+
+.focalyt-club-root .club-cert-sheet--modern {
+  color: #1f1235;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-cert-sheet--modern .club-cert-sheet__rail {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3.2%;
+  background: linear-gradient(180deg, #fc2b5a, #e11d48);
+}
+
+.focalyt-club-root .club-cert-sheet--modern::before {
+  border: 1px solid #ead7e0;
+  left: 5.5%;
+}
+
+.focalyt-club-root .club-cert-sheet--modern .club-cert-sheet__corner {
+  display: none;
+}
+
+.focalyt-club-root .club-cert-sheet--modern .club-cert-sheet__org,
+.focalyt-club-root .club-cert-sheet--modern .club-cert-sheet__name,
+.focalyt-club-root .club-cert-sheet--modern .club-cert-sheet__seal {
+  color: #e11d48;
+}
+
+.focalyt-club-root .club-cert-sheet--crest {
+  color: #10233d;
+  background: #ffffff;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__band {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22%;
+  padding: 0 8%;
+  background: #10233d;
+  color: #ffffff;
+  z-index: 2;
+  text-align: left;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__band p {
+  margin: 0;
+  letter-spacing: 0.32em;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__band h3 {
+  margin: 4px 0 0;
+  color: #ffffff;
+}
+
+.focalyt-club-root .club-cert-sheet--crest::before {
+  border: 1.5px solid #10233d;
+  top: 5%;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__inner {
+  padding-top: 24%;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__inner > .club-cert-sheet__org,
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__inner > .club-cert-sheet__campus,
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__inner > h3 {
+  display: none;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__corner {
+  border-color: #c9a44a;
+}
+
+.focalyt-club-root .club-cert-sheet--crest .club-cert-sheet__seal {
+  color: #fc2b5a;
+}
+
+@media (max-width: 980px) {
+  .focalyt-club-root .club-cert-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.focalyt-club-root .club-feed {
+  max-width: 680px;
+}
+
+.focalyt-club-root .club-feed .club-dash-tabs {
+  margin: 4px 0 14px;
+}
+
+.focalyt-club-root .club-feed-composer {
+  display: flex;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.focalyt-club-root .club-feed-composer__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.focalyt-club-root .club-feed-composer__input {
+  width: 100%;
+  border: 0;
+  resize: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text-plum);
+  line-height: 1.45;
+  min-height: 72px;
+}
+
+.focalyt-club-root .club-feed-composer__input:focus {
+  outline: none;
+}
+
+.focalyt-club-root .club-feed-composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.focalyt-club-root .club-feed-composer__bar .fc-btn-primary {
+  margin-left: auto;
+}
+
+.focalyt-club-root .club-feed-photo {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background: #f6f4f8;
+}
+
+.focalyt-club-root .club-feed-photo img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+}
+
+.focalyt-club-root .club-feed-photo__remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(17, 17, 17, 0.72);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-feed-list {
+  display: grid;
+  gap: 12px;
+}
+
+.focalyt-club-root .club-feed-card {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  padding: 14px 14px 10px;
+}
+
+.focalyt-club-root .club-feed-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.focalyt-club-root .club-feed-card__who {
+  min-width: 0;
+  flex: 1;
+}
+
+.focalyt-club-root .club-feed-card__who strong,
+.focalyt-club-root .club-feed-comment strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-feed-card__who span {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.focalyt-club-root .club-feed-flag {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--foc-magenta);
+}
+
+.focalyt-club-root .club-feed-more {
+  position: relative;
+}
+
+.focalyt-club-root .club-feed-more__btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focalyt-club-root .club-feed-more__btn:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.focalyt-club-root .club-feed-more__menu {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 6;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+  padding: 6px;
+  display: grid;
+}
+
+.focalyt-club-root .club-feed-more__menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text-plum);
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-feed-more__menu button:hover {
+  background: rgba(252, 43, 90, 0.08);
+}
+
+.focalyt-club-root .club-feed-more__menu .is-danger {
+  color: #be123c;
+}
+
+.focalyt-club-root .club-feed-card__content {
+  margin: 10px 2px 8px;
+}
+
+.focalyt-club-root .club-feed-card__content h3 {
+  margin: 0 0 4px;
+  font-size: 0.98rem;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-feed-card__content p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-plum);
+  white-space: pre-wrap;
+}
+
+.focalyt-club-root .club-feed-card__media {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin: 8px 0 6px;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f6f4f8;
+  cursor: zoom-in;
+}
+
+.focalyt-club-root .club-feed-card__media img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.focalyt-club-root .club-feed-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 10, 25, 0.82);
+  cursor: zoom-out;
+}
+
+.focalyt-club-root .club-feed-lightbox img {
+  max-width: min(1100px, 100%);
+  max-height: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.focalyt-club-root .club-feed-lightbox__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .focalyt-club-root .club-feed-card__media img {
+    max-height: 260px;
+  }
+}
+
+.focalyt-club-root .club-feed-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.focalyt-club-root .club-feed-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-feed-action:hover,
+.focalyt-club-root .club-feed-action.is-on {
+  color: var(--foc-magenta);
+  background: rgba(252, 43, 90, 0.08);
+}
+
+.focalyt-club-root .club-feed-comments {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 10px 2px 6px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.focalyt-club-root .club-feed-comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-feed-comment p {
+  margin: 2px 0 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text-plum);
+}
+
+.focalyt-club-root .club-dash-avatar--sm {
+  flex-basis: 28px;
+  width: 28px;
+  height: 28px;
+  font-size: 0.62rem;
+}
+
+.focalyt-club-root .club-feed-comment__del {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.focalyt-club-root .club-feed-reply {
+  display: flex;
+  gap: 8px;
+}
+
+.focalyt-club-root .club-feed-reply .fc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focalyt-club-root .club-feed--embedded {
+  max-width: none;
+}
+
