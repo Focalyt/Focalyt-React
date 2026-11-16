@@ -2278,7 +2278,31 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 	} catch (error) {
 		values = {};
 	}
+	const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+	const touched = new Set();
+	try {
+		const parsed = JSON.parse(body.touchedKeys || '[]');
+		if (Array.isArray(parsed)) parsed.forEach((key) => touched.add(String(key)));
+	} catch (error) {
+		touched.clear();
+	}
 	const previousByKey = new Map((previousAnswers || []).map((answer) => [answer.key, answer]));
+	const previousFor = (field) => {
+		const byKey = previousByKey.get(field.key);
+		if (byKey) return byKey;
+		const label = labelKey(field.label);
+		if (!label) return null;
+		return (previousAnswers || []).find((answer) => labelKey(answer.label) === label) || null;
+	};
+	const keepValue = (field) => {
+		const incoming = String(values[field.key] ?? '').trim();
+		if (incoming) return incoming;
+		const previous = previousFor(field);
+		const previousValue = String(previous?.value || '').trim();
+		if (!previousValue) return '';
+		if (touched.has(field.key) || (previous?.key && touched.has(previous.key))) return '';
+		return previousValue;
+	};
 	const answers = [];
 	for (const field of (template.fields || []).filter((item) => item.key !== 'batchAttendance')) {
 		if (field.type === 'file') {
@@ -2300,7 +2324,7 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 				if ((file.size || 0) > maxBytes) throw reportHttpError(400, `${file.name} is too large`);
 			});
 			const removed = new Set(readRemovedReportFileIds(body));
-			const kept = (previousByKey.get(field.key)?.files || []).filter((file) => {
+			const kept = (previousFor(field)?.files || []).filter((file) => {
 				const id = String(file?._id || file?.id || '');
 				return id && !removed.has(id);
 			});
@@ -2315,7 +2339,7 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 			answers.push({ key: field.key, label: field.label, type: field.type, value: '', files: storedFiles });
 			continue;
 		}
-		const value = String(values[field.key] ?? '').trim();
+		const value = keepValue(field);
 		if (field.required && !value) throw reportHttpError(400, `${field.label} is required`);
 		if (field.type === 'yesno' && value && value !== 'Yes' && value !== 'No') {
 			throw reportHttpError(400, `${field.label} must be Yes or No`);
@@ -2333,20 +2357,19 @@ const buildTemplateAnswers = async (template, body, files, collegeId, previousAn
 	];
 	studentCounts.forEach((field) => {
 		if (answers.some((answer) => answer.key === field.key)) return;
-		const value = String(values[field.key] ?? '').trim();
+		const value = keepValue(field);
 		if (value && (!Number.isInteger(Number(value)) || Number(value) < 0)) {
 			throw reportHttpError(400, `${field.label} must be a whole number`);
 		}
 		answers.push({ key: field.key, label: field.label, type: 'number', value, files: [] });
 	});
-	const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 	const hasTopicField = (template.fields || []).some((field) => field.key === 'topicName' || labelKey(field.label) === 'topicname');
 	if (!hasTopicField && !answers.some((answer) => answer.key === 'topicName')) {
 		const topicAnswer = {
 			key: 'topicName',
 			label: 'Topic name',
 			type: 'select',
-			value: String(values.topicName ?? '').trim(),
+			value: keepValue({ key: 'topicName', label: 'Topic name' }),
 			files: [],
 		};
 		const batchIndex = answers.findIndex((answer) => ['batchid', 'batch', 'batchno', 'batchcode'].includes(labelKey(answer.label)));

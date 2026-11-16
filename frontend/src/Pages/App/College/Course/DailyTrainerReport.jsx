@@ -161,6 +161,7 @@ const knownFieldValue = (field, context) => {
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewRotation, setPreviewRotation] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [savedAnswerRows, setSavedAnswerRows] = useState([]);
   const [batchSize, setBatchSize] = useState('');
   const [touchedAnswers, setTouchedAnswers] = useState({});
   const [answerFiles, setAnswerFiles] = useState({});
@@ -353,10 +354,17 @@ const knownFieldValue = (field, context) => {
     return Number.isInteger(fromBatch) && fromBatch > 0 ? String(fromBatch) : '';
   })();
 
+  const savedAnswerFor = (field) => (savedAnswerRows || []).find((answer) => (
+    answer.key === field.key || (field.label && labelKey(answer.label) === labelKey(field.label))
+  ));
+
   const filledAnswer = (field, source = answers) => {
     if (field.key === 'batchSize' || labelKey(field.label) === 'batchsize') return liveBatchSize;
     const typed = source[field.key];
-    if (touchedAnswers[field.key] || String(typed || '').trim()) return typed || '';
+    if (touchedAnswers[field.key]) return typed || '';
+    if (String(typed || '').trim()) return typed;
+    const saved = String(savedAnswerFor(field)?.value || '').trim();
+    if (saved) return saved;
     return knownFieldValue(field, { ...knownContext, batchSize: liveBatchSize });
   };
 
@@ -435,6 +443,7 @@ const knownFieldValue = (field, context) => {
     setRemovedIds([]);
     setSavedContext(null);
     setAnswers({});
+    setSavedAnswerRows([]);
     setTouchedAnswers({});
     setAnswerFiles({});
     setSavedAnswerFiles({});
@@ -452,11 +461,17 @@ const knownFieldValue = (field, context) => {
       location: report.location || '',
       jobRole: report.jobRole || '',
     });
+    const rows = (report.answers || []).filter((answer) => answer.key !== 'batchAttendance');
+    const answerText = (labels) => {
+      const wanted = new Set(labels);
+      const found = rows.find((answer) => wanted.has(labelKey(answer.label)) && String(answer.value || '').trim());
+      return found ? found.value : '';
+    };
     setForm({
       reportDate: report.reportDate || todayKey(),
       batchId: report.batchId || '',
-      inTime: toTimeInput(report.inTime),
-      outTime: toTimeInput(report.outTime),
+      inTime: toTimeInput(report.inTime) || toTimeInput(answerText(['intime'])),
+      outTime: toTimeInput(report.outTime) || toTimeInput(answerText(['outtime'])),
       batchSize: report.batchSize ?? '',
       totalPresent: report.totalPresent ?? '',
       totalAbsent: report.totalAbsent ?? '',
@@ -468,17 +483,33 @@ const knownFieldValue = (field, context) => {
     });
     const nextAnswers = {};
     const nextFiles = {};
-    (report.answers || []).forEach((answer) => {
-      if (answer.key === 'batchAttendance') return;
+    rows.forEach((answer) => {
       nextAnswers[answer.key] = answer.value || '';
       nextFiles[answer.key] = answer.files || [];
     });
     if (!nextAnswers[topicFieldKey] && report.topic) nextAnswers[topicFieldKey] = report.topic;
+    setSavedAnswerRows(rows);
     setAnswers(nextAnswers);
     setTouchedAnswers({});
     setAnswerFiles({});
     setSavedAnswerFiles(nextFiles);
     setRemovedIds([]);
+  };
+
+  const startEdit = async (report) => {
+    let source = report;
+    if (token && report?.id) {
+      try {
+        const response = await axios.get(`${backendUrl}/college/trainer/daily-reports/${report.id}`, {
+          headers: { 'x-auth': token },
+        });
+        if (response.data?.status && response.data.data) source = response.data.data;
+      } catch (error) {
+        console.error('Failed to load daily report:', error);
+      }
+    }
+    openReport(source);
+    setScreen('add');
   };
 
   const onField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
@@ -532,6 +563,7 @@ const knownFieldValue = (field, context) => {
       answersToSave[topicFieldKey] = filledAnswer({ key: topicFieldKey, label: 'Topic name', type: 'select', options: topicOptions });
     }
     data.append('answers', JSON.stringify(answersToSave));
+    data.append('touchedKeys', JSON.stringify(Object.keys(touchedAnswers)));
     data.append('removeFileIds', JSON.stringify(removedIds));
     Object.entries(answerFiles).forEach(([key, files]) => {
       (files || []).forEach((file) => data.append(`file_${key}`, file));
@@ -696,9 +728,10 @@ const knownFieldValue = (field, context) => {
     }
     if (field.type === 'radio' || field.type === 'yesno') {
       const options = field.type === 'yesno' ? ['Yes', 'No'] : (field.options || []);
+      const choices = value && !options.includes(value) ? options.concat(value) : options;
       return (
         <div className="dtr-radios">
-          {options.map((option) => (
+          {choices.map((option) => (
             <label className="dtr-radio" key={option}>
               <input
                 type="radio"
@@ -755,10 +788,11 @@ const knownFieldValue = (field, context) => {
           </div>
         );
       }
+      const choices = value && !options.includes(value) ? [value, ...options] : options;
       return (
         <select value={value} disabled={locked} onChange={(event) => writeAnswer(event.target.value)}>
           <option value="">Select</option>
-          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+          {choices.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
       );
     }
@@ -797,7 +831,8 @@ const knownFieldValue = (field, context) => {
         .dtr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .dtr-table th, .dtr-table td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
         .dtr-table th { color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: #f8fafc; }
-        .dtr-table td.dtr-action, .dtr-table th.dtr-action { width: 90px; text-align: right; }
+        .dtr-table td.dtr-action, .dtr-table th.dtr-action { width: 210px; text-align: right; white-space: nowrap; }
+        .dtr-action-btns { display: inline-flex; gap: 6px; justify-content: flex-end; }
         .dtr-modal { position: fixed; inset: 0; z-index: 10050; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
         .dtr-modal-card { width: min(1040px, 100%); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); }
         .dtr-modal-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; z-index: 1; }
@@ -899,14 +934,14 @@ const knownFieldValue = (field, context) => {
       `}</style>
 
       <div className="dtr-tabs">
-        <button type="button" className={screen === 'add' ? 'active' : ''} onClick={() => setScreen('add')}>Add report</button>
+        <button type="button" className={screen === 'add' ? 'active' : ''} onClick={() => { if (editingId) openNew(); setScreen('add'); }}>Add report</button>
         <button type="button" className={screen === 'view' ? 'active' : ''} onClick={() => setScreen('view')}>View report</button>
       </div>
       <div className="dtr-card">
         <div className="dtr-bar">
           <div>
-            <h2>{screen === 'add' ? 'Add daily report' : 'View reports'}</h2>
-            <p>{screen === 'add' ? 'Select the date and batch. The fields open below.' : `${visibleReports.length} saved report${visibleReports.length === 1 ? '' : 's'}`}</p>
+            <h2>{screen === 'view' ? 'View reports' : (editingId ? 'Edit daily report' : 'Add daily report')}</h2>
+            <p>{screen === 'view' ? `${visibleReports.length} saved report${visibleReports.length === 1 ? '' : 's'}` : (editingId ? 'Update the saved report, then save the row.' : 'Select the date and batch. The fields open below.')}</p>
           </div>
           <div className="dtr-actions">
             {screen === 'view' && (
@@ -1019,7 +1054,10 @@ const knownFieldValue = (field, context) => {
                       <td data-label="Course">{report.courseName || report.jobRole || '-'}</td>
                       <td data-label="Batch">{report.batchCode || '-'}</td>
                       <td className="dtr-action" data-label="Action">
-                        <button type="button" className="dtr-btn dtr-btn--ghost" onClick={() => setViewingReport(report)}>View</button>
+                        <div className="dtr-action-btns">
+                          <button type="button" className="dtr-btn dtr-btn--ghost" onClick={() => startEdit(report)}>Edit report</button>
+                          <button type="button" className="dtr-btn dtr-btn--ghost" onClick={() => setViewingReport(report)}>View</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
