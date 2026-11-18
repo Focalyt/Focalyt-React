@@ -15,6 +15,7 @@ let Status = require('../../models/status');
 const Vertical = require('../../models/verticals');
 const Vacancy = require('../../models/vacancy');
 const AppliedJobs = require('../../models/appliedJobs');
+const Source = require('../../models/source');
 const HiringStatus = require('../../models/hiringstatus');
 const Company = require('../../models/company');
 const createHrHiring = require('./hrHiring');
@@ -1508,7 +1509,13 @@ router.post('/leads', isCollege, async (req, res) => {
     const qualification = String(req.body.qualification || '').trim();
     const dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : null;
     const remark = String(req.body.remark || '').trim();
-    const source = String(req.body.source || 'manual').trim() || 'manual';
+    const registeredById = toCollegeObjectId(req.body.registeredBy || req.body.sourceId);
+    let source = String(req.body.source || '').trim();
+    if (registeredById) {
+      const sourceDoc = await Source.findById(registeredById).select('name').lean();
+      if (sourceDoc?.name) source = sourceDoc.name;
+    }
+    if (!source) source = 'manual';
 
     if (!fullName || fullName.length < 2) {
       return res.status(400).json({ success: false, message: 'Please enter a valid full name' });
@@ -1629,6 +1636,11 @@ router.post('/leads', isCollege, async (req, res) => {
     if (jobId) {
       const alreadyApplied = await AppliedJobs.findOne({ _candidate: candidate._id, _job: jobId });
       if (alreadyApplied) {
+        const currentSource = String(alreadyApplied.source || '').trim();
+        if (source && source !== 'manual' && (!currentSource || /^(manual|bulk_upload|website)$/i.test(currentSource))) {
+          alreadyApplied.source = source;
+          await alreadyApplied.save();
+        }
         const loaded = await loadAppliedLead(alreadyApplied._id, collegeId);
         return res.status(200).json({
           success: true,

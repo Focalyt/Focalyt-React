@@ -294,6 +294,8 @@ const mapHrLeadToB2cProfile = (lead) => {
   const coOwner = lead?.leadCoOwner && typeof lead.leadCoOwner === 'object'
     ? lead.leadCoOwner
     : (lead?.leadCoOwner ? { _id: lead.leadCoOwner } : null);
+  const sourceName = String(lead?.source || '').trim();
+  const visibleSource = sourceName && !/^(manual|bulk_upload|website)$/i.test(sourceName) ? sourceName : '';
   const jobName = lead?.applyingFor || '';
   const projectName = lead?.projectName || lead?.project?.name || '';
   const departmentName = lead?.departmentName || lead?.department?.name || '';
@@ -338,7 +340,8 @@ const mapHrLeadToB2cProfile = (lead) => {
     isHrJobLead: true,
     companyId: lead?.companyId || null,
     corporateHiringStatus: lead?.corporateHiringStatus || null,
-    source: lead?.source || '',
+    source: visibleSource,
+    registeredBy: visibleSource ? { name: visibleSource } : null,
     _candidate: {
       _id: lead?.candidate,
       name: lead?.fullName || '',
@@ -346,6 +349,7 @@ const mapHrLeadToB2cProfile = (lead) => {
       email: lead?.email || '',
       sex: lead?.gender || '',
       dob: lead?.dateOfBirth || null,
+      source: visibleSource,
       maritalStatus: lead?.maritalStatus || '',
       personalInfo: {
         currentAddress: { city: lead?.city || '' },
@@ -3503,6 +3507,7 @@ const CRMDashboard = () => {
 
       // Prepare the data according to the API structure
       const selectedJob = (jobs || []).find((job) => String(job?._id || job?.id) === String(addLeadJobId));
+      const selectedSource = (sources || []).find((source) => String(source._id) === String(registeredBy));
       const requestData = {
         courseId,
         jobId: addLeadJobId,
@@ -3548,7 +3553,8 @@ const CRMDashboard = () => {
         experience: 'Not provided',
         qualification: selectSearch.qualification || '',
         dateOfBirth: dob || '',
-        source: 'manual',
+        registeredBy,
+        source: selectedSource?.name || '',
       }, {
         headers: {
           'x-auth': token,

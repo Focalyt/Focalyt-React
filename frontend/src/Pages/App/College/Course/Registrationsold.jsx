@@ -16573,9 +16573,9 @@ useEffect(() => {
                   fontWeight: 600,
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  color: filterData.reachedMilestone === 'true' && !activeMilestoneId ? '#fff' : 'rgb(250, 85, 121)',
-                  backgroundColor: filterData.reachedMilestone === 'true' && !activeMilestoneId ? 'rgb(250, 85, 121)' : '#fff',
-                  border: filterData.reachedMilestone === 'true' && !activeMilestoneId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                  color: filterData.reachedMilestone === 'true' && !activeMilestoneId ? '#fff' : '#66bb6a',
+                  backgroundColor: filterData.reachedMilestone === 'true' && !activeMilestoneId ? '#66bb6a' : '#fff',
+                  border: filterData.reachedMilestone === 'true' && !activeMilestoneId ? 'none' : '1.5px solid #66bb6a',
                 }}
                 onClick={() => handleMilestoneChipClick(null)}
               >
@@ -16599,9 +16599,9 @@ useEffect(() => {
                       fontWeight: 600,
                       borderRadius: '999px',
                       cursor: 'pointer',
-                      color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
-                      backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
-                      border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                      color: isSelected ? '#fff' : '#66bb6a',
+                      backgroundColor: isSelected ? '#66bb6a' : '#fff',
+                      border: isSelected ? 'none' : '1.5px solid #66bb6a',
                     }}
                     onClick={() => handleMilestoneChipClick(milestone)}
                     title={`${milestone.activeCount ?? 0} still in this milestone, ${milestone.dropoutCount ?? 0} dropped out`}
@@ -17112,13 +17112,13 @@ useEffect(() => {
             height: 32px;
             padding: 0 26px 0 10px;
             border-radius: 999px;
-            border: 1.5px solid rgb(250, 85, 121);
-            color: rgb(250, 85, 121);
+            border: 1.5px solid #66bb6a;
+            color: #66bb6a;
             font-weight: 600;
             font-size: 12px;
             line-height: 30px;
             background-color: #fff;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fa5579' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2366bb6a' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 8px center;
             background-size: 10px 7px;
@@ -17128,7 +17128,7 @@ useEffect(() => {
             flex: 0 0 118px;
           }
           .b2b-crm-dashboard .b2b-milestone-project:focus {
-            box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.16);
+            box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.22);
           }
           .b2b-crm-dashboard .b2b-milestone-project-hint {
             color: #9ca3af;
