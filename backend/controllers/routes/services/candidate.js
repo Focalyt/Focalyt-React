@@ -251,6 +251,8 @@ module.exports = {
         $project: {
           name: 1,
           sex: 1,
+          mobile: 1,
+          whatsapp: 1,
           highestQualification: 1,
           appliedJobs: 1,
           distance: 1,

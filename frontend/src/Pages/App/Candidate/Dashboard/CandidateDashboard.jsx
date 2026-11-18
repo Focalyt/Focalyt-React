@@ -43,7 +43,7 @@ const CandidateDashboard = () => {
   return (<>
 
       <div className="">
-      
+      {false && (<>
             <a href="/candidate/cashback" className='d-md-block d-sm-none d-none'>
               <div className="height-structure bannerCan">
                 <img src="/Assets/images/candidate-dashboardnew.jpg" alt="" />
@@ -188,9 +188,42 @@ const CandidateDashboard = () => {
               </div>
 
             </section>
-            <section id="jobs_update  ">
+      </>)}
+            <section id="jobs_update">
               <div className="row">
-
+                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
+                  <div className="card mt-1 mb-2">
+                    <div className="col-xl-12 p-3">
+                      <div className="row">
+                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto ">
+                          <h4 className="card-title mb-0" id="wrapping-bottom">Interested Companies / इच्छुक कंपनियां</h4>
+                        </div>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right my-auto">
+                          <a href="/candidate/InterestedCompanies" className="btn btn-outline-primary btn-sm waves-effect waves-light viewAllBtn">View All</a>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-content">
+                      <div className="table-responsive">
+                        <table className="table table-hover-animation mb-0 table-hover">
+                          <thead>
+                            <tr>
+                              <th>Date &amp; Time</th>
+                              <th>Company</th>
+                              <th>Industry</th>
+                              <th>City</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td colSpan="4">No companies yet</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
                   <div className="card mt-1 mb-2">
@@ -215,15 +248,13 @@ const CandidateDashboard = () => {
                               <th>State</th>
                             </tr>
                           </thead>
-                          <tbody id="table-body">
-
+                          <tbody>
                             <tr>
                               <td>Focal Skill Development Pvt Ltd</td>
                               <td>Consumer Retail &amp; Hospitality</td>
                               <td>Chandigarh</td>
                               <td>Chandigarh</td>
                             </tr>
-
                           </tbody>
                         </table>
                       </div>
@@ -231,6 +262,70 @@ const CandidateDashboard = () => {
                   </div>
                 </div>
 
+                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
+                  <div className="card mt-1 mb-2">
+                    <div className="col-xl-12 p-3">
+                      <div className="row">
+                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto ">
+                          <h4 className="card-title mb-0">Available Courses / उपलब्ध कोर्स</h4>
+                        </div>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right my-auto">
+                          <a href="/candidate/searchcourses" className="btn btn-outline-primary btn-sm waves-effect waves-light viewAllBtn">View All</a>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-content">
+                      <div className="table-responsive">
+                        <table className="table table-hover-animation mb-0 table-hover">
+                          <thead>
+                            <tr>
+                              <th>Course</th>
+                              <th>Sector</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td colSpan="2">No courses yet</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-xl-6 col-lg-6 col-md-6 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
+                  <div className="card mt-1 mb-2">
+                    <div className="col-xl-12 p-3">
+                      <div className="row">
+                        <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto ">
+                          <h4 className="card-title mb-0">Applied Courses / आवेदन किए कोर्स</h4>
+                        </div>
+                        <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-right my-auto">
+                          <a href="/candidate/appliedCourses" className="btn btn-outline-primary btn-sm waves-effect waves-light viewAllBtn">View All</a>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-content">
+                      <div className="table-responsive">
+                        <table className="table table-hover-animation mb-0 table-hover">
+                          <thead>
+                            <tr>
+                              <th>Course</th>
+                              <th>Sector</th>
+                              <th>Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td colSpan="3">No courses yet</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
 

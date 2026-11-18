@@ -1,7 +1,7 @@
 <style>
 /* Matches the College HR lead-strip-v3 card geometry and panel treatment. */
 .company-student-list { display: grid; gap: 12px; padding: 12px; }
-.company-student-card { --student-card-radius: 16px; background: #fff; border-radius: var(--student-card-radius); box-shadow: 0 10px 30px #0f172a1a, 0 2px 8px #0f172a0f; border: 1px solid #cbd5e1; overflow: hidden; position: relative; transition: box-shadow .25s ease, border-color .25s ease; }
+.company-student-card { --student-card-radius: 16px; background: #fff; border-radius: var(--student-card-radius); box-shadow: 0 10px 30px #0f172a1a, 0 2px 8px #0f172a0f; border: 1px solid #cbd5e1; overflow: hidden; position: relative; transition: box-shadow .25s ease, border-color .25s ease; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 .company-student-card:hover { border-color: #94a3b8; box-shadow: 0 14px 36px #0f172a24, 0 4px 12px #0f172a14; }
 .company-student-company-header { display: flex; align-items: center; min-height: 46px; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; background: linear-gradient(180deg,#fff9fb 0%,#fff 100%); }
 .company-student-company-badge { display: inline-block; max-width: 100%; padding: 5px 14px; border-radius: 999px; background: #fa5579; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -25,19 +25,21 @@ body:has(.recruiter-sidebar) .company-student-panel h3 { margin: 0 0 3px; font-s
 .company-student-performance h3 .company-student-icon { margin-left: auto; width: 22px; height: 22px; flex-shrink: 0; }
 .company-student-kv { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; }
 .company-student-kv > span { color: #64748b; }
-.company-student-kv > strong, .company-student-kv-pill { color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 3px 6px; text-align: right; overflow-wrap: anywhere; font-size: 10px; font-weight: 700; }
+.company-student-kv > strong, .company-student-kv-pill { flex: 1; min-width: 0; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 999px; padding: 3px 10px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; font-weight: 700; }
 .company-student-kv-pill { cursor: pointer; }
-.company-student-status { flex: 1 1 0; border-top: 3px solid #f59e0b; min-width: 0; padding: 5px 6px 4px; gap: 3px; }
-.company-student-status h3 .company-student-icon { margin-left: auto; width: 22px; height: 22px; flex-shrink: 0; }
-.company-student-status-pill { align-self: flex-start; border-radius: 999px; padding: 3px 10px; font-size: 10px; font-weight: 800; line-height: 1.3; background: #ffedd5; color: #c2410c; text-transform: capitalize; }
-button.company-student-status-pill { border: 0; cursor: pointer; }
+.company-student-panel-edit { position: absolute; right: -8px; bottom: -8px; width: 18px; height: 18px; border-radius: 8px; border: 1px solid #bfdbfe; background: #eff6ff; color: #2563eb; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; padding: 0; z-index: 2; }
+.company-student-status { flex: 1 1 0; border-top: 3px solid #f59e0b; min-width: 0; padding: 5px 6px 4px; gap: 3px; overflow: visible; }
+.company-student-approval-edit { position: absolute; top: -9px; left: -9px; width: 15px; height: 15px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; color: #2563eb; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; padding: 0; z-index: 2; }
+.company-student-approval-edit:hover { background: #eff6ff; border-color: #bfdbfe; }
+.company-student-status-pill { align-self: flex-start; border: 0; border-radius: 999px; padding: 3px 10px; font-size: 10px; font-weight: 800; line-height: 1.3; background: #ffedd5; color: #c2410c; text-transform: capitalize; }
+button.company-student-status-pill { cursor: pointer; }
 .company-student-application { border-top: 3px solid #64748b; flex: 1 1 clamp(170px,15vw,210px); min-width: 150px; }
 .company-student-job { font-size: 13px; color: #0f172a; overflow-wrap: anywhere; }
 .company-student-company { font-size: 10px; color: #64748b; overflow-wrap: anywhere; }
 .company-student-date { margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 7px; display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: #64748b; }
 .company-student-date strong { color: #334155; }
 .company-student-applied { align-self: flex-start; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 2px 8px; font-size: 9px; font-weight: 800; }
-.company-student-actions { border-top: 3px solid #06b6d4; flex: 1 1 140px; min-width: 130px; overflow: visible; }
+.company-student-actions { border-top: 3px solid #10b981; flex: 1 1 140px; min-width: 130px; overflow: visible; }
 .company-student-head-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
 .company-student-actions h3 .company-student-chevron { margin-left: 0; }
 .company-student-more { position: relative; display: inline-flex; }
@@ -47,8 +49,13 @@ button.company-student-status-pill { border: 0; cursor: pointer; }
 .company-student-more-menu a:hover, .company-student-more-menu button:hover { background: #eff6ff; }
 .company-student-action-icons { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .company-student-action-icons:empty { display: none; }
-body:has(.recruiter-sidebar) .company-student-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 8px; background: white; color: #2563eb; padding: 0; font-size: 12px; cursor: pointer; }
-body:has(.recruiter-sidebar) .company-student-profile-button { display: flex; align-items: center; justify-content: center; gap: 6px; background: #2563eb; color: white; border: 1px solid #2563eb; border-radius: 6px; padding: 6px 8px; font-size: 10px; font-weight: 700; margin-top: auto; }
+body:has(.recruiter-sidebar) .company-student-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; color: #475569; padding: 0; font-size: 12px; cursor: pointer; }
+body:has(.recruiter-sidebar) .company-student-view-profile,
+body:has(.recruiter-sidebar) .company-student-unmask-top { display: none; }
+body:has(.recruiter-sidebar) .company-student-icon:hover { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+body:has(.recruiter-sidebar) .company-student-chevron {  color: #fff;}
+body:has(.recruiter-sidebar) .company-student-chevron:hover { color: #fff;  }
+body:has(.recruiter-sidebar) .company-student-profile-button { width: 100%; display: flex; align-items: center; justify-content: center; margin-top: auto; padding: 6px 10px; border: none; border-radius: 8px; background: linear-gradient(135deg, #059669, #10b981); color: #fff; font-size: 11px; font-weight: 700; line-height: 1.25; text-align: center; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28); cursor: pointer; }
 .company-student-unmask { border: 0; background: transparent; color: #2563eb; padding: 0; font-size: 11px; font-weight: 700; cursor: pointer; }
 .company-student-name-button { border: 0; padding: 0; text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
 .company-student-chevron { margin-left: auto; flex-shrink: 0; }
@@ -85,27 +92,31 @@ body:has(.recruiter-sidebar) .company-student-profile-button { display: flex; al
 .company-document-viewer > .company-student-profile-button { margin: 12px !important; }
 .company-followup-panel { min-width: 170px; flex: 1 0 170px; border-top: 3px solid #3b82f6; }
 .company-followup-panel[data-followup-type="Visit"] { border-top-color: #64748b; }
-.company-followup-panel h3 .company-student-icon { margin-left: auto; width: 22px; height: 22px; flex-shrink: 0; }
-.company-followup-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin: 5px 0; }
-.company-followup-stat { display: flex; flex-direction: column; align-items: center; gap: 5px; background: #3b82f6; color: white; border-radius: 6px; padding: 7px 3px; }
-.company-followup-stat span { width: 100%; text-align: center; font-size: 9px; white-space: nowrap; padding-bottom: 4px; border-bottom: 1px solid #ffffff55; }
+body:has(.recruiter-sidebar) .company-followup-panel h3 { margin: 0; font-size: 11px; font-weight: 800; }
+.company-followup-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; flex: 1; align-items: stretch; margin: 2px 0 0; min-height: 78px; }
+.company-followup-stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; background: rgb(18, 179, 255); color: #fff; border-radius: 10px; padding: 8px 4px; height: 100%; min-height: 72px; }
+.company-followup-stat span { width: 100%; text-align: center; font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.95); }
 .company-followup-job { font-size: 9px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .company-followup-job[hidden] { display: none; }
-.company-followup-stat strong { font-size: 17px; line-height: 1.2; }
-.company-followup-stat--planned { background: #2563eb; }
-.company-followup-stat--missed { background: #1d4ed8; }
-.company-followup-panel[data-followup-type="Visit"] .company-followup-stat { background: #4b5563; }
-.company-followup-panel[data-followup-type="Visit"] .company-followup-stat--planned { background: #374151; }
-.company-followup-panel[data-followup-type="Visit"] .company-followup-stat--missed { background: #232a34; }
-.company-followup-next { display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: #64748b; margin-top: auto; }
-.company-followup-next strong { color: #334155; font-size: 10px; line-height: 1.5; }
+.company-followup-stat strong { font-size: 15px; font-weight: 900; line-height: 1.1; }
+.company-followup-stat--planned { background: rgb(12, 125, 180); }
+.company-followup-stat--missed { background: rgb(8, 80, 120); }
+.company-followup-panel[data-followup-type="Visit"] .company-followup-stat { background: rgb(75, 85, 99); }
+.company-followup-panel[data-followup-type="Visit"] .company-followup-stat--planned { background: rgb(55, 65, 81); }
+.company-followup-panel[data-followup-type="Visit"] .company-followup-stat--missed { background: rgb(35, 42, 52); }
+.company-followup-next { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; margin-top: auto; padding-top: 6px; font-size: 10px; color: #64748b; min-width: 0; }
+.company-followup-next-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.company-followup-next span { font-weight: 700; line-height: 1.2; }
+.company-followup-next strong { color: #334155; font-size: 10px; font-weight: 800; line-height: 1.2; }
+.company-followup-edit { width: 26px; height: 26px; border: 0; border-radius: 8px; background: #eff6ff; color: #2563eb; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 11px; padding: 0; }
 .company-followup-link { border: 0; background: transparent; color: #2563eb; padding: 4px 0 0; font-size: 10px; text-align: left; cursor: pointer; font-weight: 600; }
 .company-followup-panel--empty { background: #ff4646; border-color: #ff4646 !important; }
 body:has(.recruiter-sidebar) .company-followup-panel--empty h3,
-.company-followup-panel--empty h3 > i,
-.company-followup-panel--empty .company-followup-link { color: white; }
+.company-followup-panel--empty h3,
+.company-followup-panel--empty h3 > i { color: #fff; }
 .company-followup-panel--empty .company-followup-next,
-.company-followup-panel--empty .company-followup-next strong { color: #631b1b; }
+.company-followup-panel--empty .company-followup-next strong { color: #7f1d1d; }
+.company-followup-panel--empty .company-followup-edit { background: #ef4444; border: 1px solid #dc2626; color: #fff; }
 .company-followup-dialog { border: 0; border-radius: 14px; padding: 0; width: min(720px,94vw); max-height: 88vh; box-shadow: 0 20px 80px #0f172a50; }
 .company-followup-dialog::backdrop { background: #0f172a99; }
 .company-followup-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
@@ -125,17 +136,185 @@ body:has(.recruiter-sidebar) .company-followup-panel--empty h3,
 .company-followup-history-row p { color: #64748b; margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .company-followup-history-status { display: inline-block; border-radius: 20px; background: #edf3ff; color: #2563eb; font-size: 10px; padding: 4px 8px; margin-left: 8px; text-transform: capitalize; }
 @media(max-width:768px) {
-  .company-student-list { padding: 8px; }
-  .company-student-strip { flex-wrap: wrap; overflow-x: visible; }
-  .company-student-profile { flex: 1 1 100%; min-width: 0; }
-  .company-student-pair { flex: 1 1 100%; min-width: 0; }
-  .company-student-panel { flex: 1 1 calc(50% - 8px); min-width: 0; }
-  .company-student-pair .company-student-panel { flex: 1 1 auto; }
-  .company-student-name { font-size: 16px; }
+  body:has(.recruiter-sidebar) .app-content.content { overflow-x: auto; max-width: 100%; }
+  .company-student-list { padding: 8px; max-width: 100%; min-width: 0; box-sizing: border-box; }
+  .company-student-card { overflow-x: auto; overflow-y: visible; max-width: 100%; min-width: 0; box-sizing: border-box; }
+  .company-student-company-header { min-height: 0; padding: 8px 8px 0; }
+  .company-student-strip {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px;
+    overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    background: #e8edf3;
+  }
+  .company-student-profile {
+    position: relative;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: block;
+    padding: 10px 10px 8px;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%) !important;
+    border: 0 !important;
+    border-radius: 12px;
+    color: #fff !important;
+    box-shadow: none;
+  }
+  .company-student-profile-head {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    min-width: 0;
+    padding-right: 156px;
+  }
+  .company-student-card--masked .company-student-profile-head { padding-right: 188px; }
+  .company-student-avatar { background: rgba(255,255,255,0.18) !important; color: #fff !important; }
+  .company-student-name,
+  .company-student-name-button { color: #fff !important; font-size: 14px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .company-student-open-documents { display: none !important; }
+  .company-student-profile > .company-student-contact:nth-child(2) {
+    width: 100%;
+    box-sizing: border-box;
+    background: transparent !important;
+    border: 0 !important;
+    color: rgba(255,255,255,0.95) !important;
+    padding: 0;
+    min-height: 0;
+    font-size: 12px;
+    font-weight: 800;
+    overflow: hidden;
+  }
+  .company-student-profile > .company-student-contact:nth-child(2) > i { color: rgba(255,255,255,0.9); width: 12px; }
+  .company-student-profile > .company-student-contact:nth-child(2) > span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .company-student-whatsapp {
+    position: absolute;
+    top: 10px;
+    right: 136px;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #22c55e;
+    z-index: 3;
+  }
+  .company-student-whatsapp img { width: 16px; height: 16px; }
+  .company-student-profile > .company-student-contact:nth-child(3),
+  .company-student-meta { display: none; }
+  .company-student-pair {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    box-sizing: border-box;
+  }
+  .company-student-pair .company-student-panel {
+    flex: 0 0 168px;
+    min-width: 168px;
+    min-height: 0;
+    padding: 8px 8px 6px;
+  }
+  .company-student-panel-edit { right: 8px; bottom: 8px; }
+  .company-student-performance { padding-bottom: 18px; }
+  .company-student-performance .company-student-kv { padding-right: 16px; }
+  .company-student-approval-edit { top: auto; right: auto; bottom: 8px; left: 8px; }
+  .company-student-status { padding-bottom: 22px; }
+  .company-student-pair .company-student-performance { flex-basis: 210px; min-width: 210px; }
+  .company-student-panel { flex: 0 0 min(210px, 78vw); min-width: 0; }
+  .company-student-status h3 { padding-right: 4px; }
+  .company-student-actions {
+    position: static;
+    flex: 1 1 100%;
+    min-width: 0;
+    padding: 0;
+    gap: 0;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none;
+    box-sizing: border-box;
+  }
+  .company-student-actions > h3 {
+    position: absolute;
+    top: 18px;
+    right: 16px;
+    z-index: 4;
+    margin: 0;
+    width: auto;
+  }
+  .company-student-actions > h3 > i { display: none; }
+  .company-student-head-actions { gap: 4px; }
+  body:has(.recruiter-sidebar) .company-student-actions .company-student-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px !important;
+    background: #fff !important;
+    color: #1d4ed8 !important;
+    border-color: #fff !important;
+  }
+  body:has(.recruiter-sidebar) .company-student-actions .company-student-chevron {
+    background: #0f172a !important;
+    color: #fff !important;
+    border-color: #0f172a !important;
+  }
+  body:has(.recruiter-sidebar) .company-student-view-profile,
+  body:has(.recruiter-sidebar) .company-student-unmask-top {
+    display: inline-flex !important;
+    background: linear-gradient(135deg, #059669, #10b981) !important;
+    color: #fff !important;
+    border-color: #059669 !important;
+  }
+  .company-student-card--masked .company-student-profile { padding-right: 10px; }
+  .company-student-actions > .company-student-profile-button.company-student-expand,
+  .company-student-actions > .company-student-unmask.company-student-profile-button { display: none !important; }
+  .company-student-action-icons { display: none; }
   .company-student-detail-profile { grid-template-columns: 1fr; }
   .company-lead-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .company-followup-panel { flex: 1 1 calc(50% - 8px); min-width: 0; }
-  .company-followup-stat span { font-size: 8px; letter-spacing: 0; }
+  .company-followup-panel {
+    flex: 1 1 calc(50% - 4px);
+    max-width: calc(50% - 4px);
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px 8px 6px;
+    gap: 4px;
+    overflow: hidden;
+  }
+  .company-followup-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    min-height: 0;
+    margin: 0;
+  }
+  .company-followup-stat { min-height: 42px; height: auto; padding: 5px 4px; border-radius: 8px; }
+  .company-followup-stat--missed { grid-column: 1 / -1; }
+  .company-followup-stat span { font-size: 9px; letter-spacing: 0; padding-bottom: 3px; margin-bottom: 3px; }
+  .company-followup-stat strong { font-size: 13px; }
+  .company-followup-next { flex-direction: row; align-items: center; padding-top: 4px; gap: 6px; }
+  .company-followup-next-copy { flex-direction: row; align-items: center; gap: 4px; flex-wrap: nowrap; }
+  .company-followup-next span,
+  .company-followup-next strong { white-space: nowrap; font-size: 9px; overflow: hidden; text-overflow: ellipsis; }
+  .company-followup-edit { position: static; width: 22px; height: 22px; flex-shrink: 0; }
   .company-followup-form { grid-template-columns: 1fr; }
   .company-status-form { grid-template-columns: 1fr 1fr; }
   .company-followup-dialog-content,.company-followup-dialog-header { padding: 18px; }

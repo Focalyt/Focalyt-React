@@ -27,7 +27,7 @@
 
             <section id="Concerned-Person ">
               <div class="row">
-                <div class="col-xl-12 col-lg-12">
+                <div class="col-12">
                   <div class="card">
                     <div class="card-header border border-top-0 border-left-0 border-right-0">
                       <h4 class="card-title pb-1">Interested Candidates</h4>
@@ -278,9 +278,65 @@
 
         </script>
         <style>
-          #maskunmask{
-    white-space: nowrap;
-}
+          #maskunmask { white-space: nowrap; }
+          @media (max-width: 767px) {
+            body:has(.recruiter-sidebar) .app-content.content {
+              overflow-x: hidden;
+              padding-left: 10px !important;
+              padding-right: 10px !important;
+            }
+            body:has(.recruiter-sidebar) .content-wrapper,
+            .content-wrapper,
+            .content-wrapper > section,
+            .content-wrapper .row,
+            .content-wrapper [class*="col-"],
+            .content-wrapper .card,
+            .content-wrapper .table-responsive,
+            #table-body.company-student-list {
+              width: 100% !important;
+              max-width: 100% !important;
+              min-width: 0 !important;
+              box-sizing: border-box;
+            }
+            .content-wrapper .row { margin-left: 0 !important; margin-right: 0 !important; }
+            .content-wrapper [class*="col-"] { flex: 1 1 100%; padding-left: 0; padding-right: 0; }
+            .content-wrapper .card { margin-left: 0; margin-right: 0; }
+            .content-wrapper .card .card { border: 0; box-shadow: none; margin: 0; }
+            .content-wrapper .table-responsive { overflow: hidden; }
+            #table-body .company-student-card,
+            #table-body .company-student-strip,
+            #table-body .company-student-profile,
+            #table-body .company-student-pair {
+              width: 100%;
+              max-width: 100%;
+              min-width: 0;
+              box-sizing: border-box;
+            }
+            #table-body .company-student-card,
+            #table-body .company-student-strip { overflow-x: hidden; }
+            #table-body .company-student-pair {
+              display: flex;
+              flex-direction: row;
+              flex-wrap: nowrap;
+              overflow-x: hidden;
+            }
+            #table-body .company-student-pair .company-student-performance {
+              flex: 1 1 54% !important;
+              max-width: 54%;
+              min-width: 0 !important;
+            }
+            #table-body .company-student-pair .company-student-status {
+              flex: 1 1 46% !important;
+              max-width: 46%;
+              min-width: 0 !important;
+            }
+            #table-body .company-followup-panel {
+              flex: 1 1 calc(50% - 4px) !important;
+              max-width: calc(50% - 4px);
+              min-width: 0 !important;
+              box-sizing: border-box;
+            }
+          }
         </style>
 
         <% include ./partials/footer%>

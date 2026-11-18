@@ -164,13 +164,18 @@
         </section>
         <style>
           body:has(.recruiter-sidebar):has(.corp-app-filter) .app-content.content { padding-top: 0 !important; }
-          .corp-app-filter { margin-bottom: 8px; }
-          .corp-app-filter__spacer { height: 96px; }
+          .corp-app-filter {
+            margin-bottom: 8px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
+          .corp-app-filter__spacer { height: 128px; }
           .corp-app-filter__bar {
-            display: grid;
-            grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
-            align-items: center;
-            gap: 8px 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
             background: #fff;
             border: 0;
             border-radius: 0;
@@ -178,21 +183,23 @@
             position: fixed;
             top: var(--recruiter-header-height);
             left: calc(220px + 36px + max(0px, (100vw - 220px - 72px - 1500px) / 2));
-            width: min(1500px, calc(100vw - 220px - 72px));
+            width: min(1500px, calc(100vw - 220px - 88px));
             z-index: 1025;
-            padding: 10px 8px;
+            padding: 8px 28px;
             margin: 0;
+            font-family: inherit;
           }
-          .corp-app-filter__lead { min-width: 0; padding-left: 8px; }
+          .corp-app-filter__lead { flex: 1 1 auto; min-width: 0; padding-left: 0; }
           .corp-app-filter__title-row { display: flex; align-items: baseline; justify-content: flex-start; gap: 10px; margin-bottom: 4px; }
-          body:has(.recruiter-sidebar) .corp-app-filter__title-row h2 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #212529; line-height: 1.2; }
+          body:has(.recruiter-sidebar) .corp-app-filter__title-row h2 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #212529; line-height: 1.2; font-family: inherit; }
           .corp-app-filter__viewall { font-size: 12px; font-weight: 600; white-space: nowrap; }
-          .corp-app-filter__pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+          .corp-app-filter__pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; }
           .corp-app-filter__pill {
             display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-            height: 28px; padding: 0 10px; border: 1.5px solid #e5e7eb; border-radius: 999px;
-            background: #fff; color: #4b5563; font-size: 11px; font-weight: 600; line-height: 1;
+            height: 26px; padding: 0 10px; border: 1.5px solid #e5e7eb; border-radius: 999px;
+            background: #fff; color: #4b5563; font-size: 12px; font-weight: 600; line-height: 1;
             white-space: nowrap; cursor: pointer; text-decoration: none; box-shadow: none;
+            font-family: inherit;
           }
           .corp-app-filter__pill:hover { border-color: rgba(250, 85, 121, 0.45); color: rgb(250, 85, 121); background: rgba(250, 85, 121, 0.06); text-decoration: none; }
           .corp-app-filter__pill.is-active { background: #fc567b; border-color: rgb(250, 85, 121); color: #fff; box-shadow: 0 2px 8px rgba(250, 85, 121, 0.22); }
@@ -211,19 +218,21 @@
           .corp-app-filter__dates input { height: 34px; border: 1.5px solid #e8eaed; border-radius: 8px; padding: 0 8px; font-size: 12px; color: #1f2937; background: #f9fafb; }
           .corp-app-filter__apply { width: 100%; margin-top: 10px; height: 32px; border: 0; border-radius: 8px; background: #fc567b; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
           .corp-app-filter__dropdowns {
-            display: flex; flex-wrap: nowrap; align-items: flex-end; justify-content: flex-end;
-            gap: 4px; width: 100%; min-width: 0;
+            display: flex; flex: 0 0 auto; flex-wrap: nowrap; align-items: flex-end; justify-content: flex-end;
+            gap: 12px; width: auto;
           }
-          .corp-app-filter__item { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 0; max-width: 70px; }
-          .corp-app-filter__item--job { max-width: 150px; flex: 1.4 1 110px; }
+          .corp-app-filter__item { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 0 0 auto; width: 132px; max-width: none; }
+          .corp-app-filter__item--job { width: 180px; max-width: none; flex: 0 0 auto; }
           body:has(.recruiter-sidebar) .corp-app-filter__label {
-            margin: 0; font-size: 8px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
-            color: #6b7280; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+            color: #6b7280; line-height: 1.2; white-space: nowrap; overflow: visible; text-overflow: clip;
+            font-family: inherit;
           }
-          .corp-app-filter__label i { margin-right: 2px; color: rgb(250, 85, 121); font-size: 7px; }
+          .corp-app-filter__label i { margin-right: 4px; color: rgb(250, 85, 121); font-size: 11px; }
           .corp-app-filter__item select {
-            width: 100%; height: 30px; padding: 4px 16px 4px 6px; border: 1.5px solid #e8eaed; border-radius: 8px;
-            background-color: #f9fafb; color: #1f2937; font-size: 10px; font-weight: 500; line-height: 1.3; cursor: pointer;
+            width: 100%; height: 30px; padding: 4px 22px 4px 10px; border: 1.5px solid #e8eaed; border-radius: 8px;
+            background-color: #f9fafb; color: #1f2937; font-size: 12px; font-weight: 600; line-height: 1.3; cursor: pointer;
+            font-family: inherit;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
             background-repeat: no-repeat; background-position: right 5px center; background-size: 10px;
@@ -231,28 +240,214 @@
           .corp-app-filter__item select:hover { border-color: rgba(250, 85, 121, 0.4); background-color: #fff; }
           .corp-app-filter__item select:focus { outline: none; border-color: rgb(250, 85, 121); background-color: #fff; box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.14); }
           .corp-app-filter .company-student-list { padding: 0; }
-          .corp-perf { position: relative; border: 1px solid #dee2e6; border-radius: 8px; background: #fff; padding: 12px 10px 8px; margin: 4px 0 14px; }
-          .corp-perf__label { position: absolute; top: -10px; left: 12px; padding: 0 6px; background: #fff; font-size: 13px; font-weight: 600; color: #333; }
-          .corp-perf__chips { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; align-items: center; padding-top: 4px; }
-          .corp-perf__chip { flex: 0 0 auto; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: rgb(250, 85, 121); background: #fff; border: 1.5px solid rgb(250, 85, 121); }
+          .corp-perf { position: relative; border: 1px solid #dee2e6; border-radius: 8px; background: #fff; padding: 14px 12px 10px; margin: 8px 0 14px; overflow: visible; }
+          .corp-perf__label { position: absolute; top: -10px; left: 14px; padding: 0 8px; background: #fff; font-size: 13px; font-weight: 700; color: #333; font-family: inherit; line-height: 1.2; }
+          .corp-perf__chips { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; align-items: center; padding-top: 2px; }
+          .corp-perf__chip { flex: 0 0 auto; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: rgb(250, 85, 121); background: #fff; border: 1.5px solid rgb(250, 85, 121); font-family: inherit; }
           .corp-perf__chip.is-active { color: #fff; background: rgb(250, 85, 121); border-color: rgb(250, 85, 121); }
           .corp-perf__empty { font-size: 12px; font-weight: 600; color: #9ca3af; white-space: nowrap; }
-          @media (max-width: 900px) {
-            .corp-app-filter__bar { grid-template-columns: 1fr; padding: 10px 12px; }
-            .corp-app-filter__dropdowns { justify-content: flex-start; overflow-x: auto; padding-bottom: 4px; }
-            .corp-app-filter__item { flex: 0 0 82px; max-width: none; width: 82px; }
-            .corp-app-filter__item--job { flex-basis: 140px; width: 140px; }
+          @media (max-width: 1100px) {
+            .corp-app-filter__bar {
+              flex-wrap: wrap;
+              align-items: stretch;
+              left: calc(220px + 14px);
+              width: calc(100vw - 220px - 28px);
+              padding: 10px 14px;
+              gap: 10px;
+              box-sizing: border-box;
+            }
+            .corp-app-filter__lead { flex: 1 1 100%; }
+            .corp-app-filter__dropdowns {
+              flex: 1 1 100%;
+              flex-wrap: wrap;
+              justify-content: flex-start;
+              width: 100%;
+              gap: 10px;
+            }
+            .corp-app-filter__item,
+            .corp-app-filter__item--job {
+              flex: 1 1 140px;
+              width: auto;
+              min-width: 0;
+              max-width: none;
+            }
           }
           @media (max-width: 767px) {
-            .corp-app-filter__bar { left: 14px; width: calc(100vw - 28px); }
+            body:has(.recruiter-sidebar):has(.corp-app-filter) .app-content.content {
+              overflow-x: hidden;
+              padding-left: 10px !important;
+              padding-right: 10px !important;
+            }
+            .corp-app-filter,
+            .corp-app-filter .content-body { width: 100%; max-width: 100%; min-width: 0; }
+            .corp-app-filter__bar {
+              left: 10px;
+              right: 10px;
+              width: auto;
+              padding: 10px 12px;
+              box-sizing: border-box;
+            }
+            .corp-app-filter__item,
+            .corp-app-filter__item--job { flex: 1 1 calc(50% - 10px); }
+            .corp-app-filter__dropdown { width: min(280px, calc(100% - 24px)); }
+            .corp-perf { margin-left: 0; margin-right: 0; width: 100%; box-sizing: border-box; }
+            .corp-app-filter .company-student-card,
+            .corp-app-filter .company-student-list { width: 100%; max-width: 100%; min-width: 0; }
+            .corp-app-filter .company-student-card { overflow-x: hidden; }
+            .corp-app-filter .company-student-strip { position: relative; flex-wrap: wrap; overflow-x: hidden; max-width: 100%; min-width: 0; width: 100%; box-sizing: border-box; }
+            .corp-app-filter .company-student-profile { flex: 1 1 100%; min-width: 0; max-width: 100%; width: 100%; }
+            .corp-app-filter .company-student-pair {
+              flex: 1 1 100%;
+              width: 100%;
+              min-width: 0;
+              max-width: 100%;
+              flex-direction: row;
+              flex-wrap: nowrap;
+              overflow-x: auto;
+              box-sizing: border-box;
+            }
+            .corp-app-filter .company-student-pair .company-student-status { flex: 0 0 46%; min-width: 140px; }
+            .corp-app-filter .company-student-pair .company-student-performance { flex: 0 0 54%; min-width: 160px; }
+            .corp-app-filter .company-followup-panel { flex: 1 1 calc(50% - 8px); max-width: calc(50% - 4px); min-width: 0; box-sizing: border-box; }
+            .corp-app-filter .company-student-actions { flex: 1 1 100%; min-width: 0; }
           }
+
+          /* Dashboard cards match the college lead card: Montserrat, strip, and button colors. */
+          .corp-app-filter .company-student-card {
+            background: #e8edf3;
+            border: 1px solid #d7dee8;
+            border-radius: 14px;
+            box-shadow: none;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            color: #0f172a;
+          }
+          .corp-app-filter .company-student-card:hover { border-color: #d7dee8; box-shadow: none; }
+          .corp-app-filter .company-student-company-header {
+            background: transparent;
+            border-bottom: 0;
+            min-height: 0;
+            padding: 8px 8px 0;
+          }
+          .corp-app-filter .company-student-company-badge {
+            background: #2563eb;
+            color: #fff;
+            border-radius: 999px;
+            font-weight: 800;
+          }
+          .corp-app-filter .company-student-strip {
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            padding-top: 6px;
+          }
+          .corp-app-filter .company-student-profile {
+            background: #fff;
+            border: 1px solid #d7dee8;
+            border-top: 3px solid #2563eb;
+            color: #0f172a;
+          }
+          .corp-app-filter .company-student-avatar { background: #eff6ff; color: #2563eb; }
+          .corp-app-filter .company-student-contact { background: #f8fafc; border-color: #e2e8f0; color: #334155; }
+          .corp-app-filter .company-student-contact > i { color: #2563eb; }
+          .corp-app-filter .company-student-panel {
+            background: #fff;
+            border: 1px solid #d7dee8;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+          }
+          .corp-app-filter .company-student-panel h3 { color: #1e293b; }
+          .corp-app-filter .company-student-panel h3 i { color: #3b82f6; }
+          .corp-app-filter .company-student-performance { border-top: 3px solid #3b82f6; }
+          .corp-app-filter .company-student-status { border-top: 3px solid #f59e0b; }
+          .corp-app-filter .company-student-kv > span { color: #64748b; }
+          .corp-app-filter .company-student-kv > strong,
+          .corp-app-filter .company-student-kv-pill {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            border-radius: 999px;
+          }
+          .corp-app-filter .company-student-status-pill { background: #ffedd5; color: #c2410c; border-radius: 999px; }
+          .corp-app-filter .company-followup-panel[data-followup-type="Call"] { border-top-color: #3b82f6; }
+          .corp-app-filter .company-followup-panel[data-followup-type="Visit"] { border-top-color: #64748b; }
+          .corp-app-filter .company-followup-panel[data-followup-type="Call"] .company-followup-stat { background: rgb(18, 179, 255); color: #fff; border-radius: 10px; }
+          .corp-app-filter .company-followup-panel[data-followup-type="Call"] .company-followup-stat--planned { background: rgb(12, 125, 180); }
+          .corp-app-filter .company-followup-panel[data-followup-type="Call"] .company-followup-stat--missed { background: rgb(8, 80, 120); }
+          .corp-app-filter .company-followup-panel[data-followup-type="Visit"] .company-followup-stat { background: rgb(75, 85, 99); color: #fff; border-radius: 10px; }
+          .corp-app-filter .company-followup-panel[data-followup-type="Visit"] .company-followup-stat--planned { background: rgb(55, 65, 81); }
+          .corp-app-filter .company-followup-panel[data-followup-type="Visit"] .company-followup-stat--missed { background: rgb(35, 42, 52); }
+          .corp-app-filter .company-followup-panel--empty { background: #ff4646; border-color: #ff4646 !important; }
+          .corp-app-filter .company-followup-panel--empty h3,
+          .corp-app-filter .company-followup-panel--empty h3 > i,
+          .corp-app-filter .company-followup-panel--empty .company-followup-link { color: #fff; }
+          .corp-app-filter .company-followup-panel--empty .company-followup-next,
+          .corp-app-filter .company-followup-panel--empty .company-followup-next strong { color: #7f1d1d; }
+          .corp-app-filter .company-student-card .company-student-icon {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            border-radius: 8px;
+          }
+          .corp-app-filter .company-student-card .company-student-icon:hover {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #2563eb;
+          }
+          .corp-app-filter .company-student-panel-edit {
+            position: absolute;
+            right: -8px;
+            bottom: -8px;
+            width: 18px;
+            height: 18px;
+            border-radius: 8px;
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            color: #2563eb;
+          }
+          .corp-app-filter .company-student-approval-edit {
+            position: absolute;
+            top: -9px;
+            left: -9px;
+            width: 15px;
+            height: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #2563eb;
+          }
+          @media (max-width: 767px) {
+            .corp-app-filter .company-student-panel-edit { right: 8px; bottom: 8px; }
+            .corp-app-filter .company-student-approval-edit { top: auto; right: auto; bottom: 8px; left: 8px; }
+          }
+          .corp-app-filter .company-student-card .company-student-chevron {
+            
+            color: #fff;
+          }
+          .corp-app-filter .company-student-card .company-student-chevron:hover {
+           
+            color: #fff;
+          }
+          .corp-app-filter .company-student-card .company-student-profile-button {
+            width: 100%;
+            padding: 6px 10px;
+            background: linear-gradient(135deg, #059669, #10b981);
+            border: none;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.25;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28);
+          }
+          .corp-app-filter .company-student-actions { border-top: 3px solid #10b981; }
         </style>
         <script>
           (function () {
             var form = document.getElementById('corpAppFilters');
             var spacer = document.getElementById('corpAppFilterSpacer');
             function placeFilterBar() {
-              if (form && spacer) spacer.style.height = form.offsetHeight + 'px';
+              if (form && spacer) spacer.style.height = (form.offsetHeight + 12) + 'px';
             }
             placeFilterBar();
             window.addEventListener('resize', placeFilterBar);
