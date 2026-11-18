@@ -86,6 +86,108 @@ const mediaKind = (file) => {
   return 'file';
 };
 
+const PHOTO_UPLOAD_BYTES = 700 * 1024;
+
+const isUploadImage = (file) => {
+  const type = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  if (type === 'image/gif' || name.endsWith('.gif')) return false;
+  if (type.startsWith('image/')) return true;
+  return /\.(png|jpe?g|webp|bmp|heic|heif)$/.test(name);
+};
+
+const jpegName = (name) => `${String(name || 'photo').replace(/\.[^.]+$/, '') || 'photo'}.jpg`;
+
+const canvasToJpeg = (source, width, height, quality) => new Promise((resolve) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    resolve(null);
+    return;
+  }
+  context.drawImage(source, 0, 0, width, height);
+  canvas.toBlob(resolve, 'image/jpeg', quality);
+});
+
+// Phone cameras attach multi-megabyte photos. Desktop picks are usually already small.
+// Shrink images before upload so the request stays under the server body limit.
+const shrinkUploadImage = async (file) => {
+  if (!file || !isUploadImage(file) || file.size <= PHOTO_UPLOAD_BYTES) return file;
+  const maxEdge = 1600;
+  let bitmap = null;
+  let objectUrl = '';
+  try {
+    let source = null;
+    let width = 0;
+    let height = 0;
+    if (typeof createImageBitmap === 'function') {
+      try {
+        bitmap = await createImageBitmap(file, { resizeWidth: maxEdge, resizeQuality: 'medium' });
+        source = bitmap;
+        width = bitmap.width || 0;
+        height = bitmap.height || 0;
+      } catch (error) {
+        bitmap = null;
+      }
+    }
+    if (!source) {
+      objectUrl = URL.createObjectURL(file);
+      const image = await new Promise((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error('Unable to read photo'));
+        element.src = objectUrl;
+      });
+      width = image.naturalWidth || 1;
+      height = image.naturalHeight || 1;
+      source = image;
+    }
+    const longest = Math.max(width, height);
+    if (longest > maxEdge) {
+      const scale = maxEdge / longest;
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
+    }
+    if (!source || !width || !height) return file;
+    let best = null;
+    for (const quality of [0.72, 0.58, 0.42]) {
+      const blob = await canvasToJpeg(source, width, height, quality);
+      if (!blob) continue;
+      if (!best || blob.size < best.size) best = blob;
+      if (blob.size <= PHOTO_UPLOAD_BYTES) break;
+    }
+    if (!best || best.size >= file.size) return file;
+    return new File([best], jpegName(file.name), { type: 'image/jpeg', lastModified: Date.now() });
+  } catch (error) {
+    return file;
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    bitmap?.close?.();
+  }
+};
+
+const saveFailureMessage = (error) => {
+  if (error?.response?.status === 413) {
+    return 'This photo or file is too large to upload. Remove it or choose a smaller one, then save again.';
+  }
+  const data = error?.response?.data;
+  if (data && typeof data === 'object' && data.message) return data.message;
+  if (typeof data === 'string') {
+    const text = data.trim();
+    if (text && !text.startsWith('<')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.message) return parsed.message;
+      } catch (parseError) {
+        return text.slice(0, 180);
+      }
+    }
+  }
+  return error?.message || 'Unable to save report';
+};
+
 const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const studentCountFields = [
@@ -565,12 +667,19 @@ const knownFieldValue = (field, context) => {
     data.append('answers', JSON.stringify(answersToSave));
     data.append('touchedKeys', JSON.stringify(Object.keys(touchedAnswers)));
     data.append('removeFileIds', JSON.stringify(removedIds));
-    Object.entries(answerFiles).forEach(([key, files]) => {
-      (files || []).forEach((file) => data.append(`file_${key}`, file));
-    });
 
     setSaving(true);
     try {
+      const preparedFiles = {};
+      for (const [key, files] of Object.entries(answerFiles)) {
+        preparedFiles[key] = [];
+        for (const file of files || []) {
+          preparedFiles[key].push(await shrinkUploadImage(file));
+        }
+      }
+      Object.entries(preparedFiles).forEach(([key, files]) => {
+        files.forEach((file) => data.append(`file_${key}`, file));
+      });
       const url = editingId
         ? `${backendUrl}/college/trainer/daily-reports/${editingId}`
         : `${backendUrl}/college/trainer/daily-reports`;
@@ -596,7 +705,7 @@ const knownFieldValue = (field, context) => {
         else loadReports();
         return;
       }
-      notify(error.response?.data?.message || error.message || 'Unable to save report');
+      notify(saveFailureMessage(error));
     } finally {
       setSaving(false);
     }

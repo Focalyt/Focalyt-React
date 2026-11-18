@@ -256,15 +256,19 @@ app.use(flash());
 	}
 	const isApkUpload = req.path.includes('/admin/appRelease/upload');
 	const isVideoTimestamp = req.path.includes('/college/video-timestamp/apply');
+	const isDailyReport = req.path.includes('/college/trainer/daily-reports');
 	fileupload({
 		limits: {
 			fileSize: isApkUpload
 				? 250 * 1024 * 1024
 				: isVideoTimestamp
 					? 200 * 1024 * 1024
-					: 50 * 1024 * 1024,
+					: isDailyReport
+						? 100 * 1024 * 1024
+						: 50 * 1024 * 1024,
 		},
 		abortOnLimit: true,
+		responseOnLimit: JSON.stringify({ status: false, message: 'This file is too large to upload.' }),
 	})(req, res, next);
 });
 app.use((req, res, next) => {
