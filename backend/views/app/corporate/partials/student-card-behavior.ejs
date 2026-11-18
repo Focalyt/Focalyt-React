@@ -139,6 +139,13 @@
       retry.addEventListener('click', () => loadDetails(card)); status.appendChild(retry);
     } finally { delete card.dataset.detailsLoading; details.removeAttribute('aria-busy'); }
   }
+  let openMenu = null;
+  let openToggle = null;
+  function placeMenu(menu, toggle) {
+    const rect = toggle.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 6) + 'px';
+    menu.style.left = Math.max(8, rect.right - menu.offsetWidth) + 'px';
+  }
   function closeMenus(except) {
     document.querySelectorAll('.company-student-more-menu').forEach(menu => {
       if (menu === except) return;
@@ -146,7 +153,20 @@
       const toggle = menu.parentElement && menu.parentElement.querySelector('.company-student-more-toggle');
       if (toggle) toggle.setAttribute('aria-expanded', 'false');
     });
+    if (except) {
+      openMenu = except;
+      openToggle = except.parentElement && except.parentElement.querySelector('.company-student-more-toggle');
+    } else {
+      openMenu = null;
+      openToggle = null;
+    }
   }
+  function followOpenMenu() {
+    if (!openMenu || openMenu.hidden || !openToggle) return;
+    placeMenu(openMenu, openToggle);
+  }
+  document.addEventListener('scroll', followOpenMenu, true);
+  window.addEventListener('resize', followOpenMenu);
   document.addEventListener('click', event => {
     const toggle = event.target.closest('.company-student-more-toggle');
     if (!toggle) { closeMenus(); return; }
@@ -157,11 +177,7 @@
     closeMenus(open ? menu : null);
     menu.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
-    if (open) {
-      const rect = toggle.getBoundingClientRect();
-      menu.style.top = (rect.bottom + 6) + 'px';
-      menu.style.left = Math.max(8, rect.right - menu.offsetWidth) + 'px';
-    }
+    if (open) placeMenu(menu, toggle);
   });
   document.addEventListener('click', event => {
     const button = event.target.closest('.company-student-expand, .company-student-open-documents, [data-student-tab]');

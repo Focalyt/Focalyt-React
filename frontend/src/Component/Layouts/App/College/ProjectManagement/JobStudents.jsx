@@ -12,16 +12,34 @@ const formatDate = (dateString) => {
 
 const crumbStyle = { cursor: 'pointer', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '110px', fontSize: 'clamp(15px,2vw,1rem)' };
 
-const approvalClass = {
-  APPROVED: 'text-success',
-  REJECTED: 'text-danger',
-  PENDING: 'text-secondary',
+const SOURCE_LABELS = {
+  manual: 'Added by HR',
+  'Website Apply': 'Website',
+  bulk_upload: 'Bulk upload',
+  'Digital Lead': 'Digital lead',
 };
+
+const STATUS_TABS = [
+  { key: 'ALL', label: 'All Students' },
+  { key: 'PENDING', label: 'Pending' },
+  { key: 'APPROVED', label: 'Approved' },
+  { key: 'REJECTED', label: 'Rejected' },
+];
+
+const sourceLabel = (source) => SOURCE_LABELS[source] || source || 'NA';
+
+const initials = (name) => String(name || '?')
+  .trim()
+  .split(/\s+/)
+  .slice(0, 2)
+  .map((part) => part[0]?.toUpperCase() || '')
+  .join('') || '?';
 
 const JobStudents = ({ selectedJob, onBackToJobs, selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusTab, setStatusTab] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -53,16 +71,22 @@ const JobStudents = ({ selectedJob, onBackToJobs, selectedCenter = null, onBackT
     return () => { cancelled = true; };
   }, [backendUrl, jobId]);
 
+  const statusOf = (student) => String(student.approvalStatus || 'PENDING').toUpperCase();
+  const countFor = (key) => (key === 'ALL' ? students.length : students.filter((s) => statusOf(s) === key).length);
+  const websiteCount = students.filter((s) => s.source === 'Website Apply').length;
+  const manualCount = students.filter((s) => s.source === 'manual').length;
+
   const needle = searchQuery.trim().toLowerCase();
-  const filteredStudents = students.filter((student) => (
-    !needle
-    || String(student.name || '').toLowerCase().includes(needle)
-    || String(student.mobile || '').includes(needle)
-    || String(student.email || '').toLowerCase().includes(needle)
-  ));
+  const filteredStudents = students.filter((student) => {
+    if (statusTab !== 'ALL' && statusOf(student) !== statusTab) return false;
+    if (!needle) return true;
+    return String(student.name || '').toLowerCase().includes(needle)
+      || String(student.mobile || '').includes(needle)
+      || String(student.email || '').toLowerCase().includes(needle);
+  });
 
   return (
-    <div className="container py-4">
+    <div className="container py-4" id="jobStudentsPage">
       <div className="d-flex justify-content-between align-items-center mb-3 allCenter">
         <div className="mb-2">
           <div className="d-flex align-items-center w-100">
@@ -100,11 +124,53 @@ const JobStudents = ({ selectedJob, onBackToJobs, selectedCenter = null, onBackT
         </div>
       </div>
 
-      <div className="d-flex justify-content-end mb-3 allCenter">
+      <div className="js-summary">
+        <div className="js-summary__job">
+          <div className="js-summary__icon"><i className="bi bi-briefcase"></i></div>
+          <div className="min-w-0">
+            <h4 className="js-summary__title">{selectedJob?.title || 'Job'}</h4>
+            <p className="js-summary__company">{selectedJob?.displayCompanyName || 'NA'}</p>
+          </div>
+        </div>
+        <div className="js-stats">
+          <div className="js-stat">
+            <strong>{students.length}</strong>
+            <span>Total</span>
+          </div>
+          <div className="js-stat">
+            <strong>{websiteCount}</strong>
+            <span>Website</span>
+          </div>
+          <div className="js-stat">
+            <strong>{manualCount}</strong>
+            <span>Added by HR</span>
+          </div>
+          <div className="js-stat">
+            <strong>{countFor('APPROVED')}</strong>
+            <span>Approved</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="d-flex justify-content-between mb-3 allCenter">
+        <ul className="d-flex nav nav-pills mb-2 allCenterBtn">
+          {STATUS_TABS.map((tab) => (
+            <li className="nav-item" key={tab.key}>
+              <button
+                type="button"
+                style={{ fontSize: 'clamp(12px,1.8vw,15px)' }}
+                className={`nav-link navBTn ${statusTab === tab.key ? 'active' : ''}`}
+                onClick={() => setStatusTab(tab.key)}
+              >
+                {tab.label} ({countFor(tab.key)})
+              </button>
+            </li>
+          ))}
+        </ul>
         <input
           type="text"
           className="form-control w-25 searchBar"
-          placeholder="Search students..."
+          placeholder="Search by name, mobile or email"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -120,38 +186,59 @@ const JobStudents = ({ selectedJob, onBackToJobs, selectedCenter = null, onBackT
       {!loading && error && <div className="alert alert-danger">{error}</div>}
 
       {!loading && !error && filteredStudents.length > 0 && (
-        <div className="card border rounded shadow-sm">
+        <section className="js-card">
           <div className="table-responsive">
-            <table className="table table-hover mb-0">
+            <table className="js-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Name</th>
+                  <th>Student</th>
                   <th>Mobile</th>
-                  <th>Email</th>
                   <th>Source</th>
                   <th>Status</th>
                   <th>Applied on</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((student, index) => (
-                  <tr key={student._id}>
-                    <td>{index + 1}</td>
-                    <td>{student.name || 'NA'}</td>
-                    <td>{student.mobile || 'NA'}</td>
-                    <td>{student.email || 'NA'}</td>
-                    <td>{student.source || 'NA'}</td>
-                    <td className={approvalClass[student.approvalStatus] || 'text-secondary'}>
-                      {String(student.approvalStatus || 'PENDING').toLowerCase()}
-                    </td>
-                    <td>{formatDate(student.appliedAt)}</td>
-                  </tr>
-                ))}
+                {filteredStudents.map((student, index) => {
+                  const status = statusOf(student);
+                  return (
+                    <tr key={student._id}>
+                      <td className="js-table__index">{index + 1}</td>
+                      <td>
+                        <div className="js-person">
+                          <span className="js-avatar">{initials(student.name)}</span>
+                          <div className="min-w-0">
+                            <div className="js-person__name">{student.name || 'NA'}</div>
+                            <div className="js-person__email" title={student.email}>{student.email || 'No email'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        {student.mobile ? (
+                          <a href={`tel:${student.mobile}`} className="js-phone">
+                            <i className="bi bi-telephone me-1"></i>{student.mobile}
+                          </a>
+                        ) : 'NA'}
+                      </td>
+                      <td>
+                        <span className={`js-pill ${student.source === 'manual' ? 'js-pill--hr' : 'js-pill--web'}`}>
+                          {sourceLabel(student.source)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`js-pill js-pill--${status.toLowerCase()}`}>
+                          {status.charAt(0) + status.slice(1).toLowerCase()}
+                        </span>
+                      </td>
+                      <td className="js-table__date">{formatDate(student.appliedAt)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       )}
 
       {!loading && !error && filteredStudents.length === 0 && (
@@ -160,11 +247,125 @@ const JobStudents = ({ selectedJob, onBackToJobs, selectedCenter = null, onBackT
           <h5 className="text-muted mt-3">No students found</h5>
           <p className="text-muted">
             {students.length > 0
-              ? 'Try adjusting your search'
+              ? 'Try another tab or search'
               : `No students have applied for ${selectedJob?.title || 'this job'} yet`}
           </p>
         </div>
       )}
+
+      <style>{`
+        #jobStudentsPage .min-w-0 { min-width: 0; }
+        #jobStudentsPage .js-summary {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+          background: #ffffff;
+          border: 1px solid #ffe4e6;
+          border-radius: 14px;
+          padding: 16px 20px;
+          margin-bottom: 18px;
+        }
+        #jobStudentsPage .js-summary__job { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        #jobStudentsPage .js-summary__icon {
+          background: #fff1f2;
+          color: #e11d48;
+          border-radius: 12px;
+          width: 44px;
+          height: 44px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          flex-shrink: 0;
+        }
+        #jobStudentsPage .js-summary__title { margin: 0; font-size: 18px; font-weight: 600; color: #1e293b; }
+        #jobStudentsPage .js-summary__company { margin: 2px 0 0; font-size: 13px; color: #64748b; }
+        #jobStudentsPage .js-stats { display: flex; flex-wrap: wrap; gap: 10px; }
+        #jobStudentsPage .js-stat {
+          min-width: 96px;
+          padding: 8px 14px;
+          border-radius: 10px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          text-align: center;
+        }
+        #jobStudentsPage .js-stat strong { display: block; font-size: 18px; color: #1e293b; line-height: 1.2; }
+        #jobStudentsPage .js-stat span { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+        #jobStudentsPage .js-card {
+          background: #ffffff;
+          border-radius: 14px;
+          border: 1px solid #e2e8f0;
+          overflow: hidden;
+        }
+        #jobStudentsPage .js-table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 0; }
+        #jobStudentsPage .js-table thead th {
+          text-align: left;
+          padding: 12px 14px;
+          background: #fff1f2;
+          color: #9f1239;
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          white-space: nowrap;
+          border-bottom: 1px solid #fecdd3;
+        }
+        #jobStudentsPage .js-table td {
+          padding: 12px 14px;
+          border-bottom: 1px solid #f1f5f9;
+          color: #0f172a;
+          font-size: 14px;
+          vertical-align: middle;
+        }
+        #jobStudentsPage .js-table tbody tr:last-child td { border-bottom: none; }
+        #jobStudentsPage .js-table tbody tr:hover td { background: #fff7f8; }
+        #jobStudentsPage .js-table__index { color: #94a3b8; width: 48px; }
+        #jobStudentsPage .js-table__date { white-space: nowrap; color: #475569; }
+        #jobStudentsPage .js-person { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        #jobStudentsPage .js-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: #fff1f2;
+          color: #be123c;
+          font-size: 13px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        #jobStudentsPage .js-person__name { font-weight: 600; text-transform: capitalize; }
+        #jobStudentsPage .js-person__email {
+          font-size: 12px;
+          color: #64748b;
+          max-width: 240px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        #jobStudentsPage .js-phone { color: #0f172a; text-decoration: none; white-space: nowrap; }
+        #jobStudentsPage .js-phone:hover { color: #e11d48; }
+        #jobStudentsPage .js-pill {
+          display: inline-block;
+          padding: 3px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+        #jobStudentsPage .js-pill--web { background: #eff6ff; color: #1d4ed8; }
+        #jobStudentsPage .js-pill--hr { background: #f5f3ff; color: #6d28d9; }
+        #jobStudentsPage .js-pill--pending { background: #fef3c7; color: #92400e; }
+        #jobStudentsPage .js-pill--approved { background: #ecfdf5; color: #047857; }
+        #jobStudentsPage .js-pill--rejected { background: #fff1f2; color: #be123c; }
+        @media (max-width: 768px) {
+          #jobStudentsPage .js-stats { width: 100%; }
+          #jobStudentsPage .js-stat { flex: 1 1 40%; }
+        }
+      `}</style>
     </div>
   );
 };
