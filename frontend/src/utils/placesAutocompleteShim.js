@@ -1,4 +1,4 @@
-const OLD_MAPS_KEY = "AIzaSyB7DDN_gUp2zyrlElXtYpjTEQobYiUB9Lg";
+const OLD_MAPS_KEY = process.env.REACT_APP_AUTH_KEY_GOGGLE || "";
 
 function textOf(value) {
   if (!value) return "";
@@ -327,7 +327,7 @@ function callbackName(src) {
 }
 
 function blockLegacyMapsScript(node) {
-  if (!node || node.tagName !== "SCRIPT" || typeof node.src !== "string" || !node.src.includes(OLD_MAPS_KEY)) {
+  if (!OLD_MAPS_KEY || !node || node.tagName !== "SCRIPT" || typeof node.src !== "string" || !node.src.includes(OLD_MAPS_KEY)) {
     return false;
   }
   const name = callbackName(node.src);
