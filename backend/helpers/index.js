@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const ObjectId = require("mongodb").ObjectID;
 const { verify } = require('jsonwebtoken')
@@ -123,6 +124,53 @@ module.exports.isCollege = async (req, res, next) => {
     }
     req.flash("error", err.message);
     return res.redirect("/college/login");
+  }
+};
+
+// WHATSAPP_PARTNER_API_KEYS format: "<apiKey>:<collegeId>,<apiKey2>:<collegeId2>"
+const findPartnerCollegeId = (apiKey) => {
+  const entries = String(process.env.WHATSAPP_PARTNER_API_KEYS || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  const given = Buffer.from(String(apiKey));
+  for (const entry of entries) {
+    const sep = entry.lastIndexOf(':');
+    if (sep <= 0) continue;
+    const key = Buffer.from(entry.slice(0, sep));
+    const collegeId = entry.slice(sep + 1);
+    if (key.length === given.length && crypto.timingSafeEqual(key, given)) {
+      return collegeId;
+    }
+  }
+  return null;
+};
+
+module.exports.isCollegeOrPartner = async (req, res, next) => {
+  const apiKey = req.header('x-api-key');
+  if (!apiKey) return module.exports.isCollege(req, res, next);
+
+  try {
+    const collegeId = findPartnerCollegeId(apiKey);
+    if (!collegeId || !mongoose.Types.ObjectId.isValid(collegeId)) {
+      return res.status(401).json({ success: false, message: 'Invalid API key' });
+    }
+
+    const college = await College.findById(collegeId);
+    if (!college) {
+      return res.status(401).json({ success: false, message: 'Invalid API key' });
+    }
+
+    req.college = college;
+    req.collegeId = college._id;
+    req.authType = 'partner';
+    req.body = { ...(req.body || {}), collegeId: String(college._id) };
+
+    return next();
+  } catch (err) {
+    console.log("--- ERROR Partner API key", req.header('x-forwarded-for') || req.socket.remoteAddress, err);
+    return res.status(500).json({ success: false, message: 'Failed to authenticate API key' });
   }
 };
 

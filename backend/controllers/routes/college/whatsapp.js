@@ -5,7 +5,7 @@ const uuid = require('uuid/v1');
 const multer = require('multer');
 const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead, Vertical } = require('../../models');
 const B2BDepartment = require('../../models/b2b/b2bDepartment');
-const { isCollege } = require('../../../helpers');
+const { isCollege, isCollegeOrPartner } = require('../../../helpers');
 const mongoose = require('mongoose');
 const {
 	bucketName,
@@ -2567,7 +2567,7 @@ router.post('/validate-template-variables', isCollege, async (req, res) => {
   }
 });
 
-router.post('/send-template', isCollege, async (req, res) => {
+router.post('/send-template', isCollegeOrPartner, async (req, res) => {
   try {
     const { templateName, to, collegeId, candidateId, registrationId, variableValues } = req.body;
 
