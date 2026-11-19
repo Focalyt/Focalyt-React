@@ -28,6 +28,15 @@ const GoogleMapsLocationPicker = ({
       // Check if script is already loading
       if (document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) {
         console.log('Google Maps script already loading');
+        const wait = window.setInterval(() => {
+          if (window.google?.maps?.places?.PlaceAutocompleteElement || window.google?.maps?.places?.Autocomplete) {
+            window.clearInterval(wait);
+            setMapLoaded(true);
+            window.googleMapsLoaded = true;
+            initializeAutocomplete();
+          }
+        }, 200);
+        window.setTimeout(() => window.clearInterval(wait), 15000);
         return;
       }
 

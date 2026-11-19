@@ -1479,7 +1479,8 @@ const CRMDashboard = () => {
   const [input1Value, setInput1Value] = useState('');
   const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
-  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' | 'bulkaction' | 'bulkrefer' | 'AiCall'
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' | 'bulkaction' | 'bulkrefer' | 'bulkdelete' | 'AiCall'
+  const bulkPickedProfilesRef = useRef([]);
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -1542,6 +1543,8 @@ const CRMDashboard = () => {
   const [filterConcernPerson, setFilterConcernPerson] = useState('all');
   const [filterDate, setFilterDate] = useState(new Date());
   const [selectedProfiles, setSelectedProfiles] = useState([]);
+  const [deleteLeadPrompt, setDeleteLeadPrompt] = useState(null);
+  const [deletingLeads, setDeletingLeads] = useState(false);
 
 
   //side pannel stats
@@ -2373,7 +2376,7 @@ const CRMDashboard = () => {
     setSelectedProfiles(next);
 
     // Keep Input 1 count in sync when user manually checks/unchecks leads
-    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'AiCall') {
+    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'bulkdelete' || bulkMode === 'AiCall') {
       skipBulkAutoSelectRef.current = true;
       setInput1Value(next.length > 0 ? String(next.length) : '');
     }
@@ -7177,6 +7180,55 @@ console.log('API Response:', response.data);
     (permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') ||
     permissions?.permission_type === 'Admin';
 
+  const canDeleteLeadsPermission =
+    (permissions?.custom_permissions?.can_delete_leads && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
+  const openDeleteLeads = (ids) => {
+    const idList = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id || '')).filter(Boolean))];
+    if (!idList.length) {
+      toast.error('Select at least one lead');
+      return;
+    }
+    const names = idList.map((id) => {
+      const profile = allProfiles.find((item) => String(item?._id) === id)
+        || (bulkPickedProfilesRef.current || []).find((item) => String(item?._id) === id);
+      return profile?._candidate?.name || 'Lead';
+    });
+    setShowPopup(null);
+    setDeleteLeadPrompt({ ids: idList, names });
+  };
+
+  const confirmDeleteLeads = async () => {
+    const ids = deleteLeadPrompt?.ids || [];
+    if (!ids.length || deletingLeads) return;
+    setDeletingLeads(true);
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/b2c-leads/delete`,
+        { ids },
+        { headers: { 'x-auth': token } },
+      );
+      const deletedIds = new Set((response.data?.deletedIds || ids).map((id) => String(id)));
+      const deletedCount = response.data?.deletedCount || deletedIds.size;
+      toast.success(response.data?.message || (deletedCount === 1 ? 'Lead deleted' : `${deletedCount} leads deleted`));
+      setSelectedProfiles([]);
+      bulkPickedProfilesRef.current = [];
+      setShowBulkInputs(false);
+      setBulkMode(null);
+      setInput1Value('');
+      setDeleteLeadPrompt(null);
+      const remainingOnPage = allProfiles.filter((profile) => !deletedIds.has(String(profile?._id)));
+      const nextPage = remainingOnPage.length === 0 && currentPage > 1 ? currentPage - 1 : currentPage;
+      if (nextPage !== currentPage) setCurrentPage(nextPage);
+      await fetchProfileData(filterData, nextPage);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to delete leads');
+    } finally {
+      setDeletingLeads(false);
+    }
+  };
+
   const renderOwnerSelect = (profile, {
     field,
     value,
@@ -7564,7 +7616,7 @@ console.log('API Response:', response.data);
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action, AI Call)
   useEffect(() => {
-    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'AiCall') {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'bulkdelete' && bulkMode !== 'AiCall') {
       return;
     }
 
@@ -7582,6 +7634,7 @@ console.log('API Response:', response.data);
     
     if (isNaN(numValue) || numValue < 1) {
       // Invalid value, deselect all (minimum is 1)
+      bulkPickedProfilesRef.current = [];
       setSelectedProfiles([]);
       return;
     }
@@ -7594,9 +7647,12 @@ console.log('API Response:', response.data);
     const totalAvailableLeads = bulkMode === 'AiCall'
       ? (aiCallTotalCount || profilesForSelect.length)
       : activeStatusLeadCount;
-    const validNumValue = Math.min(numValue, totalAvailableLeads);
-    if (bulkMode !== 'AiCall' && numValue > totalAvailableLeads) {
-      setInput1Value(totalAvailableLeads > 0 ? String(totalAvailableLeads) : '');
+    const selectionLimit = bulkMode === 'bulkdelete'
+      ? Math.min(totalAvailableLeads, 500)
+      : totalAvailableLeads;
+    const validNumValue = Math.min(numValue, selectionLimit);
+    if (bulkMode !== 'AiCall' && numValue > selectionLimit) {
+      setInput1Value(selectionLimit > 0 ? String(selectionLimit) : '');
     }
 
     // If user wants more profiles than currently loaded, fetch them
@@ -7636,6 +7692,7 @@ console.log('API Response:', response.data);
               : response.data.data;
             const selectedProfilesData = fetchedProfiles.slice(0, validNumValue);
             const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+            bulkPickedProfilesRef.current = selectedProfilesData;
             setSelectedProfiles(profilesToSelect);
             
             // Console log: Show selected profiles count and names
@@ -7652,6 +7709,7 @@ console.log('API Response:', response.data);
           const selectedProfilesData = (bulkMode === 'AiCall' ? profilesForSelect : allProfiles)
             .slice(0, Math.min(validNumValue, (bulkMode === 'AiCall' ? profilesForSelect : allProfiles).length));
           const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+          bulkPickedProfilesRef.current = selectedProfilesData;
           setSelectedProfiles(profilesToSelect);
           
           // Console log: Show selected profiles count and names (fallback)
@@ -7674,6 +7732,7 @@ console.log('API Response:', response.data);
       // Use current visible leads if we have enough (AI Call skips already-called leads)
       const selectedProfilesData = profilesForSelect.slice(0, validNumValue);
       const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+      bulkPickedProfilesRef.current = selectedProfilesData;
       setSelectedProfiles(profilesToSelect);
       
       // Console log: Show selected profiles count and names
@@ -11536,6 +11595,17 @@ useEffect(() => {
         <i className="fas fa-history text-secondary" aria-hidden="true"></i>
         History List
       </button>
+      {/* {canDeleteLeadsPermission && (
+        <button
+          type="button"
+          className="lead-strip-v3__actions-item"
+          onClick={() => { openDeleteLeads([profile._id]); onClose(); }}
+          style={{ color: '#b42318' }}
+        >
+          <i className="fas fa-trash" aria-hidden="true"></i>
+          Delete Lead
+        </button>
+      )} */}
     </div>
   );
 
@@ -15425,37 +15495,6 @@ useEffect(() => {
     buildListFilterQueryParts,
   ]);
 
-  const renderAppliedSourceToggle = (compact = false) => (
-    <div
-      className="form-check form-switch adm-header-date-range__source-toggle"
-      title="Off: leads and filters use applied courses. On: they use applied jobs."
-    >
-      <input
-        className="form-check-input"
-        type="checkbox"
-        role="switch"
-        id={compact ? 'appliedJobSourceToggleMobile' : 'appliedJobSourceToggle'}
-        checked={showAppliedJobs}
-        onChange={(e) => {
-          const next = e.target.checked;
-          showAppliedJobsRef.current = next;
-          setShowAppliedJobs(next);
-          setCrossSaleCache({});
-          setCurrentPage(1);
-          const nextCycle = next ? cycleFilters : { ...cycleFilters, job: '' };
-          if (!next && cycleFilters.job) setCycleFilters(nextCycle);
-          fetchProfileData(filterData, 1, nextCycle);
-        }}
-      />
-      <label
-        className="form-check-label"
-        htmlFor={compact ? 'appliedJobSourceToggleMobile' : 'appliedJobSourceToggle'}
-      >
-        {showAppliedJobs ? 'Applied Jobs' : 'Applied Courses'}
-      </label>
-    </div>
-  );
-
   const renderHeaderDateRangeFilter = (compact = false) => (
     <div
       className={`adm-header-date-range${compact ? ' adm-header-date-range--compact' : ''}`}
@@ -15568,7 +15607,6 @@ useEffect(() => {
             Clear
           </button>
         )}
-        {renderAppliedSourceToggle(compact)}
       </div>
     </div>
   );
@@ -18477,7 +18515,9 @@ useEffect(() => {
                                 }
                                 const maxValue = bulkMode === 'AiCall'
                                   ? Math.min(100, aiCallTotalCount || 0)
-                                  : activeStatusLeadCount;
+                                  : bulkMode === 'bulkdelete'
+                                    ? Math.min(500, activeStatusLeadCount)
+                                    : activeStatusLeadCount;
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
                                   const numValue = parseInt(input1Value, 10);
@@ -18489,11 +18529,17 @@ useEffect(() => {
                                   e.preventDefault();
                                   handleAiCallDispatch();
                                 }
+                                if (e.key === 'Enter' && bulkMode === 'bulkdelete' && selectedProfiles.length > 0) {
+                                  e.preventDefault();
+                                  openDeleteLeads(selectedProfiles);
+                                }
                               }}
                               onChange={(e) => {
                                 const maxValue = bulkMode === 'AiCall'
                                   ? Math.min(100, aiCallTotalCount || 0)
-                                  : activeStatusLeadCount;
+                                  : bulkMode === 'bulkdelete'
+                                    ? Math.min(500, activeStatusLeadCount)
+                                    : activeStatusLeadCount;
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
                                   setInput1Value('');
@@ -18549,6 +18595,7 @@ useEffect(() => {
                                 setShowBulkInputs(false);
                                 setBulkMode(null);
                                 setInput1Value('');
+                                bulkPickedProfilesRef.current = [];
                                 setSelectedProfiles([]);
                                 if (showPanel === 'bulkstatuschange' || showPanel === 'RefferAllLeads') {
                                   closePanel();
@@ -18584,6 +18631,22 @@ useEffect(() => {
                                 {aiFabBusy ? 'Queuing...' : 'Call AI'}
                               </button>
                             </>
+                          )}
+                          {bulkMode === 'bulkdelete' && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger"
+                              disabled={deletingLeads || selectedProfiles.length === 0}
+                              onClick={() => openDeleteLeads(selectedProfiles)}
+                              style={{
+                                padding: '6px 10px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {deletingLeads ? 'Deleting...' : `Delete${selectedProfiles.length > 0 ? ` (${selectedProfiles.length})` : ''}`}
+                            </button>
                           )}
                           </div>
                           )
@@ -18696,6 +18759,31 @@ useEffect(() => {
                                 </button>
                               </>
                             )}
+                            {/* {canDeleteLeadsPermission && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                disabled={isLoadingProfiles || allProfiles.length === 0}
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "11px",
+                                  fontWeight: "600",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px"
+                                }}
+                                onClick={() => {
+                                  setShowBulkInputs(true);
+                                  setBulkMode('bulkdelete');
+                                  setInput1Value('');
+                                  bulkPickedProfilesRef.current = [];
+                                  setSelectedProfiles([]);
+                                }}
+                              >
+                                <i className="fas fa-trash" style={{ fontSize: "10px" }}></i>
+                                Delete Leads
+                              </button>
+                            )} */}
                             <button
                               className="btn btn-sm btn-outline-dark"
                               style={{
@@ -18813,6 +18901,72 @@ useEffect(() => {
               </div>
             </nav>
           </div>
+
+          {deleteLeadPrompt && (
+            <div
+              className="modal fade show d-block"
+              tabIndex="-1"
+              role="dialog"
+              aria-modal="true"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}
+              onClick={() => { if (!deletingLeads) setDeleteLeadPrompt(null); }}
+            >
+              <div className="modal-dialog modal-dialog-centered" role="document" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">
+                      {deleteLeadPrompt.ids.length === 1 ? 'Delete lead' : `Delete ${deleteLeadPrompt.ids.length} leads`}
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      disabled={deletingLeads}
+                      onClick={() => setDeleteLeadPrompt(null)}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    <p className="mb-2">
+                      {deleteLeadPrompt.ids.length === 1
+                        ? `Delete ${deleteLeadPrompt.names[0] || 'this lead'}?`
+                        : `Delete these ${deleteLeadPrompt.ids.length} leads?`}
+                    </p>
+                    {deleteLeadPrompt.ids.length > 1 && (
+                      <ul className="mb-2 ps-3" style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                        {deleteLeadPrompt.names.slice(0, 8).map((name, index) => (
+                          <li key={`${deleteLeadPrompt.ids[index]}-${index}`}>{name}</li>
+                        ))}
+                        {deleteLeadPrompt.names.length > 8 && (
+                          <li>and {deleteLeadPrompt.names.length - 8} more</li>
+                        )}
+                      </ul>
+                    )}
+                    <p className="text-muted small mb-0">
+                      This removes the lead, its follow-ups, the candidate profile, and the student login for that mobile. It cannot be undone.
+                    </p>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={deletingLeads}
+                      onClick={() => setDeleteLeadPrompt(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={deletingLeads}
+                      onClick={confirmDeleteLeads}
+                    >
+                      {deletingLeads ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ReApply History Modal */}
           {showReapplyModal && reapplyProfile && (

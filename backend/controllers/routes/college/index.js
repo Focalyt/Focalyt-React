@@ -9149,6 +9149,171 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 	}
 });
 
+router.post('/b2c-leads/delete', isCollege, async (req, res) => {
+	try {
+		const permissionType = req.user?.permissions?.permission_type;
+		const canDelete = permissionType === 'Admin'
+			|| (permissionType === 'Custom' && req.user?.permissions?.custom_permissions?.can_delete_leads === true);
+		if (!canDelete) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to delete leads',
+			});
+		}
+
+		const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
+		const uniqueIds = [...new Set(rawIds.map((id) => String(id || '').trim()).filter(Boolean))];
+		if (!uniqueIds.length) {
+			return res.status(400).json({ status: false, message: 'Select at least one lead' });
+		}
+		if (uniqueIds.length > 500) {
+			return res.status(400).json({ status: false, message: 'Delete up to 500 leads at a time' });
+		}
+		const invalidId = uniqueIds.find((id) => !mongoose.Types.ObjectId.isValid(id));
+		if (invalidId) {
+			return res.status(400).json({ status: false, message: 'One or more lead ids are invalid' });
+		}
+
+		const college = (req.user?.college && req.user.college._id)
+			? req.user.college
+			: await College.findOne({ '_concernPerson._id': req.user._id });
+		if (!college?._id) {
+			return res.status(403).json({ status: false, message: 'College not found' });
+		}
+
+		const objectIds = uniqueIds.map((id) => new mongoose.Types.ObjectId(id));
+		const collegeId = String(college._id);
+
+		const [courseLeads, jobLeads] = await Promise.all([
+			AppliedCourses.find({ _id: { $in: objectIds } })
+				.select('_id _course _candidate')
+				.populate({ path: '_course', select: 'college' })
+				.lean(),
+			AppliedJobs.find({
+				_id: { $in: objectIds },
+				college: college._id,
+				isDeleted: { $ne: true },
+			}).select('_id _candidate').lean(),
+		]);
+
+		const courseIds = courseLeads
+			.filter((lead) => lead?._course && String(lead._course.college) === collegeId)
+			.map((lead) => lead._id);
+		const courseIdSet = new Set(courseIds.map((id) => String(id)));
+		const jobIds = jobLeads
+			.map((lead) => lead._id)
+			.filter((id) => !courseIdSet.has(String(id)));
+
+		if (!courseIds.length && !jobIds.length) {
+			return res.status(404).json({
+				status: false,
+				message: 'No matching leads found for this college',
+			});
+		}
+
+		const {
+			Candidate,
+			CandidateVisitCalender,
+			SessionAttendance,
+			SessionFeedback,
+			Placement,
+		} = require('../../models');
+
+		const candidateIds = [...courseLeads, ...jobLeads]
+			.map((lead) => lead?._candidate)
+			.filter(Boolean);
+		const removedCourseIdSet = new Set(courseIds.map((id) => String(id)));
+		const removedJobIdSet = new Set(jobIds.map((id) => String(id)));
+
+		const [otherCourses, otherJobs] = candidateIds.length
+			? await Promise.all([
+				AppliedCourses.find({ _candidate: { $in: candidateIds } }).select('_id _candidate').lean(),
+				AppliedJobs.find({ _candidate: { $in: candidateIds }, isDeleted: { $ne: true } }).select('_id _candidate').lean(),
+			])
+			: [[], []];
+
+		const stillHasLead = new Set();
+		otherCourses.forEach((lead) => {
+			if (!removedCourseIdSet.has(String(lead._id))) stillHasLead.add(String(lead._candidate));
+		});
+		otherJobs.forEach((lead) => {
+			if (!removedJobIdSet.has(String(lead._id))) stillHasLead.add(String(lead._candidate));
+		});
+		const profileIdsToRemove = [...new Set(candidateIds.map((id) => String(id)))]
+			.filter((id) => !stillHasLead.has(id))
+			.map((id) => new mongoose.Types.ObjectId(id));
+
+		const [profiles, candidateDocs] = profileIdsToRemove.length
+			? await Promise.all([
+				CandidateProfile.find({ _id: { $in: profileIdsToRemove } }).select('mobile').lean(),
+				Candidate.find({ _id: { $in: profileIdsToRemove } }).select('mobile').lean(),
+			])
+			: [[], []];
+
+		const mobileValues = [...profiles, ...candidateDocs].flatMap((doc) => {
+			const digits = String(doc?.mobile ?? '').replace(/\D/g, '');
+			const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+			if (!last10) return [];
+			const values = [last10];
+			const asNumber = Number(last10);
+			if (Number.isSafeInteger(asNumber)) values.push(asNumber);
+			return values;
+		});
+
+		const tasks = [];
+		if (courseIds.length) {
+			tasks.push(
+				AppliedCourses.deleteMany({ _id: { $in: courseIds } }),
+				B2cFollowup.deleteMany({ appliedCourseId: { $in: courseIds } }),
+				StatusLogs.deleteMany({ _appliedId: { $in: courseIds } }),
+				ReEnquire.deleteMany({ appliedCourse: { $in: courseIds } }),
+				CandidateVisitCalender.deleteMany({ appliedCourse: { $in: courseIds } }),
+				SessionAttendance.deleteMany({ appliedCourse: { $in: courseIds } }),
+				SessionFeedback.deleteMany({ appliedCourse: { $in: courseIds } }),
+				Placement.deleteMany({ appliedCourse: { $in: courseIds } }),
+			);
+		}
+		if (jobIds.length) {
+			tasks.push(AppliedJobs.deleteMany({ _id: { $in: jobIds }, college: college._id }));
+		}
+		if (profileIdsToRemove.length) {
+			tasks.push(
+				CandidateProfile.deleteMany({ _id: { $in: profileIdsToRemove } }),
+				Candidate.deleteMany({ _id: { $in: profileIdsToRemove } }),
+			);
+			if (mobileValues.length) {
+				const extraProfiles = await CandidateProfile.find({ mobile: { $in: mobileValues } }).select('_id').lean();
+				const extraCandidates = await Candidate.find({ mobile: { $in: mobileValues } }).select('_id').lean();
+				const extraIds = [...extraProfiles, ...extraCandidates].map((doc) => doc._id);
+				if (extraIds.length) {
+					tasks.push(
+						CandidateProfile.deleteMany({ _id: { $in: extraIds } }),
+						Candidate.deleteMany({ _id: { $in: extraIds } }),
+					);
+				}
+				tasks.push(User.deleteMany({ role: 3, mobile: { $in: mobileValues } }));
+			}
+		}
+		await Promise.all(tasks);
+
+		const deletedIds = [...courseIds, ...jobIds].map((id) => String(id));
+		const deletedCount = deletedIds.length;
+		return res.json({
+			status: true,
+			message: deletedCount === 1
+				? 'Lead deleted, including the candidate profile and student login'
+				: `${deletedCount} leads deleted, including candidate profiles and student logins`,
+			deletedCount,
+			deletedIds,
+			profilesRemoved: profileIdsToRemove.length,
+			skippedCount: uniqueIds.length - deletedCount,
+		});
+	} catch (error) {
+		console.error('[B2C lead delete] Error:', error);
+		return res.status(500).json({ status: false, message: 'Failed to delete leads' });
+	}
+});
+
 router.put('/lead/bulk_course_change', [isCollege], async (req, res) => {
 	try {
 		const { selectedProfiles, courseId, centerId, remarks } = req.body;

@@ -1453,13 +1453,21 @@ const B2BSales = () => {
         businessName: placeNameOnly
       }));
 
-      let city = '', state = '';
+      let city = "";
+      let state = "";
+      let district = "";
+      let area = "";
       place.address_components?.forEach((component) => {
-        const types = component.types.join(',');
-        if (types.includes("locality")) city = component.long_name;
-        if (types.includes("administrative_area_level_1")) state = component.long_name;
-        if (!city && types.includes("sublocality_level_1")) city = component.long_name;
+        const types = component.types || [];
+        const name = component.long_name || "";
+        if (!name) return;
+        if (types.includes("locality") || types.includes("postal_town")) city = name;
+        if (types.includes("administrative_area_level_3")) district = name;
+        if (!district && types.includes("administrative_area_level_2")) district = name;
+        if (types.includes("sublocality_level_1")) area = name;
+        if (types.includes("administrative_area_level_1")) state = name;
       });
+      city = city || district || area;
 
       setLeadFormData(prev => ({
         ...prev,
