@@ -232,7 +232,7 @@ app.use('/upload', serveUploadMiddleware);
 app.use('/api/upload', serveUploadMiddleware);
 app.use(express.static(path.resolve(__dirname, "public")));
 app.use(session(sess));
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
 app.use(bodyParser.json({
 	limit: "15mb",
 	verify: (req, _res, buf) => {
@@ -256,15 +256,21 @@ app.use(flash());
 	}
 	const isApkUpload = req.path.includes('/admin/appRelease/upload');
 	const isVideoTimestamp = req.path.includes('/college/video-timestamp/apply');
+	const isDailyReport = req.path.includes('/college/trainer/daily-reports');
 	fileupload({
 		limits: {
 			fileSize: isApkUpload
 				? 250 * 1024 * 1024
 				: isVideoTimestamp
 					? 200 * 1024 * 1024
-					: 50 * 1024 * 1024,
+					: isDailyReport
+						? 100 * 1024 * 1024
+						: 50 * 1024 * 1024,
+			fieldSize: 15 * 1024 * 1024,
 		},
+		uploadTimeout: isDailyReport ? 0 : 60000,
 		abortOnLimit: true,
+		responseOnLimit: JSON.stringify({ status: false, message: 'This file is too large to upload.' }),
 	})(req, res, next);
 });
 app.use((req, res, next) => {

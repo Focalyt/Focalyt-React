@@ -86,6 +86,147 @@ const mediaKind = (file) => {
   return 'file';
 };
 
+const PHOTO_UPLOAD_BYTES = 700 * 1024;
+
+const isUploadImage = (file) => {
+  const type = String(file?.type || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  if (type === 'image/gif' || name.endsWith('.gif')) return false;
+  if (type.startsWith('image/')) return true;
+  return /\.(png|jpe?g|webp|bmp|heic|heif)$/.test(name);
+};
+
+const jpegName = (name) => `${String(name || 'photo').replace(/\.[^.]+$/, '') || 'photo'}.jpg`;
+
+const canvasToJpeg = (source, width, height, quality) => new Promise((resolve) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    resolve(null);
+    return;
+  }
+  context.drawImage(source, 0, 0, width, height);
+  canvas.toBlob(resolve, 'image/jpeg', quality);
+});
+
+// Phone cameras attach multi-megabyte photos. Desktop picks are usually already small.
+// Shrink images before upload so the request stays under the server body limit.
+const shrinkUploadImage = async (file) => {
+  if (!file || !isUploadImage(file) || file.size <= PHOTO_UPLOAD_BYTES) return file;
+  const maxEdge = 1600;
+  let bitmap = null;
+  let objectUrl = '';
+  try {
+    let source = null;
+    let width = 0;
+    let height = 0;
+    if (typeof createImageBitmap === 'function') {
+      try {
+        bitmap = await createImageBitmap(file, { resizeWidth: maxEdge, resizeQuality: 'medium' });
+        source = bitmap;
+        width = bitmap.width || 0;
+        height = bitmap.height || 0;
+      } catch (error) {
+        bitmap = null;
+      }
+    }
+    if (!source) {
+      objectUrl = URL.createObjectURL(file);
+      const image = await new Promise((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error('Unable to read photo'));
+        element.src = objectUrl;
+      });
+      width = image.naturalWidth || 1;
+      height = image.naturalHeight || 1;
+      source = image;
+    }
+    const longest = Math.max(width, height);
+    if (longest > maxEdge) {
+      const scale = maxEdge / longest;
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
+    }
+    if (!source || !width || !height) return file;
+    let best = null;
+    for (const quality of [0.72, 0.58, 0.42]) {
+      const blob = await canvasToJpeg(source, width, height, quality);
+      if (!blob) continue;
+      if (!best || blob.size < best.size) best = blob;
+      if (blob.size <= PHOTO_UPLOAD_BYTES) break;
+    }
+    if (!best || best.size >= file.size) return file;
+    return new File([best], jpegName(file.name), { type: 'image/jpeg', lastModified: Date.now() });
+  } catch (error) {
+    return file;
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    bitmap?.close?.();
+  }
+};
+
+const saveFailureMessage = (error) => {
+  if (error?.response?.status === 413) {
+    return 'The phone browser blocked this save before the report was stored. Try again. If a photo is attached, remove it and save the row first.';
+  }
+  const data = error?.response?.data;
+  if (data && typeof data === 'object' && data.message) return data.message;
+  if (typeof data === 'string') {
+    const text = data.trim();
+    if (text && !text.startsWith('<')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed?.message) return parsed.message;
+      } catch (parseError) {
+        return text.slice(0, 180);
+      }
+    }
+  }
+  return error?.message || 'Unable to save report';
+};
+
+const postDailyReport = async ({ url, method, token, fields, files }) => {
+  const headers = { 'x-auth': token, Accept: 'application/json' };
+  let body;
+  if (!files.length) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(fields);
+  } else {
+    body = new FormData();
+    Object.entries(fields).forEach(([key, value]) => {
+      body.append(key, typeof value === 'string' ? value : JSON.stringify(value));
+    });
+    files.forEach(([key, file]) => body.append(`file_${key}`, file));
+  }
+  // Same-origin cookies are sent automatically and are much larger on a phone.
+  // This route authenticates with x-auth, so the cookies are not needed.
+  const response = await fetch(url, {
+    method,
+    headers,
+    body,
+    credentials: 'omit',
+    cache: 'no-store',
+  });
+  const text = await response.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      data = { message: text.slice(0, 180) };
+    }
+  }
+  if (!response.ok || data?.status === false) {
+    const error = new Error(data?.message || `Request failed with status code ${response.status}`);
+    error.response = { status: response.status, data };
+    throw error;
+  }
+  return data;
+};
+
 const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const studentCountFields = [
@@ -543,12 +684,13 @@ const knownFieldValue = (field, context) => {
       return;
     }
 
-    const data = new FormData();
-    data.append('templateId', formTemplate.id);
-    data.append('reportDate', form.reportDate);
-    data.append('batchId', form.batchId);
-    data.append('inTime', form.inTime || '');
-    data.append('outTime', form.outTime || '');
+    const fields = {
+      templateId: formTemplate.id,
+      reportDate: form.reportDate,
+      batchId: form.batchId,
+      inTime: form.inTime || '',
+      outTime: form.outTime || '',
+    };
     const answersToSave = {};
     (formTemplate.fields || []).forEach((field) => {
       if (field.type === 'file') return;
@@ -562,26 +704,30 @@ const knownFieldValue = (field, context) => {
     if (!templateHasTopic) {
       answersToSave[topicFieldKey] = filledAnswer({ key: topicFieldKey, label: 'Topic name', type: 'select', options: topicOptions });
     }
-    data.append('answers', JSON.stringify(answersToSave));
-    data.append('touchedKeys', JSON.stringify(Object.keys(touchedAnswers)));
-    data.append('removeFileIds', JSON.stringify(removedIds));
-    Object.entries(answerFiles).forEach(([key, files]) => {
-      (files || []).forEach((file) => data.append(`file_${key}`, file));
-    });
+    fields.answers = answersToSave;
+    fields.touchedKeys = Object.keys(touchedAnswers);
+    fields.removeFileIds = removedIds;
 
     setSaving(true);
     try {
+      const preparedFiles = [];
+      for (const [key, files] of Object.entries(answerFiles)) {
+        for (const file of files || []) {
+          preparedFiles.push([key, await shrinkUploadImage(file)]);
+        }
+      }
       const url = editingId
         ? `${backendUrl}/college/trainer/daily-reports/${editingId}`
         : `${backendUrl}/college/trainer/daily-reports`;
-      const response = await axios({
-        method: editingId ? 'put' : 'post',
+      const response = await postDailyReport({
         url,
-        data,
-        headers: { 'x-auth': token },
+        method: editingId ? 'PUT' : 'POST',
+        token,
+        fields,
+        files: preparedFiles,
       });
-      if (!response.data?.status) {
-        throw new Error(response.data?.message || 'Unable to save report');
+      if (!response?.status) {
+        throw new Error(response?.message || 'Unable to save report');
       }
       notify(editingId ? 'Daily report updated' : 'Daily report saved');
       await loadReports();
@@ -596,7 +742,7 @@ const knownFieldValue = (field, context) => {
         else loadReports();
         return;
       }
-      notify(error.response?.data?.message || error.message || 'Unable to save report');
+      notify(saveFailureMessage(error));
     } finally {
       setSaving(false);
     }

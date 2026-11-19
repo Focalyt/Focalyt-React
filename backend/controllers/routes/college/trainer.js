@@ -1972,14 +1972,19 @@ const readReportFields = (body, attachedFields = defaultAttachedDtrFields()) => 
 	};
 };
 
-const readRemovedReportFileIds = (body) => {
-	if (!body?.removeFileIds) return [];
+const readJsonValue = (value, fallback) => {
+	if (value == null || value === '') return fallback;
+	if (typeof value === 'object') return value;
 	try {
-		const parsed = JSON.parse(body.removeFileIds);
-		return Array.isArray(parsed) ? parsed.map(String) : [];
+		return JSON.parse(value);
 	} catch (error) {
-		return [];
+		return fallback;
 	}
+};
+
+const readRemovedReportFileIds = (body) => {
+	const parsed = readJsonValue(body?.removeFileIds, []);
+	return Array.isArray(parsed) ? parsed.map(String) : [];
 };
 
 const DTR_FIELD_TYPES = ['text', 'textarea', 'number', 'date', 'time', 'yesno', 'select', 'radio', 'file'];
@@ -2272,20 +2277,12 @@ const templateIncludesTrainer = (template, userId) => {
 };
 
 const buildTemplateAnswers = async (template, body, files, collegeId, previousAnswers = []) => {
-	let values = {};
-	try {
-		values = JSON.parse(body.answers || '{}');
-	} catch (error) {
-		values = {};
-	}
+	const parsedValues = readJsonValue(body.answers, {});
+	const values = parsedValues && typeof parsedValues === 'object' && !Array.isArray(parsedValues) ? parsedValues : {};
 	const labelKey = (label) => String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 	const touched = new Set();
-	try {
-		const parsed = JSON.parse(body.touchedKeys || '[]');
-		if (Array.isArray(parsed)) parsed.forEach((key) => touched.add(String(key)));
-	} catch (error) {
-		touched.clear();
-	}
+	const parsedTouched = readJsonValue(body.touchedKeys, []);
+	if (Array.isArray(parsedTouched)) parsedTouched.forEach((key) => touched.add(String(key)));
 	const previousByKey = new Map((previousAnswers || []).map((answer) => [answer.key, answer]));
 	const previousFor = (field) => {
 		const byKey = previousByKey.get(field.key);
