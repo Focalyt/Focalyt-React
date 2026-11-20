@@ -245,7 +245,7 @@ function About() {
             <div className="ab-hero-logos">
               <div className="ab-hero-logo"><img src="/Assets/public/images/logo/logo.png" alt="Focalyt" /></div>
               <div className="ab-hero-sep" />
-              <div className="ab-hero-logo"><img src="/Assets/public/images/logo/focal.png" alt="Focal" /></div>
+              <div className="ab-hero-logo"><img src="/Assets/public/images/logo/focalyt_new_logo.png" alt="Focal" /></div>
             </div>
             <div className="ab-hero-content">
               <span className="ab-eyebrow">About Us</span>
