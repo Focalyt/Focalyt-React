@@ -4144,8 +4144,9 @@ const STYLES = `
   }
 }
 
-/* Mobile landscape — width often >768px but viewport height is very short */
-@media (orientation: landscape) and (max-height: 540px) {
+/* Phone landscape only. A wide desktop window with a short height (DevTools docked
+   at the bottom) should keep the normal hero, otherwise the buttons stretch full width. */
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 960px) {
   .foc-cyber-home section.hero {
     min-height: auto;
     padding: 108px 0 18px;
@@ -4186,14 +4187,15 @@ const STYLES = `
   }
   .hero-btns {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 6px;
-    width: 100%;
-    max-width: none;
+    width: auto;
+    max-width: 100%;
     margin: 0;
   }
   .hero-btns .btn-primary {
-    width: 100%;
+    width: auto;
     min-height: 34px;
     padding: 6px 12px;
     font-size: 9px;
@@ -4202,7 +4204,7 @@ const STYLES = `
   .hero-right {
     margin-top: 0;
     gap: 8px;
-    align-items: stretch;
+    align-items: center;
     width: 100%;
   }
   .foc-cyber-home section.hero .hero-kicker {
@@ -4227,10 +4229,11 @@ const STYLES = `
     line-height: 1.08;
   }
   .foc-cyber-home section.hero .hero-right-cta {
-    width: 100%;
+    width: auto;
     max-width: none;
+    align-self: center;
     min-height: 34px;
-    padding: 6px 12px;
+    padding: 6px 14px;
     font-size: 9px;
     border-radius: 8px;
   }
