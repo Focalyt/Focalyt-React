@@ -6,26 +6,94 @@ const { createCrmInserter, normalizePhone } = require('./metaLeadInsert');
 const MAX_TRANSIENT_RETRIES = 5;
 const RETRY_MINUTES = [2, 5, 15, 30, 60];
 
-function fieldValue(fieldData, names) {
-  const wanted = new Set(names);
-  const row = (fieldData || []).find(item => (
-    item && wanted.has(String(item.name || '').toLowerCase())
-  ));
-  if (!row || !Array.isArray(row.values) || row.values[0] === undefined || row.values[0] === null) {
-    return '';
+const NAME_KEYS = ['full_name', 'fullname', 'name'];
+const FIRST_NAME_KEYS = ['first_name', 'firstname'];
+const LAST_NAME_KEYS = ['last_name', 'lastname'];
+const PHONE_KEYS = ['phone_number', 'phonenumber', 'phone', 'mobile', 'mobile_number', 'mobilenumber'];
+const WHATSAPP_KEYS = ['whatsapp', 'whatsapp_number', 'whatsappnumber'];
+const EMAIL_KEYS = ['email'];
+const GENDER_KEYS = ['gender', 'sex'];
+
+function normalizeFieldKey(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+function firstText(values) {
+  if (!Array.isArray(values) || values[0] === undefined || values[0] === null) return '';
+  return String(values[0]).trim();
+}
+
+function indexFields(fieldData) {
+  const foundKeys = [];
+  const byKey = new Map();
+  (fieldData || []).forEach((item) => {
+    if (!item) return;
+    const key = normalizeFieldKey(item.name);
+    if (!key) return;
+    foundKeys.push(key);
+    if (byKey.has(key)) return;
+    const value = firstText(item.values);
+    if (value) byKey.set(key, value);
+  });
+  return { foundKeys, byKey };
+}
+
+function pickField(byKey, aliases) {
+  for (let index = 0; index < aliases.length; index += 1) {
+    const alias = aliases[index];
+    if (byKey.get(alias)) return byKey.get(alias);
+    const compact = alias.replace(/_/g, '');
+    if (compact !== alias && byKey.get(compact)) return byKey.get(compact);
   }
-  return String(row.values[0]).trim();
+  return '';
+}
+
+function safeLogKey(key) {
+  if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) return '';
+  return key;
+}
+
+function summarizeLeadFields(fieldData, lead) {
+  const indexed = indexFields(fieldData);
+  return {
+    fieldKeys: indexed.foundKeys.map(safeLogKey).filter(Boolean),
+    recognized: {
+      name: Boolean(lead && lead.name),
+      mobile: Boolean(lead && lead.mobile),
+      email: Boolean(lead && lead.email),
+      whatsapp: Boolean(lead && lead.whatsapp),
+      sex: Boolean(lead && lead.sex),
+    },
+  };
+}
+
+function logLeadFieldCheck(logger, event, graphLead, lead) {
+  try {
+    const fields = graphLead && (graphLead.field_data || graphLead.fieldData);
+    const summary = summarizeLeadFields(fields, lead);
+    const keys = summary.fieldKeys.length ? summary.fieldKeys.join(',') : 'none';
+    const flags = summary.recognized;
+    logger.info(
+      `[meta] Lead field check. formId=${String((event && event.formId) || '')} keys=${keys} name=${flags.name} mobile=${flags.mobile} email=${flags.email} whatsapp=${flags.whatsapp} sex=${flags.sex}`,
+    );
+  } catch (_error) {
+    // Field diagnostics must not stop lead processing.
+  }
 }
 
 function parseLead(graphLead) {
   const fields = graphLead && (graphLead.field_data || graphLead.fieldData);
-  const first = fieldValue(fields, ['first_name']);
-  const last = fieldValue(fields, ['last_name']);
-  const full = fieldValue(fields, ['full_name', 'name']);
-  const phone = normalizePhone(fieldValue(fields, ['phone_number', 'phone', 'mobile']));
-  const whatsapp = normalizePhone(fieldValue(fields, ['whatsapp', 'whatsapp_number'])) || phone;
-  const email = fieldValue(fields, ['email']).toLowerCase();
-  const gender = fieldValue(fields, ['gender', 'sex']).toLowerCase();
+  const { byKey } = indexFields(fields);
+  const first = pickField(byKey, FIRST_NAME_KEYS);
+  const last = pickField(byKey, LAST_NAME_KEYS);
+  const full = pickField(byKey, NAME_KEYS);
+  const phone = normalizePhone(pickField(byKey, PHONE_KEYS));
+  const whatsapp = normalizePhone(pickField(byKey, WHATSAPP_KEYS)) || phone;
+  const email = pickField(byKey, EMAIL_KEYS).toLowerCase();
+  const gender = pickField(byKey, GENDER_KEYS).toLowerCase();
   let sex = '';
   if (gender === 'male' || gender === 'm') sex = 'Male';
   if (gender === 'female' || gender === 'f') sex = 'Female';
@@ -80,6 +148,7 @@ function createLeadProcessor({
   fetchLead,
   resolveMapping = resolveMetaFormMapping,
   insertLead,
+  logger = console,
 } = {}) {
   const api = fetchLead ? null : createMetaApi();
   const loadLead = fetchLead || (event => api.getLead(event.metaLeadId));
@@ -126,6 +195,7 @@ function createLeadProcessor({
       return scheduleRetry(event, 'The Meta lead could not be retrieved.');
     }
     const lead = parseLead(graphLead || {});
+    logLeadFieldCheck(logger, event, graphLead, lead);
     if (lead.formId && lead.formId !== String(event.formId)) {
       return mark(event, {
         processingStatus: 'failed',
@@ -181,4 +251,9 @@ function createLeadProcessor({
   return { processDue, processOne, parseLead };
 }
 
-module.exports = { createLeadProcessor, parseLead };
+module.exports = {
+  createLeadProcessor,
+  parseLead,
+  normalizeFieldKey,
+  summarizeLeadFields,
+};
