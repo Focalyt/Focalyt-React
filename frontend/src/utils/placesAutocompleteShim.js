@@ -55,7 +55,7 @@ function setNativeValue(input, value) {
   input.value = value == null ? "" : String(value);
 }
 
-function mirrorInputValue(input, element) {
+function mirrorInputValue(input, element, syncState) {
   const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
   if (!descriptor?.get || !descriptor?.set || input._focalytValueMirror) return;
   Object.defineProperty(input, "value", {
@@ -67,6 +67,7 @@ function mirrorInputValue(input, element) {
     set(next) {
       const text = next == null ? "" : String(next);
       descriptor.set.call(this, text);
+      if (syncState?.fromWidget) return;
       if (element.isConnected && element.value !== text) element.value = text;
     },
   });
@@ -147,7 +148,54 @@ function createCompat() {
 
     input.classList.add("focalyt-places-source");
     input.insertAdjacentElement("afterend", element);
-    mirrorInputValue(input, element);
+
+    let applyingPlace = false;
+    const syncState = { fromWidget: false };
+    mirrorInputValue(input, element, syncState);
+
+    const widgetText = () => (element.value == null ? "" : String(element.value));
+
+    // The visible box is Google's widget. Typed text that is not a map place
+    // still has to reach the hidden input, or React keeps the field empty.
+    const syncTypedValue = (event) => {
+      if (applyingPlace) return;
+      const target = event?.target;
+      const text = target && target !== element && typeof target.value === "string"
+        ? target.value
+        : widgetText();
+      if (input.value === text) return;
+      syncState.fromWidget = true;
+      setNativeValue(input, text);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      window.setTimeout(() => {
+        syncState.fromWidget = false;
+      }, 0);
+    };
+
+    const bindInnerInput = () => {
+      const root = element.shadowRoot;
+      const inner = root && root.querySelector("input, textarea");
+      if (!inner || inner._focalytTypedSync) return;
+      inner._focalytTypedSync = true;
+      inner.addEventListener("input", syncTypedValue);
+      inner.addEventListener("change", syncTypedValue);
+    };
+
+    element.addEventListener("input", syncTypedValue);
+    element.addEventListener("change", syncTypedValue);
+    element.addEventListener("focusout", () => {
+      if (applyingPlace) return;
+      const text = widgetText();
+      const selected = this.place;
+      if (selected) {
+        const formatted = selected.formatted_address || "";
+        const name = selected.name || "";
+        if (text === formatted || text === name) return;
+      }
+      syncTypedValue();
+    });
+    bindInnerInput();
+    window.requestAnimationFrame(bindInnerInput);
 
     const emit = () => {
       this.listeners.slice().forEach((handler) => {
@@ -178,13 +226,21 @@ function createCompat() {
 
         this.place = toLegacyPlace(place);
         const formatted = this.place.formatted_address || this.place.name || "";
-        if (formatted) {
-          element.value = formatted;
-          setNativeValue(input, formatted);
-          input.dispatchEvent(new Event("input", { bubbles: true }));
+        applyingPlace = true;
+        try {
+          if (formatted) {
+            element.value = formatted;
+            setNativeValue(input, formatted);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          emit();
+        } finally {
+          window.setTimeout(() => {
+            applyingPlace = false;
+          }, 0);
         }
-        emit();
       } catch (error) {
+        applyingPlace = false;
         console.error("Places lookup failed", error);
       }
     };
