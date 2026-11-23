@@ -46,18 +46,33 @@ const CollegeRegister = ({ embedded = false }) => {
 
 
     useEffect(() => {
+        let cancelled = false;
+        let timer = null;
 
+        const hideSearchIcon = () => {
+            const input = document.getElementById('collegeName');
+            const widget = input?.parentElement?.querySelector('gmp-place-autocomplete');
+            if (!widget) return false;
+            if (!widget.querySelector('[slot="input-icon"]')) {
+                const blank = document.createElement('span');
+                blank.slot = 'input-icon';
+                blank.setAttribute('aria-hidden', 'true');
+                widget.appendChild(blank);
+            }
+            return true;
+        };
 
         const waitForGoogle = () => {
-            if (window.google && window.google.maps && window.google.maps.places) {
-                const input = document.getElementById('collegeName');
-                if (input) {
-                    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-                        types: ['establishment'],
-                        componentRestrictions: { country: 'in' },
-                    });
+            if (cancelled) return;
+            const input = document.getElementById('collegeName');
+            if (input && window.google?.maps?.places && !input.dataset.placesBound) {
+                input.dataset.placesBound = '1';
+                const autocomplete = new window.google.maps.places.Autocomplete(input, {
+                    types: ['establishment'],
+                    componentRestrictions: { country: 'in' },
+                });
 
-                    autocomplete.addListener('place_changed', () => {
+                autocomplete.addListener('place_changed', () => {
                         const place = autocomplete.getPlace();
                         if (!place || !place.geometry || !place.geometry.location) return;
 
@@ -85,16 +100,17 @@ const CollegeRegister = ({ embedded = false }) => {
                         // Optionally save full address in another state
                         setAddress(place.formatted_address || '');
                     });
-
-                }
-
-
-            } else {
-                setTimeout(waitForGoogle, 100);
             }
+
+            if (hideSearchIcon()) return;
+            timer = setTimeout(waitForGoogle, 100);
         };
 
         waitForGoogle();
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
     }, []);
     const checkEmail = (email) => {
         let emailReg = /^([\w-\.]+@([\w-]+\.)+[\w-]{2,4})?$/;
@@ -749,6 +765,20 @@ html body .content {
 }
 .collegeRegistration input {
     margin: 0px !important;
+}
+.collegeRegistration .input-icon {
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1em;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+}
+.collegeRegistration .input-field > label {
+    display: none;
 }
 .collegeRegistration .row fieldset:nth-of-type(1), .collegeRegistration .row fieldset:nth-of-type(2), .collegeRegistration .row fieldset:nth-of-type(3){
     margin: 0px;

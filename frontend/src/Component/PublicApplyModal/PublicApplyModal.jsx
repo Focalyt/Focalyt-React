@@ -312,6 +312,18 @@ function PublicApplyModal() {
         types: ["geocode"],
         componentRestrictions: { country: "in" },
       });
+      const hideSearchIcon = () => {
+        const widget = addressRef.current?.parentElement?.querySelector("gmp-place-autocomplete");
+        if (!widget) return false;
+        if (!widget.querySelector('[slot="input-icon"]')) {
+          const blank = document.createElement("span");
+          blank.slot = "input-icon";
+          blank.setAttribute("aria-hidden", "true");
+          widget.appendChild(blank);
+        }
+        return true;
+      };
+      if (!hideSearchIcon()) timer = window.setTimeout(hideSearchIcon, 150);
       autocomplete.addListener("place_changed", () => {
         const place = autocomplete.getPlace();
         if (!isValidPlace(place)) return;
@@ -981,7 +993,7 @@ function PublicApplyModal() {
                 ref={addressRef}
                 id="public-apply-address"
                 type="text"
-                placeholder="Search and select your complete address"
+                placeholder="Enter your address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 autoComplete="off"
@@ -1308,7 +1320,7 @@ function PublicApplyModal() {
   white-space: normal;
 }
 .pam-field.is-invalid,
-.pam-select-wrap.is-invalid select {
+.pam-select-wrap.is-invalid {
   border-color: #f87171;
   background-color: #fff7f7;
 }
@@ -1371,7 +1383,7 @@ function PublicApplyModal() {
   color: #ef4444;
   font-style: normal;
 }
-.pam-field, .pam-select-wrap select {
+.pam-field, .pam-select-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1380,6 +1392,7 @@ function PublicApplyModal() {
   border-radius: 12px;
   background: #fff;
   padding: 0 12px;
+  box-sizing: border-box;
 }
 .pam-field input, .pam-select-wrap select {
   border: 0;
@@ -1393,7 +1406,57 @@ function PublicApplyModal() {
   color: var(--foc-color-text, #061426);
   min-height: 42px;
 }
-.pam-field__icon { color: #94a3b8; display: grid; place-items: center; }
+.pam-field__icon { color: #94a3b8; display: grid; place-items: center; flex: 0 0 auto; position: relative; z-index: 1; }
+.pam-field gmp-place-autocomplete.focalyt-places-input {
+  flex: 1 1 0% !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin-left: -40px !important;
+  contain: inline-size;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  min-height: 42px;
+}
+.pam-field gmp-place-autocomplete::part(input) {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow-x: auto;
+  text-overflow: clip;
+  background: transparent;
+  border: 0;
+}
+.pam-field gmp-place-autocomplete::part(focus-ring) {
+  opacity: 0 !important;
+  border: 0 !important;
+}
+.pam-field gmp-place-autocomplete::part(prediction-list) {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  max-height: 180px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.pam-field gmp-place-autocomplete::part(prediction-item) {
+  height: auto !important;
+  overflow: visible !important;
+  align-items: flex-start !important;
+}
+.pam-field gmp-place-autocomplete::part(prediction-item-main-text),
+.pam-field gmp-place-autocomplete::part(prediction-item-secondary-text) {
+  display: block !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.35;
+}
 .pam-cc {
   color: #64748b;
   font-size: 13px;
@@ -1448,7 +1511,16 @@ function PublicApplyModal() {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.pam-select-wrap select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #94a3b8 50%), linear-gradient(135deg, #94a3b8 50%, transparent 50%); background-position: calc(100% - 16px) 18px, calc(100% - 10px) 18px; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
+.pam-select-wrap select {
+  appearance: none;
+  border: 0;
+  background-color: transparent;
+  background-image: linear-gradient(45deg, transparent 50%, #94a3b8 50%), linear-gradient(135deg, #94a3b8 50%, transparent 50%);
+  background-position: calc(100% - 4px) center, calc(100% + 2px) center;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 16px;
+}
 .pam-check {
   display: flex !important;
   align-items: flex-start;

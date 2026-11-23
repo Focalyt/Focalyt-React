@@ -519,7 +519,7 @@ const CollegeLogin = () => {
                                             <>
                                             <div className="input-field">
                                                 <span className="input-icon">
-                                                    <i className="fa-regular fa-key"></i>
+                                                    <i className="fa-solid fa-key"></i>
                                                 </span>
                                                 <input
                                                     type="text"
@@ -636,7 +636,7 @@ const CollegeLogin = () => {
                                 <div>
                                     <div className="input-field">
                                         <span className="input-icon">
-                                            <i className="fa-regular fa-key"></i>
+                                            <i className="fa-solid fa-key"></i>
                                         </span>
                                         <input
                                             type="text"
@@ -659,7 +659,7 @@ const CollegeLogin = () => {
                                 <div>
                                     <div className="input-field">
                                         <span className="input-icon">
-                                            <i className="fa-regular fa-lock"></i>
+                                            <i className="fa-solid fa-lock"></i>
                                         </span>
                                         <input
                                             type={showNewPassword ? "text" : "password"}
@@ -674,7 +674,7 @@ const CollegeLogin = () => {
 
                                     <div className="input-field">
                                         <span className="input-icon">
-                                            <i className="fa-regular fa-lock"></i>
+                                            <i className="fa-solid fa-lock"></i>
                                         </span>
                                         <input
                                             type={showNewPassword ? "text" : "password"}
@@ -895,16 +895,32 @@ const CollegeLogin = () => {
                 .input-icon {
                     position: absolute;
                     left: 15px;
-                    top: 35%;
+                    top: 50%;
                     transform: translateY(-50%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    line-height: 1;
+                    height: 1em;
+                    margin: 0;
                     color: #999;
+                }
+
+                .collegeRegistration .input-field > label {
+                    display: none;
                 }
                 
                 .toggle-password {
                     position: absolute;
                     right: 15px;
-                    top: 35%;
+                    top: 50%;
                     transform: translateY(-50%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    line-height: 1;
+                    height: 1em;
+                    margin: 0;
                     cursor: pointer;
                     color: #999;
                 }
