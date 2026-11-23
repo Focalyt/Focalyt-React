@@ -1313,7 +1313,7 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/jobs' ? 'active' : ''}`}>
                     <Link to="/institute/jobs" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserCheck} />
-                      <span className="menu-title">HR Leads</span>
+                      <span className="menu-title">Job Leads</span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/myfollow' ? 'active' : ''}`}>

@@ -14,7 +14,7 @@
           <div class="content-overlay"></div>
           <div class="header-navbar-shadow"></div>
           <div class="content-wrapper"></div>
-          <form>
+          <form class="job-form">
             <section id="Concerned-Person">
               <div class="row">
                 <div class="col-xl-12 px-3 text-right">
@@ -740,6 +740,107 @@
                   </div>
                 </div>
               </div>
+              <section id="studentDocsRequired">
+                <div class="row">
+                  <div class="col-xl-12 col-lg-12 px-3">
+                    <div class="card mt-1">
+                      <div class="card-header border border-top-0 border-left-0 border-right-0">
+                        <h4 class="card-title pb-1">Student Documents Required</h4>
+                      </div>
+                      <div class="card-content">
+                        <div class="card-body">
+                          <div id="documentContainer">
+                            <% const existingDocs = (jd && Array.isArray(jd.docsRequired) ? jd.docsRequired : []).filter((doc) => doc && doc.status !== false && (doc.Name || doc.name)); %>
+                            <% existingDocs.forEach((doc) => { %>
+                              <div class="row requiredDocsRow" data-doc-id="<%= doc._id %>">
+                                <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                                  <label>Document Name</label>
+                                  <input type="text" class="form-control docsName" value="<%= doc.Name || doc.name %>">
+                                </div>
+                                <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                                  <label>Mandatory</label>
+                                  <select class="form-control docsMandatory">
+                                    <option value="true" <%= doc.mandatory ? 'selected' : '' %>>Yes</option>
+                                    <option value="false" <%= doc.mandatory ? '' : 'selected' %>>No</option>
+                                  </select>
+                                </div>
+                                <div class="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                                  <button type="button" class="btn btn-outline-danger btn-sm remove-doc-btn">Remove</button>
+                                </div>
+                              </div>
+                            <% }) %>
+                          </div>
+                          <div class="d-flex justify-content-end mt-1">
+                            <button type="button" class="btn btn-success text-white" id="add-doc-btn">
+                              <%= existingDocs.length > 0 ? 'Add Another' : 'Add Document' %>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <script>
+                function updateDocsButtonLabel() {
+                  const count = document.querySelectorAll('#documentContainer .requiredDocsRow').length;
+                  const btn = document.getElementById('add-doc-btn');
+                  if (btn) btn.textContent = count > 0 ? 'Add Another' : 'Add Document';
+                }
+
+                function addDocumentField() {
+                  const container = document.getElementById('documentContainer');
+                  const row = document.createElement('div');
+                  row.className = 'row requiredDocsRow';
+                  row.innerHTML = `
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                      <label>Document Name</label>
+                      <input type="text" class="form-control docsName">
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                      <label>Mandatory</label>
+                      <select class="form-control docsMandatory">
+                        <option value="true">Yes</option>
+                        <option value="false" selected>No</option>
+                      </select>
+                    </div>
+                    <div class="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                      <button type="button" class="btn btn-outline-danger btn-sm remove-doc-btn">Remove</button>
+                    </div>
+                  `;
+                  container.appendChild(row);
+                  updateDocsButtonLabel();
+                }
+
+                function getDocsRequired() {
+                  const docs = [];
+                  document.querySelectorAll('#documentContainer .requiredDocsRow').forEach((row) => {
+                    const name = row.querySelector('.docsName')?.value.trim() || '';
+                    if (!name) return;
+                    const doc = {
+                      Name: name,
+                      mandatory: row.querySelector('.docsMandatory')?.value === 'true',
+                      status: true
+                    };
+                    if (row.dataset.docId) doc._id = row.dataset.docId;
+                    docs.push(doc);
+                  });
+                  return docs;
+                }
+
+                document.getElementById('add-doc-btn').addEventListener('click', function (event) {
+                  event.preventDefault();
+                  addDocumentField();
+                });
+
+                document.getElementById('documentContainer').addEventListener('click', function (event) {
+                  const btn = event.target.closest('.remove-doc-btn');
+                  if (!btn) return;
+                  event.preventDefault();
+                  btn.closest('.requiredDocsRow').remove();
+                  updateDocsButtonLabel();
+                });
+              </script>
               <section id="questionanswerTemplate">
                 <template>
                   <div class="row questionanswerrow">
@@ -1216,27 +1317,99 @@
           }
         </script>
         <script
-          src="https://maps.googleapis.com/maps/api/js?key=<%= process.env.AUTH_KEY_GOGGLE%>&callback=initMap&libraries=places&v=weekly"
+          src="https://maps.googleapis.com/maps/api/js?key=<%= process.env.GOOGLE_API_KEY %>&loading=async&v=weekly"
+          async
           defer></script>
         <script>
           let lessCoins = false
           function initMap() {
+            document.querySelectorAll('gmp-place-autocomplete').forEach(function (node) { node.remove(); });
+            const location = document.getElementById('work-loc');
+            if (!location || !window.google?.maps?.importLibrary || location.dataset.placesReady === 'true') return;
+            location.dataset.placesReady = 'true';
+            location.style.display = '';
 
-            const options = {
-              componentRestrictions: { country: "in" },
-              types: ["establishment"]
+            const field = document.getElementById('loc-field');
+            const list = document.createElement('div');
+            list.className = 'work-loc-suggestions';
+            list.hidden = true;
+            field.appendChild(list);
+
+            const hide = function () {
+              list.hidden = true;
+              list.innerHTML = '';
             };
+            let timer = null;
+            let requestId = 0;
 
-            const location = document.getElementById("work-loc")
-            const autocomplete = new google.maps.places.Autocomplete(location, options);
-            google.maps.event.addListener(autocomplete, 'place_changed', function () {
-              let place = autocomplete.getPlace();
+            location.addEventListener('input', function () {
               document.getElementById('place').value = location.value;
-              document.getElementById('latitude').value = place.geometry.location.lat();
-              document.getElementById('longitude').value = place.geometry.location.lng();
+              const text = location.value.trim();
+              clearTimeout(timer);
+              if (text.length < 2) {
+                hide();
+                return;
+              }
+              timer = setTimeout(async function () {
+                const current = ++requestId;
+                try {
+                  const { AutocompleteSuggestion } = await google.maps.importLibrary('places');
+                  const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                    input: text,
+                    includedRegionCodes: ['in']
+                  });
+                  if (current !== requestId) return;
+                  list.innerHTML = '';
+                  (suggestions || []).slice(0, 6).forEach(function (item) {
+                    const prediction = item.placePrediction;
+                    if (!prediction) return;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'work-loc-suggestion';
+                    const label = prediction.text && (prediction.text.text || String(prediction.text));
+                    button.textContent = label || '';
+                    button.addEventListener('mousedown', async function (event) {
+                      event.preventDefault();
+                      const place = prediction.toPlace();
+                      await place.fetchFields({ fields: ['formattedAddress', 'location', 'displayName'] });
+                      const formatted = place.formattedAddress || (place.displayName && (place.displayName.text || place.displayName)) || button.textContent;
+                      const point = place.location;
+                      const lat = point && (typeof point.lat === 'function' ? point.lat() : point.lat);
+                      const lng = point && (typeof point.lng === 'function' ? point.lng() : point.lng);
+                      location.value = formatted || '';
+                      document.getElementById('place').value = formatted || '';
+                      if (lat != null) document.getElementById('latitude').value = lat;
+                      if (lng != null) document.getElementById('longitude').value = lng;
+                      hide();
+                    });
+                    list.appendChild(button);
+                  });
+                  list.hidden = list.childElementCount === 0;
+                } catch (error) {
+                  console.error('Work location search failed', error);
+                  hide();
+                }
+              }, 250);
+            });
+
+            document.addEventListener('click', function (event) {
+              if (!field.contains(event.target)) hide();
             });
           }
           window.initMap = initMap;
+          (function bootWorkLocation() {
+            if (window.google && window.google.maps && window.google.maps.importLibrary) {
+              initMap();
+              return;
+            }
+            var timer = setInterval(function () {
+              if (window.google && window.google.maps && window.google.maps.importLibrary) {
+                clearInterval(timer);
+                initMap();
+              }
+            }, 50);
+            setTimeout(function () { clearInterval(timer); }, 20000);
+          })();
         </script>
 
         <script>
@@ -1487,6 +1660,7 @@
             }
 
 
+            formData.set('docsRequired', JSON.stringify(getDocsRequired()));
             if (!lessCoins) {
               axios.post("<%= process.env.MIPIE_BACKEND_URL %>/company/editJobs/<%= jd?._id%>", formData).then((res) => {
                 if (res.status && res) {

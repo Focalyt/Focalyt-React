@@ -1412,6 +1412,28 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
 
 
     }
+    if (req.body.docsRequired !== undefined && req.body.docsRequired !== '') {
+      try {
+        const parsed = typeof req.body.docsRequired === 'string'
+          ? JSON.parse(req.body.docsRequired)
+          : req.body.docsRequired;
+        updatedJob.docsRequired = (Array.isArray(parsed) ? parsed : [])
+          .map((item) => {
+            const doc = {
+              Name: String(item?.Name || item?.name || '').trim(),
+              mandatory: item?.mandatory === true || item?.mandatory === 'true',
+              status: item?.status === undefined ? true : (item.status === true || item.status === 'true'),
+            };
+            if (item?._id && mongoose.Types.ObjectId.isValid(item._id)) doc._id = item._id;
+            return doc;
+          })
+          .filter((item) => item.Name);
+      } catch (err) {
+        console.warn('Unable to parse docsRequired:', err.message);
+        delete updatedJob.docsRequired;
+      }
+    }
+
     const companyId = company._id;
     const jobTitle = req.body.title
 
@@ -1765,6 +1787,25 @@ router
         jobDetails['whatsappNumberof'] = "";
         jobDetails['emailof'] = "";
       }
+
+      if (req.body.docsRequired !== undefined && req.body.docsRequired !== '') {
+        try {
+          const parsed = typeof req.body.docsRequired === 'string'
+            ? JSON.parse(req.body.docsRequired)
+            : req.body.docsRequired;
+          jobDetails.docsRequired = (Array.isArray(parsed) ? parsed : [])
+            .map((item) => ({
+              Name: String(item?.Name || item?.name || '').trim(),
+              mandatory: item?.mandatory === true || item?.mandatory === 'true',
+              status: item?.status === undefined ? true : (item.status === true || item.status === 'true'),
+            }))
+            .filter((item) => item.Name);
+        } catch (err) {
+          console.warn('Unable to parse docsRequired:', err.message);
+          delete jobDetails.docsRequired;
+        }
+      }
+
       const jd = await Vacancy.create(jobDetails);
 
       console.log("jd", jd)

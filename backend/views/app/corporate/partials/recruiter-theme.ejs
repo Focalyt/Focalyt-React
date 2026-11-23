@@ -198,4 +198,70 @@ body:has(.recruiter-sidebar) .recruiter-candidate-search .card.mb-0 { background
 @media (max-width: 420px) {
   .recruiter-stats { grid-template-columns: 1fr; }
 }
+body:has(.recruiter-sidebar) .app-content.content:has(.job-form) {
+  padding: 16px 20px 32px !important;
+}
+body:has(.recruiter-sidebar) .job-form .card {
+  margin-bottom: 10px;
+}
+body:has(.recruiter-sidebar) .job-form .card.mt-1,
+body:has(.recruiter-sidebar) .job-form .card.mt-2 {
+  margin-top: 0 !important;
+}
+body:has(.recruiter-sidebar) .job-form .card .card-header {
+  padding: 10px 14px 6px;
+}
+body:has(.recruiter-sidebar) .job-form .card-body {
+  padding: 10px 14px;
+}
+body:has(.recruiter-sidebar) .job-form .form-control,
+body:has(.recruiter-sidebar) .job-form .input-group-text {
+  padding: 6px 10px;
+  min-height: 36px;
+}
+body:has(.recruiter-sidebar) .job-form .mb-1,
+body:has(.recruiter-sidebar) .job-form .mb-2 {
+  margin-bottom: 0.35rem !important;
+}
+body:has(.recruiter-sidebar) .job-form label {
+  margin-bottom: 2px;
+}
+.job-form gmp-place-autocomplete,
+.job-form .autocomplete-icon {
+  display: none !important;
+}
+.job-form #loc-field {
+  position: relative;
+  min-width: 0;
+}
+.job-form #loc-field .input-group {
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+.job-form .work-loc-suggestions {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: calc(100% - 4px);
+  z-index: 30;
+  background: #fff;
+  border: 1px solid #d7dfea;
+  border-radius: 7px;
+  max-height: 220px;
+  overflow: auto;
+  box-shadow: 0 8px 20px rgba(36, 52, 82, 0.12);
+}
+.job-form .work-loc-suggestion {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: #fff;
+  text-align: left;
+  padding: 8px 10px;
+  color: #243452;
+  font-size: 13px;
+}
+.job-form .work-loc-suggestion:hover {
+  background: #edf3ff;
+}
 </style>
