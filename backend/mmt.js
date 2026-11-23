@@ -135,6 +135,14 @@ async function connectDB() {
 			socketTimeoutMS: 300000, // Set timeout if required
 		});
 		console.log("Connected to MongoDB");
+		// Pending lead events are claimed only after this connection succeeds.
+		try {
+			const { startMetaLeadWorker } = require("./services/meta/metaLeadWorker");
+			startMetaLeadWorker();
+		} catch (workerErr) {
+			const workerMessage = workerErr && workerErr.message ? workerErr.message : "unknown error";
+			console.error("[meta] Lead worker failed to start.", workerMessage);
+		}
 		server.listen(port, () => {
 			console.log(`Server running on port ${port}`);
 			process.send = process.send || ((f) => f);
@@ -160,6 +168,13 @@ const gracefulShutdown = (signal) => {
 		if (err) {
 			console.error("Error closing HTTP server:", err.message);
 			process.exit(1);
+		}
+		try {
+			const { stopMetaLeadWorker } = require("./services/meta/metaLeadWorker");
+			await stopMetaLeadWorker();
+		} catch (workerStopErr) {
+			const workerMessage = workerStopErr && workerStopErr.message ? workerStopErr.message : "unknown error";
+			console.error("[meta] Lead worker failed to stop.", workerMessage);
 		}
 		try {
 			await mongoose.connection.close();

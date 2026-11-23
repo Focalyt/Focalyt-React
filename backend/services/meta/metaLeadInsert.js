@@ -8,6 +8,9 @@ const User = require('../../controllers/models/users');
 function normalizePhone(value) {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.length < 10) return '';
+  // +91 and a trunk 0 are prefixes. The CRM stores the 10-digit mobile.
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
   return digits.slice(-10);
 }
 

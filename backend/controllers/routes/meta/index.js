@@ -1,7 +1,6 @@
 const express = require('express');
 const { isCollege } = require('../../../helpers');
 const { getHealth, getConfigStatus, logStartupStatus } = require('../../../services/meta');
-const { startMetaLeadWorker } = require('../../../services/meta/metaLeadWorker');
 const {
   requireCrmAdmin,
   testAdAccount,
@@ -55,7 +54,5 @@ router.patch('/mappings/:id', isCollege, requireCrmAdmin, updateFormMapping);
 router.delete('/mappings/:id', isCollege, requireCrmAdmin, deactivateFormMapping);
 
 logStartupStatus();
-
-startMetaLeadWorker();
 
 module.exports = router;
