@@ -8,6 +8,7 @@ import {
   readAssignedCollegesFromSession,
 } from '../config/club/clubAuthSession';
 import { ROLE_LABELS, ROLES } from '../config/club/roles';
+import { studentCanActInClub } from '../config/club/membership';
 import { useClubStaffLiveUpdates } from '../Pages/App/Club/hooks/useClubStaffLiveUpdates';
 
 const CMS_ROLE_MAP = {
@@ -160,10 +161,35 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
   }, [refreshLiveCms]);
 
   useClubStaffLiveUpdates({
-    enabled: isLiveMode && isStaffPortal,
+    // Students need this too — otherwise approved joins stay pending until a manual refresh.
+    enabled: isLiveMode,
     campusIds: (assignedColleges || []).map((college) => college._id || college.id),
     onMembershipChange: refreshLiveCms,
   });
+
+  // While a student has pending join requests, poll lightly in case the socket miss fires.
+  useEffect(() => {
+    if (!isLiveMode || isStaffPortal || mode !== 'student') return undefined;
+    const hasPending = (state.clubs || []).some((club) =>
+      (club.members || []).some(
+        (member) =>
+          String(member.studentId) === String(state.currentStudent?.id) &&
+          String(member.status || '').toLowerCase() === 'pending'
+      )
+    );
+    if (!hasPending) return undefined;
+    const timer = window.setInterval(() => {
+      refreshLiveCms();
+    }, 12000);
+    return () => window.clearInterval(timer);
+  }, [
+    isLiveMode,
+    isStaffPortal,
+    mode,
+    refreshLiveCms,
+    state.clubs,
+    state.currentStudent?.id,
+  ]);
 
   const getClubPath = useCallback(
     (subPath = '') => {
@@ -338,6 +364,18 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
     (activityId) => {
       const activity = state.activities.find((a) => a.id === activityId);
       if (!activity) return;
+      // Students: browse campus events freely; join only after club approval.
+      if (
+        mode === 'student' &&
+        !studentCanActInClub(state.clubs, state.currentStudent, activity.clubId)
+      ) {
+        notify(
+          'Join the club first',
+          'Request to join this club and wait for approval before registering for its events.',
+          'info'
+        );
+        return;
+      }
       if (isLiveMode && isLiveMongoId(activityId)) {
         clubCmsApi
           .registerActivity(activityId)
@@ -375,7 +413,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
         );
       }
     },
-    [isLiveMode, notify, refreshLiveCms, state]
+    [isLiveMode, mode, notify, refreshLiveCms, state]
   );
 
   const cancelActivityRegistration = useCallback(
@@ -496,6 +534,28 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
         payload.id ? 'Institution updated' : 'Institution added',
         `"${payload.name}" is now live.`
       );
+    },
+    [isLiveMode, notify, refreshLiveCms]
+  );
+
+  const assignClubOwner = useCallback(
+    (clubId, ownerUserId) => {
+      if (!isLiveMode) {
+        notify('Live only', 'Owner reassignment needs the live Club API.', 'info');
+        return;
+      }
+      if (!isLiveMongoId(clubId) || !isLiveMongoId(ownerUserId)) {
+        notify('Action not allowed', 'Choose a valid club and Club Admin.', 'info');
+        return;
+      }
+      clubCmsApi
+        .assignClubOwner(clubId, ownerUserId)
+        .then((res) => {
+          if (!res.status) throw new Error(res.message);
+          notify('Club Admin added', 'Earlier admins remain on this club.');
+          return refreshLiveCms();
+        })
+        .catch((err) => notify('Action not allowed', err.response?.data?.message || err.message, 'info'));
     },
     [isLiveMode, notify, refreshLiveCms]
   );
@@ -935,7 +995,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
             if (res.duplicate) {
               notify('Already requested', 'You already have a pending request for this position.', 'info');
             } else {
-              notify('Position requested', 'Club Admin can now Approve or Reject this request.');
+              notify('Position requested', 'Status: Pending. Club Admin can Recommend, Assign, or Reject.');
             }
             return refreshLiveCms();
           })
@@ -950,7 +1010,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
           } else if (result.duplicate) {
             notify('Already requested', 'You already have a pending request for this position.', 'info');
           } else {
-            notify('Position requested', 'Club Admin can now Approve or Reject this request.');
+            notify('Position requested', 'Status: Pending. Club Admin can Recommend, Assign, or Reject.');
           }
         }, 0);
         return result.nextState;
@@ -972,7 +1032,9 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
                 : decision === 'recommend'
                   ? 'Position recommended'
                   : 'Position request rejected',
-              'The student will see the updated status.',
+              decision === 'approve' || decision === 'assign'
+                ? 'Seat filled. Position marks Filled when all seats are taken.'
+                : 'The student will see the updated status.',
               decision === 'reject' ? 'info' : 'success'
             );
             return refreshLiveCms();
@@ -1699,6 +1761,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
         removeClubSuggestion,
         upsertInstitution,
         upsertClub,
+        assignClubOwner,
         deleteClub,
         reviewClubMemberRequest,
         approveStudentClubSuggestion,

@@ -196,11 +196,19 @@ const CollegeLogin = () => {
                 } else {
                     setSuccessMessage('');
                     console.log('response', verifyRes)
-                    setErrorMessage('OTP verification failed !!!');
+                    setErrorMessage(
+                        verifyRes.data?.message ||
+                            verifyRes.data?.error ||
+                            'OTP verification failed !!!'
+                    );
                 }
             } catch (err) {
                 console.error("Error in OTP verification:", err);
-                setErrorMessage('OTP verification failed !!!');
+                setErrorMessage(
+                    err.response?.data?.message ||
+                        err.response?.data?.error ||
+                        'OTP verification failed !!!'
+                );
             }
         }
     };

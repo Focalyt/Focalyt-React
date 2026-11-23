@@ -7,6 +7,7 @@ import { StatusBadge } from '../Components/cms/StatusBadge';
 import { useClub } from '../../../../contexts/ClubContext';
 import { usePermission } from '../hooks/usePermission';
 import { ROLE_LABELS, ROLES } from '../../../../config/club/roles';
+import { isMainInstituteAdmin } from '../../../../config/club/clubAuthSession';
 import { staffManageableClubs } from '../../../../services/club/clubLiveState';
 
 const OPEN_BUDGET_STATUSES = new Set(['requested', 'recommended']);
@@ -162,18 +163,19 @@ export const StaffDashboardPage = () => {
   const [confirmAction, setConfirmAction] = useState(null);
 
   const campusName = assignedColleges?.[0]?.name || '';
+  const manageableClubs = useMemo(() => staffManageableClubs(state.clubs), [state.clubs]);
   const manageableIds = useMemo(
-    () => new Set(staffManageableClubs(state.clubs).map((club) => String(club.id))),
-    [state.clubs]
+    () => new Set(manageableClubs.map((club) => String(club.id))),
+    [manageableClubs]
   );
-  const canManageClub = (clubId) => !manageableIds.size || manageableIds.has(String(clubId));
+  const canManageClub = (clubId) => manageableIds.has(String(clubId));
   const clubName = (clubId) => state.clubs.find((club) => String(club.id) === String(clubId))?.name || '—';
   const positionTitle = (positionId) =>
     state.positions.find((position) => String(position.id) === String(positionId))?.title || 'Position';
 
   const pendingMembers = useMemo(
     () =>
-      state.clubs.flatMap((club) =>
+      manageableClubs.flatMap((club) =>
         (club.members || [])
           .filter((member) => isPendingMember(member.status))
           .map((member) => ({
@@ -182,17 +184,21 @@ export const StaffDashboardPage = () => {
             clubId: club.id,
           }))
       ),
-    [state.clubs]
+    [manageableClubs]
   );
 
-  const joinedMembers = state.clubs.reduce(
+  const joinedMembers = manageableClubs.reduce(
     (sum, club) => sum + (club.members || []).filter((member) => isJoinedMember(member.status)).length,
     0
   );
 
   const openBudgets = useMemo(
-    () => (state.budgets || []).filter((budget) => isOpenBudget(budget.status)),
-    [state.budgets]
+    () =>
+      (state.budgets || []).filter(
+        (budget) =>
+          isOpenBudget(budget.status) && (!budget.clubId || manageableIds.has(String(budget.clubId)))
+      ),
+    [state.budgets, manageableIds]
   );
   const pendingPickups = useMemo(
     () => (state.redemptions || []).filter((item) => isPendingPickup(item.status)),
@@ -200,16 +206,24 @@ export const StaffDashboardPage = () => {
   );
   const openPositionRequests = useMemo(
     () =>
-      (state.positionRequests || []).filter((request) =>
-        ['pending', 'recommended'].includes(statusKey(request.status))
-      ),
-    [state.positionRequests]
+      (state.positionRequests || []).filter((request) => {
+        if (!['pending', 'recommended'].includes(statusKey(request.status))) return false;
+        if (!request.clubId) return true;
+        return manageableIds.has(String(request.clubId));
+      }),
+    [state.positionRequests, manageableIds]
   );
   const todaysActivities = useMemo(
-    () => (state.activities || []).filter((activity) => isToday(activity.startDate || activity.date)),
-    [state.activities]
+    () =>
+      (state.activities || []).filter(
+        (activity) =>
+          isToday(activity.startDate || activity.date) &&
+          (!activity.clubId || manageableIds.has(String(activity.clubId)))
+      ),
+    [state.activities, manageableIds]
   );
   const waitingActivities = (state.activities || [])
+    .filter((activity) => !activity.clubId || manageableIds.has(String(activity.clubId)))
     .map((activity) => ({ activity, next: nextActivityAction(activity.scheduleStatus, can) }))
     .filter((row) => row.next);
 
@@ -241,7 +255,16 @@ export const StaffDashboardPage = () => {
   };
 
   const stats = [
-    { label: 'Clubs', value: state.clubs.length, hint: 'On this campus', to: 'clubs', icon: Building2 },
+    {
+      label: 'Clubs',
+      value: manageableClubs.length,
+      hint:
+        activeRole === ROLES.CLUB_ADMIN && !isMainInstituteAdmin()
+          ? 'Clubs you manage'
+          : 'On this campus',
+      to: 'clubs',
+      icon: Building2,
+    },
     { label: 'Members', value: joinedMembers, hint: 'Joined / approved', to: 'members', icon: Users },
     {
       label: 'Waiting on you',

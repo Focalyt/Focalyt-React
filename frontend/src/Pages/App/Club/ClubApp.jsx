@@ -70,6 +70,10 @@ const ClubApp = ({ mode, basePath }) => {
                 <Route path="members" element={page('members.view', MembersPage)} />
                 <Route path="positions" element={page('positions.view', PositionsStaffPage)} />
                 <Route path="people" element={<Navigate to="dashboard" replace />} />
+                <Route path="chat" element={<Navigate to="dashboard" replace />} />
+                <Route path="faq" element={<Navigate to="dashboard" replace />} />
+                <Route path="notifications" element={<Navigate to="dashboard" replace />} />
+                <Route path="assign-staff" element={<Navigate to="dashboard" replace />} />
                 <Route path="activities" element={page('activities.view', AdminActivitiesPage)} />
                 <Route path="registrations" element={page('registrations.view', RegistrationsPage)} />
                 <Route path="budgets" element={page('budgets.view', BudgetsPage)} />
@@ -97,6 +101,9 @@ const ClubApp = ({ mode, basePath }) => {
                 <Route path="certificates" element={page('certificates.view', CertificatesStudentPage)} />
                 <Route path="community" element={page('posts.view', CommunityPage)} />
                 <Route path="announcements" element={page('announcements.view', AnnouncementsPage)} />
+                <Route path="chat" element={<Navigate to="discover" replace />} />
+                <Route path="faq" element={<Navigate to="discover" replace />} />
+                <Route path="notifications" element={<Navigate to="discover" replace />} />
                 <Route path="profile" element={page('profile.view', StudentProfilePage)} />
                 <Route path="*" element={<Navigate to="discover" replace />} />
               </>

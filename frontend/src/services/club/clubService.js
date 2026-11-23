@@ -716,16 +716,37 @@ export const clubService = {
     if (!roleHasPermission(role, 'positions.create')) {
       return deny(state, 'Only Club Administrators can create or update positions.');
     }
+    const seats = Math.max(1, Number(payload.seats) || 1);
     if (payload.id) {
-      return allow({
-        ...state,
-        positions: state.positions.map((p) => (p.id === payload.id ? { ...p, ...payload } : p)),
+      const positions = state.positions.map((p) => {
+        if (p.id !== payload.id) return p;
+        const holders = p.holders || [];
+        const filledSeats = holders.length;
+        return {
+          ...p,
+          ...payload,
+          seats,
+          filledSeats,
+          holders,
+          status: filledSeats >= seats ? 'Filled' : payload.status || 'Open',
+        };
       });
+      return allow({ ...state, positions });
     }
     return allow({
       ...state,
       positions: [
-        { ...payload, id: `pos-${Date.now()}`, status: payload.status || 'Open' },
+        {
+          ...payload,
+          id: `pos-${Date.now()}`,
+          seats,
+          filledSeats: 0,
+          holders: [],
+          termLabel: payload.termLabel || '',
+          termStart: payload.termStart || '',
+          termEnd: payload.termEnd || '',
+          status: payload.status || 'Open',
+        },
         ...state.positions,
       ],
     });
@@ -759,20 +780,49 @@ export const clubService = {
       return deny(state, 'Club positions are turned off.', { duplicate: false });
     }
     const position = state.positions.find((p) => p.id === payload.positionId);
-    if (!position || position.status !== 'Open') {
+    if (!position || position.status === 'Filled') {
       return deny(state, 'This position is not open.', { duplicate: false });
+    }
+    const club = state.clubs.find((c) => c.id === position.clubId);
+    const membership = (club?.members || []).find(
+      (m) => String(m.studentId) === String(state.currentStudent.id)
+    );
+    const memberOk =
+      membership &&
+      (membership.status === 'joined' ||
+        membership.status === 'approved' ||
+        membership.status === 'Approved');
+    if (!memberOk) {
+      return deny(state, 'Join this club and get approved before requesting a position.', {
+        duplicate: false,
+      });
+    }
+    const filledSeats = Number(position.filledSeats) || (position.holders || []).length;
+    if (filledSeats >= (Number(position.seats) || 1)) {
+      return deny(state, 'All seats for this position are filled.', { duplicate: false });
     }
     const exists = state.positionRequests.some(
       (r) =>
         r.positionId === payload.positionId &&
         r.studentId === state.currentStudent.id &&
-        r.status === 'Pending'
+        (r.status === 'Pending' || r.status === 'Recommended' || r.status === 'Assigned')
     );
     if (exists) return { ok: true, error: null, nextState: state, duplicate: true };
+    const otherOpen = state.positionRequests.some(
+      (r) =>
+        r.clubId === position.clubId &&
+        r.studentId === state.currentStudent.id &&
+        (r.status === 'Pending' || r.status === 'Recommended')
+    );
+    if (otherOpen) {
+      return deny(state, 'You already have an open position request in this club.', {
+        duplicate: false,
+      });
+    }
     const created = {
       id: `preq-${Date.now()}`,
       positionId: payload.positionId,
-      clubId: payload.clubId,
+      clubId: payload.clubId || position.clubId,
       studentId: state.currentStudent.id,
       studentName: state.currentStudent.name,
       note: payload.note?.trim() || '',
@@ -798,7 +848,7 @@ export const clubService = {
       if (!roleHasPermission(role, 'positions.assign')) {
         return deny(state, 'You cannot assign positions.');
       }
-      nextStatus = 'Approved';
+      nextStatus = 'Assigned';
     } else if (decision === 'reject') {
       if (
         !roleHasPermission(role, 'positions.assign') &&
@@ -809,12 +859,45 @@ export const clubService = {
     } else {
       return deny(state, 'Invalid review decision.');
     }
-    return allow({
-      ...state,
-      positionRequests: state.positionRequests.map((r) =>
-        r.id === requestId ? { ...r, status: nextStatus } : r
-      ),
-    });
+
+    const request = state.positionRequests.find((r) => r.id === requestId);
+    if (!request) return deny(state, 'Position request not found.');
+    if (nextStatus === 'Assigned') {
+      const position = state.positions.find((p) => p.id === request.positionId);
+      const seats = Math.max(1, Number(position?.seats) || 1);
+      const filled = (position?.holders || []).length;
+      if (filled >= seats) {
+        return deny(state, 'All seats for this position are filled.');
+      }
+    }
+
+    const positionRequests = state.positionRequests.map((r) =>
+      r.id === requestId ? { ...r, status: nextStatus } : r
+    );
+
+    let positions = state.positions;
+    if (nextStatus === 'Assigned' && request.positionId) {
+      positions = state.positions.map((p) => {
+        if (p.id !== request.positionId) return p;
+        const holders = [
+          ...(p.holders || []),
+          {
+            studentId: request.studentId,
+            studentName: request.studentName || 'Student',
+            assignedAt: new Date().toISOString().slice(0, 10),
+          },
+        ];
+        const seats = Math.max(1, Number(p.seats) || 1);
+        return {
+          ...p,
+          holders,
+          filledSeats: holders.length,
+          status: holders.length >= seats ? 'Filled' : 'Open',
+        };
+      });
+    }
+
+    return allow({ ...state, positionRequests, positions });
   },
 
   upsertBudget(state, payload) {

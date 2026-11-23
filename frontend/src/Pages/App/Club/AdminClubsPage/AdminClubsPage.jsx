@@ -6,6 +6,9 @@ import { CLUB_THEME_TEMPLATES, getClubTheme } from '../../../../config/club/club
 import { ConfirmDialog } from '../Components/cms/ConfirmDialog';
 import { StatusBadge } from '../Components/cms/StatusBadge';
 import { clubCmsApi } from '../../../../services/club/clubCmsApi';
+import { ROLES } from '../../../../config/club/roles';
+import { isMainInstituteAdmin } from '../../../../config/club/clubAuthSession';
+import { staffManageableClubs } from '../../../../services/club/clubLiveState';
 
 const CATEGORIES = [
   'Creative',
@@ -18,9 +21,11 @@ export const AdminClubsPage = () => {
   const {
     state,
     mode,
+    activeRole,
     assignedColleges,
     upsertClub,
     deleteClub,
+    assignClubOwner,
     reviewClubMemberRequest,
     setMemberStatus,
   } = useClub();
@@ -31,6 +36,15 @@ export const AdminClubsPage = () => {
       )
     : state.institutions;
   const campusOptions = assignedInstitutions.length ? assignedInstitutions : state.institutions;
+  const scopeToAssignedClubs =
+    (activeRole === ROLES.CLUB_ADMIN && !isMainInstituteAdmin()) ||
+    activeRole === ROLES.SENIOR_SALES_ENGINEER ||
+    activeRole === ROLES.SALES_ENGINEER;
+  // Club Admin / SSE / SE only list clubs they are assigned to; Institute Admin sees campus clubs.
+  const visibleClubs = useMemo(() => {
+    if (scopeToAssignedClubs) return staffManageableClubs(state.clubs);
+    return state.clubs;
+  }, [scopeToAssignedClubs, state.clubs]);
 
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [membersModalClubId, setMembersModalClubId] = useState(null);
@@ -47,11 +61,19 @@ export const AdminClubsPage = () => {
   const [centers, setCenters] = useState([]);
   const [placementLoading, setPlacementLoading] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState('');
+  const [ownerUserId, setOwnerUserId] = useState('');
+  const [staffUserIds, setStaffUserIds] = useState([]);
+  const [campusClubAdmins, setCampusClubAdmins] = useState([]);
+  const [campusClubStaff, setCampusClubStaff] = useState([]);
   const [featured, setFeatured] = useState(false);
   const [theme, setTheme] = useState(CLUB_THEME_TEMPLATES[0].id);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [confirmAction, setConfirmAction] = useState(null);
+  const [reassignClubId, setReassignClubId] = useState(null);
+  const [reassignOwnerId, setReassignOwnerId] = useState('');
+  const canAssignOwner =
+    isMainInstituteAdmin() || activeRole === ROLES.SENIOR_SALES_ENGINEER;
 
   const selectedCenter = useMemo(
     () => centers.find((center) => String(center._id) === String(centerId)),
@@ -67,6 +89,67 @@ export const AdminClubsPage = () => {
     const campusPeople = staff.filter((person) => person.institutionId === selectedCollegeId);
     return campusPeople.length ? campusPeople : staff;
   }, [selectedCollegeId, state.people]);
+
+  useEffect(() => {
+    if (!formModalOpen && !reassignClubId) return undefined;
+    if (!canAssignOwner || !isLiveClubAdmin) {
+      setCampusClubAdmins([]);
+      return undefined;
+    }
+    const collegeId = reassignClubId
+      ? visibleClubs.find((c) => c.id === reassignClubId)?.institutionId ||
+        state.clubs.find((c) => c.id === reassignClubId)?.institutionId
+      : selectedCollegeId;
+    if (!collegeId) {
+      setCampusClubAdmins([]);
+      return undefined;
+    }
+    let cancelled = false;
+    clubCmsApi
+      .listCampusClubAdmins(collegeId)
+      .then((res) => {
+        if (cancelled) return;
+        setCampusClubAdmins(res?.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setCampusClubAdmins([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    formModalOpen,
+    reassignClubId,
+    canAssignOwner,
+    isLiveClubAdmin,
+    selectedCollegeId,
+    visibleClubs,
+    state.clubs,
+  ]);
+
+  useEffect(() => {
+    if (!formModalOpen || !isLiveClubAdmin) {
+      setCampusClubStaff([]);
+      return undefined;
+    }
+    if (!selectedCollegeId) {
+      setCampusClubStaff([]);
+      return undefined;
+    }
+    let cancelled = false;
+    clubCmsApi
+      .listCampusClubStaff(selectedCollegeId)
+      .then((res) => {
+        if (cancelled) return;
+        setCampusClubStaff(res?.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setCampusClubStaff([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [formModalOpen, isLiveClubAdmin, selectedCollegeId]);
 
   useEffect(() => {
     if (!formModalOpen || !isLiveClubAdmin) return undefined;
@@ -146,6 +229,8 @@ export const AdminClubsPage = () => {
     setInstitutionId(campusOptions[0]?.id || '');
     resetPlacement();
     setCoordinatorId(state.people[0]?.id || '');
+    setOwnerUserId('');
+    setStaffUserIds([]);
     setFeatured(false);
     setTheme(CLUB_THEME_TEMPLATES[0].id);
     setThemePickerOpen(false);
@@ -163,6 +248,8 @@ export const AdminClubsPage = () => {
     setProjectId(club.projectId || '');
     setCenterId(club.centerId || '');
     setCoordinatorId(club.coordinatorId);
+    setOwnerUserId(club.createdByUserId || '');
+    setStaffUserIds(Array.isArray(club.staffUserIds) ? club.staffUserIds.map(String) : []);
     setFeatured(club.featured);
     setTheme(club.theme || CLUB_THEME_TEMPLATES[0].id);
     setThemePickerOpen(false);
@@ -182,6 +269,10 @@ export const AdminClubsPage = () => {
     } else if (!institutionId) {
       nextErrors.institutionId = 'Select a campus.';
     }
+    // Institute Admin / SSE must assign a dedicated Club Admin — not themselves.
+    if (canAssignOwner && !ownerUserId) {
+      nextErrors.ownerUserId = 'Select a Club Admin as owner. Institute Admin cannot own the club.';
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -191,7 +282,7 @@ export const AdminClubsPage = () => {
     const selectedVertical = verticals.find((row) => String(row._id) === String(verticalId));
     const selectedProject = projects.find((row) => String(row._id) === String(projectId));
 
-    upsertClub({
+    const payload = {
       id: editingClubId,
       name: name.trim(),
       description: description.trim(),
@@ -207,16 +298,37 @@ export const AdminClubsPage = () => {
       projectName: selectedProject?.name || '',
       centerName: selectedCenter?.name || '',
       coordinatorId,
+      staffUserIds,
       joiningMethod: 'Approval Required',
       interests: [category],
       featured,
-    });
+    };
+    // Club Admin: owner is always themselves (backend enforces). Admin/SSE may pick owner.
+    if (canAssignOwner && ownerUserId) {
+      payload.ownerUserId = ownerUserId;
+    }
+
+    upsertClub(payload);
 
     setFormModalOpen(false);
   };
 
+  const openReassignOwner = (club) => {
+    setReassignClubId(club.id);
+    setReassignOwnerId(club.createdByUserId || '');
+  };
+
+  const submitReassignOwner = () => {
+    if (!reassignClubId || !reassignOwnerId) return;
+    assignClubOwner(reassignClubId, reassignOwnerId);
+    setReassignClubId(null);
+    setReassignOwnerId('');
+  };
+
   const activeMembersModalClub = membersModalClubId
-    ? state.clubs.find((c) => c.id === membersModalClubId) || null
+    ? visibleClubs.find((c) => c.id === membersModalClubId) ||
+      state.clubs.find((c) => c.id === membersModalClubId) ||
+      null
     : null;
 
   return (
@@ -224,7 +336,11 @@ export const AdminClubsPage = () => {
       <div className="club-list-page__header">
         <div>
           <h1>Clubs</h1>
-          <p>Create clubs for a department, project, and centre.</p>
+          <p>
+            {scopeToAssignedClubs
+              ? `Your clubs (${visibleClubs.length}). You only manage clubs you are assigned to.`
+              : 'Create clubs for a department, project, and centre. Assign SSE/SE per club.'}
+          </p>
         </div>
         <Can permission="clubs.create">
           <button type="button" className="fc-btn fc-btn-primary" onClick={openAddClub}>
@@ -239,6 +355,8 @@ export const AdminClubsPage = () => {
             <tr>
               <th>Club</th>
               <th>Centre</th>
+              <th>Admins</th>
+              <th>SSE / SE</th>
               <th>Coordinator</th>
               <th>Members</th>
               <th>Pending</th>
@@ -246,22 +364,40 @@ export const AdminClubsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {state.clubs.length === 0 ? (
+            {visibleClubs.length === 0 ? (
               <tr>
-                <td colSpan={6} className="club-list-page__empty">
-                  No clubs yet. Click Create Club to add one.
+                <td colSpan={8} className="club-list-page__empty">
+                  {scopeToAssignedClubs
+                    ? 'No clubs assigned to you yet. Create one, or ask Institute Admin to link you on a club.'
+                    : 'No clubs yet. Click Create Club to add one.'}
                 </td>
               </tr>
             ) : (
-              state.clubs.map((club) => {
+              visibleClubs.map((club) => {
                 const inst = state.institutions.find((i) => i.id === club.institutionId);
                 const coord = state.people.find((p) => p.id === club.coordinatorId);
+                const owner =
+                  (club.adminNames && club.adminNames.length
+                    ? club.adminNames.join(', ')
+                    : '') ||
+                  club.ownerName ||
+                  state.people.find((p) => p.id === club.createdByUserId)?.name ||
+                  '—';
                 const members = club.members || [];
                 const joinedCount = members.filter(
                   (m) => m.status === 'joined' || m.status === 'approved'
                 ).length;
                 const pendingCount = members.filter((m) => m.status === 'pending').length;
                 const canManageClub = club.canManage !== false;
+                const officeLine = (state.positions || [])
+                  .filter((position) => String(position.clubId) === String(club.id))
+                  .flatMap((position) =>
+                    (position.holders || []).map(
+                      (holder) => `${position.title}: ${holder.studentName || 'Member'}`
+                    )
+                  )
+                  .slice(0, 3)
+                  .join(' · ');
 
                 return (
                   <tr key={club.id}>
@@ -270,6 +406,7 @@ export const AdminClubsPage = () => {
                       <div className="club-list-page__meta">
                         {club.category}
                         {!canManageClub ? ' · Other campus' : ''}
+                        {officeLine ? ` · ${officeLine}` : ''}
                       </div>
                     </td>
                     <td>
@@ -277,6 +414,12 @@ export const AdminClubsPage = () => {
                       {club.projectName ? (
                         <div className="club-list-page__meta">{club.projectName}</div>
                       ) : null}
+                    </td>
+                    <td>{owner}</td>
+                    <td>
+                      {(club.staffNames && club.staffNames.length
+                        ? club.staffNames.join(', ')
+                        : '') || '—'}
                     </td>
                     <td>{coord?.name || 'Unassigned'}</td>
                     <td>{joinedCount}</td>
@@ -309,6 +452,16 @@ export const AdminClubsPage = () => {
                                 <Edit3 size={14} />
                               </button>
                             </Can>
+                            {canAssignOwner && (
+                              <button
+                                type="button"
+                                className="club-link-btn"
+                                title="Add another Club Admin"
+                                onClick={() => openReassignOwner(club)}
+                              >
+                                Add Admin
+                              </button>
+                            )}
                             <Can permission="clubs.edit">
                               <button
                                 type="button"
@@ -640,6 +793,39 @@ export const AdminClubsPage = () => {
                     </div>
                   )}
 
+                  {canAssignOwner ? (
+                    <div className="form-field">
+                      <label className="form-label" htmlFor="club-owner">
+                        Owner (Club Admin) *
+                      </label>
+                      <select
+                        id="club-owner"
+                        className="form-select"
+                        value={ownerUserId}
+                        onChange={(e) => setOwnerUserId(e.target.value)}
+                      >
+                        <option value="">Select Club Admin</option>
+                        {campusClubAdmins.map((admin) => (
+                          <option key={String(admin._id)} value={String(admin._id)}>
+                            {admin.name}
+                            {admin.roleLabel ? ` · ${admin.roleLabel}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.ownerUserId && <span className="form-error">{errors.ownerUserId}</span>}
+                      <span className="club-list-page__meta">
+                        Institute Admin oversees the campus. A separate Club Admin must own the club.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="form-field">
+                      <label className="form-label">Owner</label>
+                      <div className="club-list-page__meta">
+                        You will be the owner of this club automatically.
+                      </div>
+                    </div>
+                  )}
+
                   <div className="form-field">
                     <label className="form-label" htmlFor="club-coord">
                       Coordinator
@@ -667,6 +853,50 @@ export const AdminClubsPage = () => {
                         No institute users yet. Add them in Access Management, then return here.
                       </span>
                     )}
+                  </div>
+
+                  <div className="form-field full-width">
+                    <div className="form-label" id="club-staff-label">
+                      Linked SSE / SE
+                    </div>
+                    {campusClubStaff.length ? (
+                      <div
+                        className="club-staff-link-list"
+                        role="group"
+                        aria-labelledby="club-staff-label"
+                      >
+                        {campusClubStaff.map((staff) => {
+                          const id = String(staff._id);
+                          const checked = staffUserIds.includes(id);
+                          return (
+                            <label key={id} className="club-staff-link-item">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setStaffUserIds((prev) =>
+                                    e.target.checked
+                                      ? [...new Set([...prev, id])]
+                                      : prev.filter((value) => value !== id)
+                                  );
+                                }}
+                              />
+                              <span>
+                                {staff.name}
+                                {staff.roleLabel ? ` · ${staff.roleLabel}` : ''}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="form-error">
+                        No SSE/SE on this campus yet. Grant the role in Access Management first.
+                      </span>
+                    )}
+                    <span className="club-list-page__meta">
+                      Tick people who should manage this club. They will see it on their dashboard.
+                    </span>
                   </div>
 
                   <div className="form-field">
@@ -762,6 +992,62 @@ export const AdminClubsPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {reassignClubId && (
+        <div className="fc-modal-backdrop" role="presentation" onClick={() => setReassignClubId(null)}>
+          <div
+            className="fc-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add Club Admin"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="fc-modal-header">
+              <h2>Add Club Admin</h2>
+              <button type="button" className="club-icon-btn" onClick={() => setReassignClubId(null)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="fc-modal-body">
+              <p className="club-list-page__meta" style={{ marginBottom: 12 }}>
+                Earlier admins stay on this club. One club can have multiple Club Admins.
+              </p>
+              <div className="form-field">
+                <label className="form-label" htmlFor="reassign-owner">
+                  Club Admin to add
+                </label>
+                <select
+                  id="reassign-owner"
+                  className="form-select"
+                  value={reassignOwnerId}
+                  onChange={(e) => setReassignOwnerId(e.target.value)}
+                >
+                  <option value="">Select Club Admin</option>
+                  {campusClubAdmins.map((admin) => (
+                    <option key={String(admin._id)} value={String(admin._id)}>
+                      {admin.name}
+                      {admin.roleLabel ? ` · ${admin.roleLabel}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="fc-modal-footer">
+              <button type="button" className="fc-btn fc-btn-outline fc-btn-sm" onClick={() => setReassignClubId(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="fc-btn fc-btn-primary fc-btn-sm"
+                disabled={!reassignOwnerId}
+                onClick={submitReassignOwner}
+              >
+                Add Admin
+              </button>
+            </div>
           </div>
         </div>
       )}

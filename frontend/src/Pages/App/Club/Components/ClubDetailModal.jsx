@@ -314,7 +314,7 @@ export const ClubDetailModal = ({ club, onClose, onSelectActivity }) => {
                           <span className="pill pill-Joined">
                             <Check size={13} /> Joined
                           </span>
-                        ) : (
+                        ) : status === 'approved' ? (
                           <button
                             type="button"
                             className="fc-btn fc-btn-primary fc-btn-sm"
@@ -322,6 +322,8 @@ export const ClubDetailModal = ({ club, onClose, onSelectActivity }) => {
                           >
                             Join event
                           </button>
+                        ) : (
+                          <span className="club-list-page__meta">Join club to register</span>
                         )}
                       </div>
                     </div>

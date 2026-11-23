@@ -9,7 +9,17 @@ export const ClubRouteGuard = ({ permission, roles, children }) => {
   const { activeRole, getClubPath, isLiveMode, cmsStatus, state } = useClub();
   const { can } = usePermission();
 
-  if (isLiveMode && cmsStatus === 'loading') return null;
+  if (isLiveMode && cmsStatus === 'loading') {
+    return (
+      <div className="empty-state-box" style={{ textAlign: 'center', padding: '48px 20px' }}>
+        <div className="spinner-border text-primary mb-3" role="status" aria-label="Loading club" />
+        <strong style={{ display: 'block' }}>Loading Club…</strong>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 8 }}>
+          Fetching your clubs and campus activity.
+        </p>
+      </div>
+    );
+  }
   if (isLiveMode && cmsStatus === 'error') {
     return (
       <div className="empty-state-box">

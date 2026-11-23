@@ -258,10 +258,17 @@ export const CommunityPage = ({ lockedClubId = '', embedded = false } = {}) => {
       ) : null}
 
       {filteredPosts.length === 0 ? (
-        <section className="club-dash-panel">
-          <p className="club-dash-empty">
-            {filterClubId ? `No posts in ${clubName(filterClubId)} yet.` : 'No posts yet. Share the first update.'}
-          </p>
+        <section className={`club-dash-panel ${embedded ? 'club-feed-welcome' : ''}`}>
+          {embedded ? (
+            <div className="club-feed-welcome__body">
+              <h3>Start the conversation</h3>
+              <p>Share updates, wins, or announcements. Members will see them here.</p>
+            </div>
+          ) : (
+            <p className="club-dash-empty">
+              {filterClubId ? `No posts in ${clubName(filterClubId)} yet.` : 'No posts yet. Share the first update.'}
+            </p>
+          )}
         </section>
       ) : (
         <div className="club-feed-list">

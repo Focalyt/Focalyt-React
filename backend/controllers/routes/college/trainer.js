@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const uuid = require('uuid/v1');
 const jwt = require('jsonwebtoken');
-const { isCollege, isTrainer } = require('../../../helpers');
+const { isCollege, isTrainer, generatePassword } = require('../../../helpers');
 const { Parser } = require("json2csv");
 const mongoose = require('mongoose');
 const axios = require('axios');
@@ -200,6 +200,7 @@ router.post('/addTrainer', isCollege, uploadTrainerFiles, async (req, res) => {
             }
         }
 
+        const temporaryPassword = await generatePassword();
         const newUser = new User({
             name: name.trim(),
             email: email.toLowerCase().trim(),
@@ -210,7 +211,7 @@ router.post('/addTrainer', isCollege, uploadTrainerFiles, async (req, res) => {
             passportSizePhoto: passportPhotoUrl,
             role: 4,
             status: true,
-            password: 'Focalyt',
+            password: temporaryPassword,
             isDeleted: false,
             userAddedby: currentUserId
         });
@@ -248,7 +249,8 @@ router.post('/addTrainer', isCollege, uploadTrainerFiles, async (req, res) => {
             passportSizePhoto: savedUser.passportSizePhoto,
             role: savedUser.role,
             status: savedUser.status,
-            created_at: savedUser.createdAt
+            created_at: savedUser.createdAt,
+            temporaryPassword,
         }
 
     //   console.log("newUser" , newUser)

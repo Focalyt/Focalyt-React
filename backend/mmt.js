@@ -20,6 +20,11 @@ const axios = require("axios");
 const AWS = require('aws-sdk');
 const { Server } = require("socket.io");
 const { setClubIo } = require("./helpers/clubSocket");
+const {
+	authenticateSocketUser,
+	assertCanJoinClubRoom,
+	assertCanJoinCampusRoom,
+} = require("./helpers/clubSocketAuth");
 
 const dns = require('dns');
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
@@ -84,14 +89,45 @@ const io = new Server(server, {
 	if (!userSockets[userId]) userSockets[userId] = [];
 	userSockets[userId].push(socket.id);
 
-	socket.on("club:join", (clubId) => {
-		if (clubId) socket.join(`club:${String(clubId)}`);
+	// Personal Club room — students get membership approve/reject without campus assign rooms.
+	if (userId && userId !== "guestUser") {
+		socket.join(`club-user:${String(userId)}`);
+	}
+
+	socket.on("club:join", async (clubId, ack) => {
+		const reply = (payload) => {
+			if (typeof ack === "function") ack(payload);
+		};
+		try {
+			if (!clubId) return reply({ ok: false, message: "Club id required" });
+			const user = await authenticateSocketUser(socket);
+			if (!user) return reply({ ok: false, message: "Authentication required" });
+			const allowed = await assertCanJoinClubRoom(user, clubId);
+			if (!allowed) return reply({ ok: false, message: "Not allowed to join this club room" });
+			socket.join(`club:${String(clubId)}`);
+			return reply({ ok: true });
+		} catch (err) {
+			return reply({ ok: false, message: err.message || "Join failed" });
+		}
 	});
 	socket.on("club:leave", (clubId) => {
 		if (clubId) socket.leave(`club:${String(clubId)}`);
 	});
-	socket.on("club-campus:join", (collegeId) => {
-		if (collegeId) socket.join(`club-campus:${String(collegeId)}`);
+	socket.on("club-campus:join", async (collegeId, ack) => {
+		const reply = (payload) => {
+			if (typeof ack === "function") ack(payload);
+		};
+		try {
+			if (!collegeId) return reply({ ok: false, message: "Campus id required" });
+			const user = await authenticateSocketUser(socket);
+			if (!user) return reply({ ok: false, message: "Authentication required" });
+			const allowed = await assertCanJoinCampusRoom(user, collegeId);
+			if (!allowed) return reply({ ok: false, message: "Not allowed to join this campus room" });
+			socket.join(`club-campus:${String(collegeId)}`);
+			return reply({ ok: true });
+		} catch (err) {
+			return reply({ ok: false, message: err.message || "Join failed" });
+		}
 	});
 	socket.on("club-campus:leave", (collegeId) => {
 		if (collegeId) socket.leave(`club-campus:${String(collegeId)}`);

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const router = express.Router();
 
-const { isCollege, auth1, authenti, logUserActivity, getAllTeamMembers } = require("../../../helpers");
+const { isCollege, auth1, authenti, logUserActivity, getAllTeamMembers, generatePassword } = require("../../../helpers");
 const {
   CLUB_ROLE_FLAGS,
   cmsRoleFromFlags,
@@ -106,7 +106,9 @@ const mapCampus = (college, targetUserId, managedIds) => ({
 const collegesForUser = (userId) =>
   College.find({
     isDeleted: { $ne: true },
-    $or: [{ '_concernPerson._id': userId }, { _concernPerson: userId }],
+    // _concernPerson is [{ _id, defaultAdmin }] — do not query `{ _concernPerson: userId }`
+    // (casts string → EmbeddedDocument and throws ObjectParameterError).
+    _concernPerson: { $elemMatch: { _id: userId } },
   })
     .select(CAMPUS_SELECT)
     .sort({ name: 1 })
@@ -232,41 +234,48 @@ const unassignUserFromCampus = async (collegeId, targetUserId) =>
 
 router.get('/', isCollege, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 200));
     const user = req.user;
+    const includeTeam = String(req.query.includeTeam || '') === '1';
 
-    const query = { '_concernPerson._id': user._id };
-    // const totalCount = await College.countDocuments(query);
+    // Fast path: collect concern-person IDs, then one User.find (no N+1 team recursion).
+    const colleges = await College.find({ '_concernPerson._id': user._id })
+      .select('_concernPerson')
+      .lean();
 
-    const colleges = await College.find(query)
-      .populate({
-        path: '_concernPerson._id',
-        select: 'name email mobile designation permissions reporting_managers createdAt status my_team'
-      })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .sort({ createdAt: -1 });
-
-    let users = await Promise.all(colleges.flatMap(college => college._concernPerson.map(concernPerson => concernPerson._id)));
-
-    for (let user of users) {
-      if (user?._id) user.my_team = await getAllTeamMembers(user._id);
-    }
-
-    const seenUsers = new Set();
-    users = users.filter((listedUser) => {
-      if (!listedUser?._id) return false;
-      const id = String(listedUser._id);
-      if (seenUsers.has(id)) return false;
-      seenUsers.add(id);
-      return true;
+    const userIdSet = new Set();
+    colleges.forEach((college) => {
+      const rows = Array.isArray(college._concernPerson)
+        ? college._concernPerson
+        : college._concernPerson
+          ? [college._concernPerson]
+          : [];
+      rows.forEach((row) => {
+        const id = row?._id || row;
+        if (id) userIdSet.add(String(id));
+      });
     });
 
-    totalCount = users.length
+    const allUserIds = [...userIdSet].filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const totalCount = allUserIds.length;
+    const start = (page - 1) * limit;
+    const pageIds = allUserIds.slice(start, start + limit);
 
-    // Fetch user details
+    let users = await User.find({ _id: { $in: pageIds } })
+      .select('name email mobile designation permissions reporting_managers createdAt status my_team isDeleted')
+      .sort({ name: 1 })
+      .lean();
 
+    // Preserve request order loosely by name already; optional heavy team expand only when asked.
+    if (includeTeam) {
+      users = await Promise.all(
+        users.map(async (listedUser) => {
+          const teamIds = await getAllTeamMembers(listedUser._id);
+          return { ...listedUser, my_team: teamIds };
+        })
+      );
+    }
 
     res.json({
       success: true,
@@ -274,7 +283,7 @@ router.get('/', isCollege, async (req, res) => {
         users,
         pagination: {
           currentPage: page,
-          totalPages: Math.ceil(totalCount / limit),
+          totalPages: Math.max(1, Math.ceil(totalCount / limit)),
           totalUsers: totalCount,
           limit
         }
@@ -475,7 +484,8 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       }
     }
 
-    // Generate temporary password
+    // Generate temporary password (shown once to the creator; never use a shared default)
+    const temporaryPassword = await generatePassword();
     const currentUserId = req.user ? req.user.id : null;
 
     // Create user object (role is always 2 for college users)
@@ -496,7 +506,7 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
         custom_permissions: customPermissions
       },
       status: true,
-      password: 'Focalyt',
+      password: temporaryPassword,
       isDeleted: false,
       userAddedby: currentUserId
     });
@@ -514,7 +524,7 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
 
 
 
-    // Return success response
+    // Return success response (temporaryPassword only once — share with the new user securely)
     const userResponse = {
       id: savedUser._id,
       name: savedUser.name,
@@ -531,7 +541,8 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       verticals_access: validVerticalsAccess,
       b2c_projects_access: validB2cProjectsAccess,
       status: savedUser.status,
-      created_at: savedUser.createdAt
+      created_at: savedUser.createdAt,
+      temporaryPassword,
     };
 
 

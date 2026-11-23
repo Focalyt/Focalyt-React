@@ -710,84 +710,94 @@ module.exports.loginAsCandidate = async (req, res) => {
 
 module.exports.loginAsCollege = async (req, res) => {
   try {
-
     const { userInput, otp } = req.body;
-    const isMobile = /^\d{10}$/.test(userInput); // 10 digit check
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInput); // email check
-    let mobile;
-    let email;
-    if(isMobile){
-      mobile = userInput;
-    }else if(isEmail){
-      email = userInput;
-      const user = await User.findOne({ email, role: 2 });
-      if(!user){
-        return res.json({ status: false, error: "User not found" });
-      }
-      mobile = user.mobile;
-    }else{
-      return res.json({ status: false, error: "Invalid mobile number or email" });
+    const input = String(userInput || '').trim();
+    const isMobile = /^\d{10}$/.test(input);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
+
+    // DB stores college-user mobile as Number — never query with a string or OTP login fails after verify.
+    let user = null;
+    if (isMobile) {
+      user = await User.findOne({ mobile: parseInt(input, 10), role: 2 });
+    } else if (isEmail) {
+      user = await User.findOne({ email: input.toLowerCase(), role: 2 });
+    } else {
+      return res.json({ status: false, message: 'Invalid mobile number or email' });
     }
 
-    const auth = authKey
-    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
-    const result = await axios.get(url);
-    if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
+    if (!user) {
+      return res.json({ status: false, message: 'User not found' });
+    }
+    if (user.status === false || user.isDeleted) {
+      return res.json({ status: false, message: 'User disabled' });
+    }
 
-      const query = {
-        mobile,
-        role: 2
-      }
-      const user = await User.findOne(query);
-
-      if (!user) {
-        return res.json({ status: false, error: "User not found" });
-      }
-
-      const userId = new mongoose.Types.ObjectId(user._id);
-      const college = await College.findOne({
-				_concernPerson: { $elemMatch: { _id: userId } }
-			}, "name _concernPerson");
-
-      if (!college || college === null) {
-        return res.json({ status: false, message: 'Missing College!' });
-
-      };
-
-      // Extract isDefaultAdmin from _concernPerson
-      const concernPersonData = college._concernPerson.find(
-        p => p._id.toString() === userId.toString(),
-      );
-      const isDefaultAdmin = concernPersonData?.isDefaultAdmin || false;
-
-      const token = await user.generateAuthToken();
-
-      userData = {
-        _id: user._id,
-        name: user.name,
-        role: 2,
-        email: user.email,
-        mobile: user.mobile,
-        collegeName: college.name,
-        collegeId: college._id,
-        token,
-        isDefaultAdmin,
-        permissions: user.permissions,
-      };
-      return res.json({ status: true, message: "Login successful", userData });
-    } else {
-      return res.send({
+    const mobile = String(user.mobile || '').replace(/\D/g, '');
+    if (!/^\d{10}$/.test(mobile)) {
+      return res.json({
         status: false,
-        message: 'Invalid OTP!'
+        message: 'Valid mobile number not found on this account. Contact admin.',
       });
     }
 
+    const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${authKey}&mobile=91${mobile}&otp=${otp}`;
+    const result = await axios.get(url);
+    const otpOk =
+      result.data?.type === 'success' ||
+      result.data?.type === 'status' ||
+      result.data?.message === 'already_verified' ||
+      String(otp) === '2025';
 
+    if (!otpOk) {
+      return res.json({ status: false, message: 'Invalid OTP!' });
+    }
 
-  }
-  catch (err) {
-    req.flash("error", err.message || "Something went wrong!");
-    return res.redirect("back");
+    const userId = user._id;
+    const college = await College.findOne(
+      {
+        isDeleted: { $ne: true },
+        $or: [
+          { '_concernPerson._id': userId },
+          { _concernPerson: { $elemMatch: { _id: userId } } },
+        ],
+      },
+      'name _concernPerson'
+    );
+
+    if (!college) {
+      return res.json({
+        status: false,
+        message: 'Missing College! This Club Admin is not assigned to any campus.',
+      });
+    }
+
+    const concernPersonData = (college._concernPerson || []).find(
+      (p) => String(p?._id || p) === String(userId)
+    );
+    const isDefaultAdmin = Boolean(
+      concernPersonData?.defaultAdmin || concernPersonData?.isDefaultAdmin
+    );
+
+    const token = await user.generateAuthToken();
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      role: 2,
+      email: user.email,
+      mobile: user.mobile,
+      collegeName: college.name,
+      collegeId: college._id,
+      token,
+      isDefaultAdmin,
+      permissions: user.permissions,
+    };
+    return res.json({ status: true, message: 'Login successful', userData });
+  } catch (err) {
+    console.error('otpCollegeLogin failed:', err.message || err);
+    return res.status(500).json({
+      status: false,
+      message: err.message || 'OTP verification failed',
+    });
   }
 }
 

@@ -81,6 +81,10 @@ export function emptyLiveCmsState(assignedColleges = []) {
 }
 
 export function mapLiveCmsToState(_prev, payload = {}, assignedColleges = []) {
+  const currentUserId = asId(payload.currentUser?._id || payload.currentUser?.id);
+  const cmsRole = String(payload.cmsRole || '').toLowerCase();
+  const isMainInstituteAdmin = Boolean(payload.currentUser?.isMainInstituteAdmin);
+
   const membersByClub = (payload.members || []).reduce((acc, member) => {
     const clubId = asId(member.clubId?._id || member.clubId);
     acc[clubId] = acc[clubId] || [];
@@ -147,8 +151,77 @@ export function mapLiveCmsToState(_prev, payload = {}, assignedColleges = []) {
       centerName: centerDoc?.name || club.centerName || '',
       projectName: projectDoc?.name || club.projectName || '',
       departmentName: verticalDoc?.name || club.departmentName || '',
-      canManage: !assignedCampusIds.size || assignedCampusIds.has(institutionId),
+      createdByUserId: asId(club.createdByUserId?._id || club.createdByUserId),
+      adminUserIds: [
+        ...new Set(
+          [
+            asId(club.createdByUserId?._id || club.createdByUserId),
+            ...(club.adminUserIds || []).map((row) => asId(row?._id || row)),
+          ].filter(Boolean)
+        ),
+      ],
+      staffUserIds: [
+        ...new Set((club.staffUserIds || []).map((row) => asId(row?._id || row)).filter(Boolean)),
+      ],
+      staffNames: (() => {
+        const names = [];
+        (club.staffUserIds || []).forEach((row) => {
+          if (row && typeof row === 'object' && row.name) {
+            if (!names.includes(row.name)) names.push(row.name);
+            return;
+          }
+          const id = asId(row);
+          const fromPeople = people.find((p) => p.id === id)?.name;
+          if (fromPeople && !names.includes(fromPeople)) names.push(fromPeople);
+        });
+        return names;
+      })(),
+      ownerName:
+        (club.createdByUserId && typeof club.createdByUserId === 'object'
+          ? club.createdByUserId.name || ''
+          : '') ||
+        people.find((p) => p.id === asId(club.createdByUserId?._id || club.createdByUserId))?.name ||
+        '',
+      adminNames: (() => {
+        const names = [];
+        const pushName = (id, fallbackName) => {
+          if (!id) return;
+          const fromPeople = people.find((p) => p.id === id)?.name;
+          const name = fallbackName || fromPeople;
+          if (name && !names.includes(name)) names.push(name);
+        };
+        if (club.createdByUserId && typeof club.createdByUserId === 'object') {
+          pushName(asId(club.createdByUserId._id), club.createdByUserId.name);
+        } else {
+          pushName(asId(club.createdByUserId));
+        }
+        (club.adminUserIds || []).forEach((row) => {
+          if (row && typeof row === 'object') pushName(asId(row._id), row.name);
+          else pushName(asId(row));
+        });
+        return names;
+      })(),
       coordinatorId: asId(club.coordinatorId) || (assignedCoord ? assignedCoord.id : ''),
+      canManage: (() => {
+        const onCampus = !assignedCampusIds.size || assignedCampusIds.has(institutionId);
+        if (!onCampus) return false;
+        if (isMainInstituteAdmin) return true;
+        if (cmsRole === 'institute') return true;
+        const coordinator = asId(club.coordinatorId) || asId(assignedCoord?.id);
+        const staffIds = (club.staffUserIds || []).map((row) => asId(row?._id || row)).filter(Boolean);
+        if (cmsRole === 'senior_sales_engineer' || cmsRole === 'sales_engineer') {
+          return Boolean(currentUserId) && (staffIds.includes(currentUserId) || coordinator === currentUserId);
+        }
+        if (cmsRole === 'club_admin') {
+          const adminIds = [
+            asId(club.createdByUserId?._id || club.createdByUserId),
+            ...(club.adminUserIds || []).map((row) => asId(row?._id || row)),
+          ].filter(Boolean);
+          if (!adminIds.length && !coordinator) return true; // legacy unowned clubs
+          return Boolean(currentUserId) && (adminIds.includes(currentUserId) || coordinator === currentUserId);
+        }
+        return onCampus;
+      })(),
       eligibility: club.eligibility || '',
       joiningMethod: 'Approval Required',
       meetingSchedule: club.meetingSchedule || '',
@@ -168,15 +241,6 @@ export function mapLiveCmsToState(_prev, payload = {}, assignedColleges = []) {
     };
   });
 
-  const positions = (payload.positions || []).map((position) => ({
-    id: asId(position._id),
-    clubId: asId(position.clubId),
-    title: position.title,
-    description: position.description,
-    seats: position.seats,
-    status: position.status,
-  }));
-
   const positionRequests = (payload.positionRequests || []).map((item) => ({
     id: asId(item._id),
     positionId: asId(item.positionId),
@@ -186,14 +250,47 @@ export function mapLiveCmsToState(_prev, payload = {}, assignedColleges = []) {
     note: item.note,
     status:
       item.status === 'assigned'
-        ? 'Approved'
+        ? 'Assigned'
         : item.status === 'recommended'
           ? 'Recommended'
           : item.status === 'rejected'
             ? 'Rejected'
             : 'Pending',
-    requestedAt: item.createdAt ? String(item.createdAt).slice(0, 10) : '',
+    requestedAt: item.createdAt ? String(item.createdAt).slice(0, 10) : item.requestedAt || '',
+    assignedAt: item.assignedAt || '',
   }));
+
+  const holdersByPosition = {};
+  positionRequests.forEach((request) => {
+    if (request.status !== 'Assigned' || !request.positionId) return;
+    if (!holdersByPosition[request.positionId]) holdersByPosition[request.positionId] = [];
+    holdersByPosition[request.positionId].push({
+      studentId: request.studentId,
+      studentName: request.studentName || 'Student',
+      assignedAt: request.assignedAt || '',
+    });
+  });
+
+  const positions = (payload.positions || []).map((position) => {
+    const id = asId(position._id);
+    const seats = Math.max(1, Number(position.seats) || 1);
+    const holders = holdersByPosition[id] || [];
+    const filledSeats = holders.length;
+    const computedStatus = filledSeats >= seats ? 'Filled' : position.status || 'Open';
+    return {
+      id,
+      clubId: asId(position.clubId),
+      title: position.title,
+      description: position.description,
+      seats,
+      filledSeats,
+      holders,
+      status: computedStatus,
+      termLabel: position.termLabel || '',
+      termStart: position.termStart || '',
+      termEnd: position.termEnd || '',
+    };
+  });
 
   const activities = (payload.activities || []).map((act) => {
     const hostClub = clubs.find((c) => c.id === asId(act.clubId));

@@ -20,6 +20,7 @@ import { ActivityCard } from '../Components/ActivityCard';
 import { ClubDetailModal } from '../Components/ClubDetailModal';
 import { ActivityDetailModal } from '../Components/ActivityDetailModal';
 import { CATEGORY_OPTIONS } from '../../../../config/club/labels';
+import { studentCanActInClub } from '../../../../config/club/membership';
 
 export const DiscoverPage = () => {
   const navigate = useNavigate();
@@ -34,6 +35,8 @@ export const DiscoverPage = () => {
     registerForActivity,
     cancelActivityRegistration,
   } = useClub();
+  const canJoinFeatured = (activity) =>
+    studentCanActInClub(state.clubs, state.currentStudent, activity?.clubId);
 
   const [selectedClub, setSelectedClub] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
@@ -280,9 +283,15 @@ export const DiscoverPage = () => {
                     <button
                       type="button"
                       className="fc-btn fc-btn-primary"
+                      disabled={!canJoinFeatured(featuredActivity)}
+                      title={
+                        canJoinFeatured(featuredActivity)
+                          ? undefined
+                          : 'Join this club and get approved before registering.'
+                      }
                       onClick={() => registerForActivity(featuredActivity.id)}
                     >
-                      Join this event
+                      {canJoinFeatured(featuredActivity) ? 'Join this event' : 'Join club first'}
                     </button>
                   )}
 

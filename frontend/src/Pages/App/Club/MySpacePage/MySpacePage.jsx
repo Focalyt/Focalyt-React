@@ -14,7 +14,11 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { useClub } from '../../../../contexts/ClubContext';
-import { findStudentMembership, isApprovedMemberStatus } from '../../../../config/club/membership';
+import {
+  findStudentMembership,
+  isApprovedMemberStatus,
+  studentCanActInClub,
+} from '../../../../config/club/membership';
 import { ClubCard } from '../Components/ClubCard';
 import { ClubDetailModal } from '../Components/ClubDetailModal';
 import { ActivityDetailModal } from '../Components/ActivityDetailModal';
@@ -386,15 +390,18 @@ export const MySpacePage = () => {
                         >
                           Remove Saved
                         </button>
-                        {!registered && (
-                          <button
-                            type="button"
-                            className="fc-btn fc-btn-primary fc-btn-sm"
-                            onClick={() => registerForActivity(act.id)}
-                          >
-                            Join event
-                          </button>
-                        )}
+                        {!registered &&
+                          (studentCanActInClub(state.clubs, state.currentStudent, act.clubId) ? (
+                            <button
+                              type="button"
+                              className="fc-btn fc-btn-primary fc-btn-sm"
+                              onClick={() => registerForActivity(act.id)}
+                            >
+                              Join event
+                            </button>
+                          ) : (
+                            <span className="club-list-page__meta">Join club to register</span>
+                          ))}
                       </div>
                     </div>
                   </div>

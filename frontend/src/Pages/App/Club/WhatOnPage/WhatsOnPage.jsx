@@ -56,7 +56,7 @@ export const WhatsOnPage = () => {
             </div>
             <h1 className="section-title">Upcoming club events</h1>
             <p className="section-subtitle">
-              Tap the bookmark to save an event. Tap <strong>Join event</strong> to take a seat. Tap the card to see more.
+              Browse campus events here. To join an event, request membership in that club and wait for approval first.
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { useClub } from '../../../../contexts/ClubContext';
+import { getClubAuthToken } from '../../../../config/club/clubAuthSession';
 
 const socketUrl =
   process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
@@ -11,9 +12,12 @@ export function useClubChatSocket(clubId) {
 
   useEffect(() => {
     if (!clubId || !socketUrl) return undefined;
+    const token = getClubAuthToken();
+    if (!token) return undefined;
 
     const socket = io(socketUrl, {
-      query: { userId: userId || 'club-guest' },
+      auth: { token },
+      query: { userId: userId || 'club-user', token },
       transports: ['websocket', 'polling'],
       reconnection: true,
     });

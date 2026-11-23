@@ -2,10 +2,12 @@ import React from 'react';
 import { Bookmark, Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { useClub } from '../../../../contexts/ClubContext';
 import { modeLabel } from '../../../../config/club/labels';
+import { studentCanActInClub } from '../../../../config/club/membership';
 
 export const ActivityCard = ({ activity, onSelectActivity }) => {
   const {
     state,
+    mode,
     isActivitySaved,
     isActivityRegistered,
     toggleSaveActivity,
@@ -18,6 +20,11 @@ export const ActivityCard = ({ activity, onSelectActivity }) => {
   const club = state.clubs.find((c) => c.id === activity.clubId);
   const seatsLeft = Math.max(0, activity.capacity - activity.registrations.length);
   const isFull = seatsLeft === 0;
+  const canJoinEvent =
+    mode !== 'student' || studentCanActInClub(state.clubs, state.currentStudent, activity.clubId);
+  const joinBlockedReason = !canJoinEvent
+    ? 'Join this club and get approved before registering for its events.'
+    : '';
 
   const openDetails = () => onSelectActivity(activity);
 
@@ -94,13 +101,14 @@ export const ActivityCard = ({ activity, onSelectActivity }) => {
             <button
               type="button"
               className="fc-btn fc-btn-primary fc-btn-sm"
-              disabled={isFull}
+              disabled={isFull || !canJoinEvent}
+              title={joinBlockedReason || (isFull ? 'Full' : 'Join event')}
               onClick={(e) => {
                 e.stopPropagation();
                 registerForActivity(activity.id);
               }}
             >
-              Join event
+              {!canJoinEvent ? 'Join club first' : isFull ? 'Full' : 'Join event'}
             </button>
           )}
         </div>

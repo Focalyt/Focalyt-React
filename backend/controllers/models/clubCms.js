@@ -16,6 +16,12 @@ const clubSchema = new Schema(
     centerId: { type: ObjectId, ref: 'Center' },
     coordinatorId: { type: String, default: '' },
     createdByUserId: { type: ObjectId, ref: 'User' },
+    // All Club Admins who can manage this club (owner + added admins). createdByUserId stays primary.
+    // Use [ObjectId] (not [{ type: ObjectId }]) so Mongoose treats this as an ObjectId array,
+    // not a DocumentArray — DocumentArray casts throw: Parameter "obj" to Document() must be an object.
+    adminUserIds: { type: [ObjectId], ref: 'User', default: [] },
+    // SSE / SE linked to this club only (not campus-wide).
+    staffUserIds: { type: [ObjectId], ref: 'User', default: [] },
     createdByRole: { type: String, default: '' },
     eligibility: { type: String, default: 'Open to all registered students.' },
     joiningMethod: { type: String, default: 'Approval Required' },
@@ -77,6 +83,10 @@ const clubPositionSchema = new Schema(
     description: { type: String, default: '' },
     seats: { type: Number, default: 1 },
     status: { type: String, default: 'Open' },
+    // Optional academic term, e.g. "Academic Year 2025–26"
+    termLabel: { type: String, default: '', trim: true },
+    termStart: { type: String, default: '' },
+    termEnd: { type: String, default: '' },
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }

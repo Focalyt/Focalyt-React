@@ -52,3 +52,12 @@ export function isApprovedClubMember(member, student) {
   }
   return isApprovedMemberStatus(member.status);
 }
+
+/** Student may browse campus clubs; actions need approved membership. */
+export function studentCanActInClub(clubs = [], student, clubId) {
+  if (!clubId) return false;
+  const club = (clubs || []).find((row) => String(row.id || row._id) === String(clubId));
+  if (!club) return false;
+  const mine = findStudentMembership(club, student);
+  return isApprovedMemberStatus(mine?.status);
+}

@@ -2605,6 +2605,32 @@
   color: #64748b;
 }
 
+.focalyt-club-root .club-staff-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.focalyt-club-root .club-staff-link-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.focalyt-club-root .club-staff-link-item input {
+  margin: 0;
+}
+
 .focalyt-club-root .club-list-page__pending {
   color: #b45309;
   font-weight: 600;

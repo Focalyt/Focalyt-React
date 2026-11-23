@@ -545,7 +545,12 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         }
       })
       if (reponse.status) {
-        alert('User added successfully')
+        const tempPassword = reponse.data?.data?.temporaryPassword;
+        alert(
+          tempPassword
+            ? `User added successfully.\n\nTemporary password (share once, then ask them to change it):\n${tempPassword}`
+            : 'User added successfully'
+        );
         onAddUser()
       }
       else {

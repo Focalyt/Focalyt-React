@@ -46,6 +46,7 @@ const {
   cmsRoleFromFlags,
   mergeClubPermissions,
 } = require('../../../helpers/clubAssignablePermissions');
+const { isAllowedClubMediaUrl } = require('../../../helpers/clubSocketAuth');
 
 const router = express.Router();
 const clubAdminRouter = express.Router();
@@ -324,6 +325,48 @@ async function isStudentClubMember(req, clubId) {
   return Boolean(member && isApprovedMemberStatus(member.status));
 }
 
+/**
+ * Students: campus bubble + act only inside approved clubs.
+ * Browse campus events is fine; registering requires approved membership of that club.
+ */
+async function denyActivityRegistrationAccess(req, res, activity) {
+  if (!activity) {
+    res.status(404).json({ status: false, message: 'Activity not found' });
+    return true;
+  }
+  const isStudent = req.clubAccess?.cmsRole === 'student';
+  if (isStudent) {
+    let collegeId = activity.collegeId;
+    if (!collegeId && activity.clubId && isValidObjectId(activity.clubId)) {
+      const club = await Club.findById(activity.clubId).select('collegeId').lean();
+      collegeId = club?.collegeId;
+    }
+    if (!collegeId || !campusAllowed(req, collegeId)) {
+      res.status(403).json({
+        status: false,
+        message: 'This activity is not on your campus.',
+      });
+      return true;
+    }
+    if (!isValidObjectId(activity.clubId)) {
+      res.status(403).json({
+        status: false,
+        message: 'Join a campus club and get approved before registering for events.',
+      });
+      return true;
+    }
+    if (!(await isStudentClubMember(req, activity.clubId))) {
+      res.status(403).json({
+        status: false,
+        message: 'Join this club and get approved before registering for its activities.',
+      });
+      return true;
+    }
+    return false;
+  }
+  return denyCampus(req, res, activity.collegeId);
+}
+
 function isPublishedSchedule(activity) {
   return !activity?.scheduleStatus || activity.scheduleStatus === 'scheduled';
 }
@@ -339,9 +382,286 @@ function denyCampus(req, res, collegeId) {
     return true;
   }
   if (campusAllowed(req, collegeId)) return false;
-  if (req.clubAccess?.cmsRole === 'student') return false;
   res.status(403).json({ status: false, message: 'This campus is not assigned to you.' });
   return true;
+}
+
+function clubAdminIdList(club) {
+  const ids = [];
+  const push = (value) => {
+    const id = value?._id || value;
+    if (isValidObjectId(id)) ids.push(String(id));
+  };
+  push(club?.createdByUserId);
+  (club?.adminUserIds || []).forEach(push);
+  return [...new Set(ids)];
+}
+
+function withClubAdmins(ownerId, existingIds = []) {
+  // Must return ObjectIds — assigning string[] to DocumentArray throws:
+  // Parameter "obj" to Document() must be an object, got "<id>" (type string)
+  const seen = new Set();
+  const ids = [];
+  const push = (value) => {
+    const raw = value?._id || value;
+    if (!isValidObjectId(raw)) return;
+    const key = String(raw);
+    if (seen.has(key)) return;
+    seen.add(key);
+    ids.push(new mongoose.Types.ObjectId(key));
+  };
+  push(ownerId);
+  (existingIds || []).forEach(push);
+  return ids;
+}
+
+function isClubOwnerOrCoordinator(user, club) {
+  const uid = String(user?._id || '');
+  if (!uid || !club) return false;
+  if (clubAdminIdList(club).includes(uid)) return true;
+  if (String(club.coordinatorId || '') === uid) return true;
+  return false;
+}
+
+function clubStaffIdList(club) {
+  const ids = [];
+  const push = (value) => {
+    const id = value?._id || value;
+    if (isValidObjectId(id)) ids.push(String(id));
+  };
+  (club?.staffUserIds || []).forEach(push);
+  if (String(club?.coordinatorId || '').trim() && isValidObjectId(club.coordinatorId)) {
+    push(club.coordinatorId);
+  }
+  return [...new Set(ids)];
+}
+
+function withClubStaffIds(userIds = [], existingIds = []) {
+  const seen = new Set();
+  const ids = [];
+  const push = (value) => {
+    const raw = value?._id || value;
+    if (!isValidObjectId(raw)) return;
+    const key = String(raw);
+    if (seen.has(key)) return;
+    seen.add(key);
+    ids.push(new mongoose.Types.ObjectId(key));
+  };
+  (existingIds || []).forEach(push);
+  (userIds || []).forEach(push);
+  return ids;
+}
+
+function isFieldStaffCmsRole(role) {
+  return role === 'senior_sales_engineer' || role === 'sales_engineer';
+}
+
+/** SSE/SE: linked via staffUserIds or coordinatorId only. */
+function isClubLinkedFieldStaff(user, club) {
+  const uid = String(user?._id || '');
+  if (!uid || !club) return false;
+  return clubStaffIdList(club).includes(uid);
+}
+
+/** Club Admin: own/coordinate only. SSE/SE: assigned clubs only. Institute Admin: campus-wide. */
+function canManageClubMembership(req, club) {
+  if (!club) return false;
+  if (!campusAllowed(req, club.collegeId)) return false;
+  if (isMainInstituteAdminUser(req.user)) return true;
+  const role = req.clubAccess?.cmsRole;
+  if (role === 'institute') return true;
+  if (isFieldStaffCmsRole(role)) {
+    return isClubLinkedFieldStaff(req.user, club);
+  }
+  if (role === 'club_admin') {
+    // Legacy clubs with no owner yet stay manageable by campus Club Admins.
+    if (!club.createdByUserId && !String(club.coordinatorId || '').trim()) return true;
+    return isClubOwnerOrCoordinator(req.user, club);
+  }
+  return false;
+}
+
+function denyClubMembershipManage(req, res, club) {
+  if (canManageClubMembership(req, club)) return false;
+  res.status(403).json({
+    status: false,
+    message:
+      'You can only manage members for clubs you are assigned to. Institute Admin can manage any club on the campus.',
+  });
+  return true;
+}
+
+function denyClubStaffManage(req, res, club) {
+  if (!club) {
+    res.status(404).json({ status: false, message: 'Club not found' });
+    return true;
+  }
+  if (isMainInstituteAdminUser(req.user) || req.clubAccess?.cmsRole === 'institute') return false;
+  const role = req.clubAccess?.cmsRole;
+  if (role === 'club_admin') {
+    if (
+      !isClubOwnerOrCoordinator(req.user, club) &&
+      (club.createdByUserId || String(club.coordinatorId || '').trim())
+    ) {
+      res.status(403).json({
+        status: false,
+        message: 'You can only edit clubs you own or coordinate.',
+      });
+      return true;
+    }
+    return false;
+  }
+  if (isFieldStaffCmsRole(role)) {
+    if (!isClubLinkedFieldStaff(req.user, club)) {
+      res.status(403).json({
+        status: false,
+        message: 'You can only manage clubs you are assigned to.',
+      });
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+const CLUB_MANAGE_SELECT =
+  'collegeId createdByUserId coordinatorId adminUserIds staffUserIds isDeleted';
+
+/** Club Admin / SSE / SE must operate on assigned clubs; Main Institute Admin is campus-wide. */
+function needsAssignedClubScope(req) {
+  if (isMainInstituteAdminUser(req.user)) return false;
+  const role = req.clubAccess?.cmsRole;
+  return role === 'club_admin' || isFieldStaffCmsRole(role);
+}
+
+async function findClubLeanForManage(clubId) {
+  if (!isValidObjectId(clubId)) return null;
+  const club = await Club.findById(clubId).select(CLUB_MANAGE_SELECT).lean();
+  if (!club || club.isDeleted) return null;
+  return club;
+}
+
+/**
+ * Campus + assigned-club gate for staff ops.
+ * @returns {Promise<boolean>} true if response already sent
+ */
+async function denyStaffClubOpsByClubId(req, res, clubId, { required = false } = {}) {
+  if (!isValidObjectId(clubId)) {
+    if (required || needsAssignedClubScope(req)) {
+      res.status(400).json({ status: false, message: 'Select a club you are assigned to.' });
+      return true;
+    }
+    return false;
+  }
+  const club = await findClubLeanForManage(clubId);
+  if (!club) {
+    res.status(404).json({ status: false, message: 'Club not found' });
+    return true;
+  }
+  if (denyCampus(req, res, club.collegeId)) return true;
+  if (denyClubStaffManage(req, res, club)) return true;
+  return false;
+}
+
+function isSseOrSeCapableUser(user) {
+  if (!user || user.isDeleted || user.status === false) return false;
+  if (Number(user.role) !== 2 && Number(user.role) !== 5) return false;
+  const custom = user?.permissions?.custom_permissions || {};
+  return Boolean(custom.can_be_club_sse || custom.can_be_club_se);
+}
+
+/** Main Institute Admin or SSE may assign/reassign club owner. Club Admin cannot. */
+function canAssignClubOwner(req) {
+  if (isMainInstituteAdminUser(req.user)) return true;
+  return req.clubAccess?.cmsRole === 'senior_sales_engineer';
+}
+
+/** Dedicated Club Admin only — Main Institute Admin is NOT a Club Admin owner. */
+function isClubAdminCapableUser(user) {
+  if (!user || user.isDeleted || user.status === false) return false;
+  if (Number(user.role) !== 2 && Number(user.role) !== 5) return false;
+  const custom = user?.permissions?.custom_permissions || {};
+  return Boolean(custom.can_be_club_admin);
+}
+
+async function userOnCampus(userId, collegeId) {
+  if (!isValidObjectId(userId) || !isValidObjectId(collegeId)) return false;
+  // College._concernPerson is [{ _id, defaultAdmin }] — never query `{ _concernPerson: userId }`
+  // (Mongoose tries to cast the string into an EmbeddedDocument and throws ObjectParameterError).
+  const college = await College.findOne({
+    _id: collegeId,
+    isDeleted: { $ne: true },
+    _concernPerson: { $elemMatch: { _id: userId } },
+  })
+    .select('_id')
+    .lean();
+  return Boolean(college);
+}
+
+async function resolveClubOwnerUserId(req, collegeId, requestedOwnerId) {
+  // Club Admin creating a club: owner is always themselves.
+  if (!canAssignClubOwner(req)) {
+    if (!isClubAdminCapableUser(req.user)) {
+      return { error: 'Only a Club Admin can own a club. Ask Institute Admin to assign a Club Admin.' };
+    }
+    return { ownerId: req.user._id };
+  }
+
+  // Institute Admin / SSE: must pick a dedicated Club Admin — not themselves.
+  if (!isValidObjectId(requestedOwnerId)) {
+    return {
+      error: 'Select a Club Admin as owner. Institute Admin cannot be the club owner.',
+    };
+  }
+  if (String(requestedOwnerId) === String(req.user._id) && isMainInstituteAdminUser(req.user)) {
+    return {
+      error: 'Institute Admin cannot be Club Admin/owner. Assign a user with Club Admin role.',
+    };
+  }
+
+  const owner = await User.findById(requestedOwnerId)
+    .select('_id name role permissions status isDeleted')
+    .lean();
+  if (!isClubAdminCapableUser(owner)) {
+    return {
+      error: 'Owner must be a Club Admin on this campus (Institute Admin / SSE are not Club Admins).',
+    };
+  }
+  const onCampus = await userOnCampus(owner._id, collegeId);
+  if (!onCampus) {
+    return { error: 'Selected Club Admin is not assigned to this campus.' };
+  }
+  return { ownerId: owner._id };
+}
+
+async function canAccessClubPost(req, post) {
+  if (!post) return false;
+  if (req.clubAccess?.cmsRole === 'student') {
+    if (String(post.authorUserId) === String(req.user?._id)) return true;
+    return isStudentClubMember(req, post.clubId);
+  }
+  if (!campusAllowed(req, post.collegeId)) return false;
+  if (!needsAssignedClubScope(req)) return true;
+  if (!isValidObjectId(post.clubId)) return !isFieldStaffCmsRole(req.clubAccess?.cmsRole);
+  const club = await findClubLeanForManage(post.clubId);
+  if (!club) return false;
+  if (isFieldStaffCmsRole(req.clubAccess?.cmsRole)) return isClubLinkedFieldStaff(req.user, club);
+  if (req.clubAccess?.cmsRole === 'club_admin') {
+    if (!club.createdByUserId && !String(club.coordinatorId || '').trim()) return true;
+    return isClubOwnerOrCoordinator(req.user, club);
+  }
+  return true;
+}
+
+function rejectBadMediaUrl(res, mediaUrl) {
+  if (!isAllowedClubMediaUrl(mediaUrl)) {
+    res.status(400).json({
+      status: false,
+      message: 'Media URL is not allowed. Upload via the app or use an approved storage link.',
+    });
+    return true;
+  }
+  return false;
 }
 
 function accessIdList(values) {
@@ -630,15 +950,19 @@ async function resolveUserCampusesAndRole(user, queryCollegeId) {
       };
     }
 
-    campuses = scopeToLoginCampus(
-      await College.find({
-        isDeleted: { $ne: true },
-        $or: [{ '_concernPerson._id': user._id }, { _concernPerson: user._id }],
-      })
-        .select(COLLEGE_SELECT)
-        .lean(),
-      loginCollegeId
-    );
+    const allConcernCampuses = await College.find({
+      isDeleted: { $ne: true },
+      _concernPerson: { $elemMatch: { _id: user._id } },
+    })
+      .select(COLLEGE_SELECT)
+      .lean();
+    // Dedicated Club Admins may manage clubs on more than one campus (Add Admin).
+    // Do not collapse them to a single login campus or those clubs disappear from the dashboard.
+    const isDedicatedClubAdmin =
+      Boolean(customPerms.can_be_club_admin) && permType !== 'Admin' && roleNum !== 5;
+    campuses = isDedicatedClubAdmin
+      ? allConcernCampuses
+      : scopeToLoginCampus(allConcernCampuses, loginCollegeId);
   } else if (roleNum === 1) {
     const assignments = await ClubStaffAssignment.find({ userId: user._id }).lean();
     if (assignments.length > 0) {
@@ -810,10 +1134,12 @@ function initialsFromName(name) {
 function instituteClubRoleLabel(user) {
   const permType = user?.permissions?.permission_type;
   const customPerms = user?.permissions?.custom_permissions || {};
-  if (permType === 'Admin' || customPerms.can_be_club_admin) return 'Club Administrator';
+  // Keep roles distinct in UI labels.
+  if (permType === 'Admin') return 'Institute Admin';
+  if (customPerms.can_be_club_admin) return 'Club Administrator';
   if (customPerms.can_be_club_sse) return 'Senior Sales Engineer';
   if (customPerms.can_be_club_se) return 'Sales Engineer';
-  return 'Institution Admin';
+  return 'Institution user';
 }
 
 function concernPersonUserId(row) {
@@ -828,6 +1154,49 @@ function concernPersonUserId(row) {
 function concernPersonRows(college) {
   if (!college?._concernPerson) return [];
   return Array.isArray(college._concernPerson) ? college._concernPerson : [college._concernPerson];
+}
+
+async function listCampusConcernUsers(collegeId, predicate, fallbackName) {
+  if (!isValidObjectId(collegeId)) return [];
+  const college = await College.findOne({ _id: collegeId, isDeleted: { $ne: true } })
+    .select('_concernPerson')
+    .lean();
+  const ids = concernPersonRows(college)
+    .map((row) => concernPersonUserId(row))
+    .filter(Boolean);
+  if (!ids.length) return [];
+  const users = await User.find({
+    _id: { $in: ids },
+    isDeleted: { $ne: true },
+    status: { $ne: false },
+  })
+    .select('_id name email designation permissions role')
+    .lean();
+  return users
+    .filter((user) => predicate(user))
+    .map((user) => ({
+      _id: user._id,
+      name: user.name || fallbackName,
+      email: user.email || '',
+      designation: user.designation || '',
+      roleLabel: instituteClubRoleLabel(user),
+    }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+async function listCampusClubAdmins(collegeId) {
+  return listCampusConcernUsers(collegeId, isClubAdminCapableUser, 'Club Admin');
+}
+
+async function listCampusClubFieldStaff(collegeId) {
+  return listCampusConcernUsers(collegeId, isSseOrSeCapableUser, 'Club staff');
+}
+
+function parseStaffUserIds(body = {}) {
+  const raw = body.staffUserIds != null ? body.staffUserIds : body.staffUserId;
+  if (Array.isArray(raw)) return raw.filter((id) => isValidObjectId(id)).map((id) => String(id));
+  if (isValidObjectId(raw)) return [String(raw)];
+  return [];
 }
 
 async function buildDirectoryPeople({
@@ -1145,23 +1514,332 @@ function emptyBootstrapPayload(req, cmsRole, permissions, campuses) {
 // ============================================================================
 // 1. BOOTSTRAP ENDPOINT
 // ============================================================================
+
+/** Fast student bootstrap — campus-only catalog (no cross-campus browse). */
+async function bootstrapStudentCms(req, res) {
+  try {
+  const { cmsRole, permissions, campuses, activeCampusId } = req.clubAccess;
+  const uid = req.user._id;
+  const rosterFilter = await studentRosterFilter(req.user);
+  const campusIds = (campuses || []).map((c) => c._id).filter((id) => isValidObjectId(id));
+  const campusClubFilter = campusIds.length
+    ? { isDeleted: { $ne: true }, collegeId: { $in: campusIds } }
+    : { _id: null }; // no campus → empty catalog
+
+  const myMemberships = await ClubMember.find(rosterFilter).sort({ createdAt: -1 }).limit(100).lean();
+  // Keep memberships only for clubs on the student's campus(es).
+  const membersMineRaw = await dedupeClubMembers(myMemberships);
+  const membershipClubIds = [
+    ...new Set(membersMineRaw.map((m) => String(m.clubId)).filter(isValidObjectId)),
+  ];
+  const membershipClubsOnCampus = membershipClubIds.length
+    ? await Club.find({
+        _id: { $in: membershipClubIds },
+        isDeleted: { $ne: true },
+        ...(campusIds.length ? { collegeId: { $in: campusIds } } : { _id: null }),
+      })
+        .select('_id')
+        .lean()
+    : [];
+  const allowedMembershipClubIds = new Set(membershipClubsOnCampus.map((c) => String(c._id)));
+  const membersMine = membersMineRaw.filter((m) => allowedMembershipClubIds.has(String(m.clubId)));
+  const joinedClubIds = [
+    ...new Set(
+      membersMine
+        .filter((m) => isApprovedMemberStatus(m.status))
+        .map((m) => String(m.clubId))
+        .filter(isValidObjectId)
+    ),
+  ];
+  const pendingClubIds = [
+    ...new Set(
+      membersMine
+        .filter((m) => String(m.status || '').toLowerCase() === 'pending')
+        .map((m) => String(m.clubId))
+        .filter(isValidObjectId)
+    ),
+  ];
+  const relevantClubIds = [...new Set([...joinedClubIds, ...pendingClubIds])];
+
+  // Positions to request: only clubs the student is already approved in.
+  const positionQuery = joinedClubIds.length
+    ? {
+        isDeleted: { $ne: true },
+        clubId: { $in: joinedClubIds },
+        status: { $ne: 'Filled' },
+        ...(campusIds.length ? { collegeId: { $in: campusIds } } : {}),
+      }
+    : { _id: null };
+
+  const announcementOr = [{ submittedByUserId: uid }];
+  if (joinedClubIds.length) {
+    announcementOr.push({ clubId: { $in: joinedClubIds }, status: 'published' });
+  }
+  if (campusIds.length) {
+    announcementOr.push({ status: 'published', collegeId: { $in: campusIds } });
+  }
+
+  const publishedActivityFilter = {
+    ...(campusIds.length ? { collegeId: { $in: campusIds } } : { _id: null }),
+    $or: [
+      { scheduleStatus: { $exists: false } },
+      { scheduleStatus: null },
+      { scheduleStatus: 'scheduled' },
+    ],
+  };
+
+  const notificationFilter = campusIds.length
+    ? {
+        $or: [
+          { userId: uid },
+          {
+            collegeId: { $in: campusIds },
+            $or: [{ role: 'student' }, { role: { $exists: false } }],
+          },
+        ],
+      }
+    : { userId: uid };
+
+  const [
+    campusSetting,
+    clubs,
+    positions,
+    positionRequests,
+    activities,
+    suggestions,
+    posts,
+    announcements,
+    budgets,
+    certificates,
+    redemptions,
+    notifications,
+    studentState,
+    achievementCards,
+  ] = await Promise.all([
+    activeCampusId
+      ? ClubCampusSetting.findOne({ collegeId: activeCampusId }).lean()
+      : Promise.resolve(null),
+    Club.find(campusClubFilter)
+      .select(
+        'name tagline description category clubType theme collegeId verticalId projectId centerId coordinatorId createdByUserId adminUserIds featured meetingSchedule location interests createdAt'
+      )
+      .populate('centerId', 'name')
+      .populate('projectId', 'name')
+      .populate('createdByUserId', 'name')
+      .populate('adminUserIds', 'name')
+      .sort({ createdAt: -1 })
+      .limit(250)
+      .lean(),
+    ClubPosition.find(positionQuery).sort({ createdAt: -1 }).limit(150).lean(),
+    ClubPositionRequest.find({ studentUserId: uid }).sort({ createdAt: -1 }).limit(50).lean(),
+    ClubActivity.find(publishedActivityFilter).sort({ createdAt: -1 }).limit(80).lean(),
+    ClubSuggestion.find({ studentUserId: uid }).sort({ createdAt: -1 }).limit(30).lean(),
+    joinedClubIds.length
+      ? ClubPost.find({ clubId: { $in: joinedClubIds } }).sort({ createdAt: -1 }).limit(60).lean()
+      : Promise.resolve([]),
+    ClubAnnouncement.find({ isDeleted: { $ne: true }, $or: announcementOr })
+      .sort({ createdAt: -1 })
+      .limit(40)
+      .lean(),
+    ClubBudget.find({
+      $or: [{ submittedByUserId: uid }, { requestedByUserId: uid }],
+    })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean(),
+    ClubCertificate.find({ studentUserId: uid }).sort({ createdAt: -1 }).limit(40).lean(),
+    ClubRedemption.find({ studentUserId: uid }).sort({ createdAt: -1 }).limit(40).lean(),
+    ClubNotification.find(notificationFilter).sort({ createdAt: -1 }).limit(20).lean(),
+    ensureStudentState(req.user),
+    ClubAchievementCard.find({
+      $or: [
+        { createdByUserId: uid },
+        ...(joinedClubIds.length ? [{ clubId: { $in: joinedClubIds } }] : []),
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean(),
+  ]);
+
+  let members = membersMine;
+  if (joinedClubIds.length) {
+    const joinedRoster = await ClubMember.find({
+      clubId: { $in: joinedClubIds },
+      status: { $in: APPROVED_MEMBER_STATUSES },
+    })
+      .sort({ createdAt: -1 })
+      .limit(400)
+      .lean();
+    members = await dedupeClubMembers([...membersMine, ...joinedRoster]);
+  }
+
+  // Rewards catalog stays on the student's own campus only.
+  const rewardCampusIds = campusIds.map((id) => String(id)).slice(0, 8);
+
+  let goodies = [];
+  let faqs = [];
+  let badges = [];
+  if (rewardCampusIds.length) {
+    await Promise.all(rewardCampusIds.map((id) => ensureCampusCatalog(id)));
+    [goodies, faqs, badges] = await Promise.all([
+      ClubGoodie.find({ collegeId: { $in: rewardCampusIds }, isDeleted: { $ne: true } })
+        .sort({ points: 1 })
+        .limit(60)
+        .lean(),
+      ClubFaq.find({ collegeId: { $in: rewardCampusIds }, isDeleted: { $ne: true } })
+        .sort({ sortOrder: 1, createdAt: 1 })
+        .limit(40)
+        .lean(),
+      ClubBadge.find({ collegeId: { $in: rewardCampusIds }, isDeleted: { $ne: true } })
+        .sort({ createdAt: 1 })
+        .limit(40)
+        .lean(),
+    ]);
+  }
+
+  // Directory: members of joined clubs + coordinators only (skip full campus staff scan).
+  let people = [];
+  try {
+    people = await buildDirectoryPeople({
+      campuses: [],
+      members: members.filter((m) => relevantClubIds.includes(String(m.clubId))),
+      clubs: (clubs || []).filter((club) => relevantClubIds.includes(String(club._id))),
+      currentUser: req.user,
+      activeCampusId,
+      cmsRole: 'student',
+    });
+  } catch (peopleErr) {
+    console.error('buildDirectoryPeople (student) failed:', peopleErr.message);
+    people = [];
+  }
+
+  const publishedAnnouncements = (announcements || []).filter(
+    (item) => !item.status || item.status === 'published' || String(item.submittedByUserId) === String(uid)
+  );
+
+  return res.json({
+    status: true,
+    cmsRole,
+    permissions,
+    managesAllCampuses: false,
+    permissionMatrix: campusSetting?.permissionMatrix || null,
+    campuses,
+    catalogCampuses: [],
+    currentUser: {
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      mobile: req.user.mobile,
+      isMainInstituteAdmin: false,
+      role: req.user.role,
+    },
+    studentState,
+    settings: {
+      positionsFeatureEnabled:
+        campusSetting?.positionsFeatureEnabled !== undefined
+          ? campusSetting.positionsFeatureEnabled
+          : true,
+    },
+    clubs,
+    members,
+    positions,
+    positionRequests,
+    activities,
+    suggestions,
+    posts,
+    announcements: publishedAnnouncements,
+    chatMessages: [],
+    budgets,
+    results: [],
+    certificates,
+    redemptions,
+    people,
+    clubWorkflows: [],
+    notifications,
+    students: [],
+    goodies: attachCampusNames(dedupeById(goodies), campuses),
+    faqs,
+    badges: attachCampusNames(dedupeBadges(badges, true), campuses),
+    notificationTemplates: [],
+    achievementCards,
+    institutePoints: campusSetting?.institutePoints || 0,
+  });
+  } catch (err) {
+    console.error('Error in student club bootstrap:', err);
+    return res.status(500).json({ status: false, message: err.message });
+  }
+}
+
 router.get('/bootstrap', requireClubUser, async (req, res) => {
   try {
     let { cmsRole, permissions, campuses, activeCampusId } = req.clubAccess;
     const isStudent = cmsRole === 'student';
     const assignedFilter = assignedCampusFilter(req);
 
-    if (!isStudent && (!activeCampusId || !campuses.length)) {
+    if (isStudent) {
+      return bootstrapStudentCms(req, res);
+    }
+
+    if (!activeCampusId || !campuses.length) {
       return res.json(emptyBootstrapPayload(req, cmsRole, permissions, campuses));
     }
 
-    const campusFilter = isStudent ? assignedFilter : assignedFilter;
-    const clubCatalogFilter = isStudent ? {} : assignedFilter;
-    const rosterFilter = isStudent ? await studentRosterFilter(req.user) : assignedFilter;
-
-    if (!isStudent) {
-      await ensureCampusCatalog(activeCampusId);
+    // Staff stay campus-scoped — Club Admins / SSE / SE only see clubs they are assigned to.
+    const campusFilter = assignedFilter;
+    const isDedicatedClubAdmin =
+      cmsRole === 'club_admin' && !isMainInstituteAdminUser(req.user);
+    const isAssignedFieldStaff = isFieldStaffCmsRole(cmsRole);
+    // Institute Admin: campus-wide. Club Admin / SSE / SE: only clubs they are assigned to.
+    let clubCatalogFilter = assignedFilter;
+    if (isDedicatedClubAdmin) {
+      clubCatalogFilter = {
+        $or: [
+          { createdByUserId: req.user._id },
+          { adminUserIds: req.user._id },
+          { coordinatorId: String(req.user._id) },
+          // Legacy unowned clubs on assigned campuses stay manageable by campus Club Admins.
+          {
+            $and: [
+              assignedFilter,
+              {
+                $or: [
+                  { createdByUserId: { $exists: false } },
+                  { createdByUserId: null },
+                ],
+              },
+              {
+                $or: [
+                  { coordinatorId: { $exists: false } },
+                  { coordinatorId: null },
+                  { coordinatorId: '' },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    } else if (isAssignedFieldStaff) {
+      clubCatalogFilter = {
+        $or: [
+          { staffUserIds: req.user._id },
+          { coordinatorId: String(req.user._id) },
+        ],
+      };
+      // Keep field staff inside campuses they belong to (when campus list is known).
+      const campusIds = (campuses || [])
+        .map((campus) => campus?._id)
+        .filter((id) => isValidObjectId(id));
+      if (campusIds.length) {
+        clubCatalogFilter = {
+          $and: [{ collegeId: { $in: campusIds } }, clubCatalogFilter],
+        };
+      }
     }
+    const rosterFilter = assignedFilter;
+    const studentCampusOrGlobal = assignedFilter;
+
+    await ensureCampusCatalog(activeCampusId);
 
     let [
       campusSetting,
@@ -1194,33 +1872,69 @@ router.get('/bootstrap', requireClubUser, async (req, res) => {
         .populate('centerId', 'name address')
         .populate('projectId', 'name')
         .populate('verticalId', 'name')
+        .populate('createdByUserId', 'name email')
+        .populate('adminUserIds', 'name email')
+        .populate('staffUserIds', 'name email')
         .sort({ createdAt: -1 })
         .lean(),
       ClubMember.find(rosterFilter).sort({ createdAt: -1 }).lean(),
-      ClubPosition.find({ ...(isStudent ? {} : campusFilter), isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
-      ClubPositionRequest.find(isStudent ? { studentUserId: req.user._id } : campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubActivity.find(isStudent ? {} : campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubSuggestion.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubPost.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubAnnouncement.find({ ...campusFilter, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
-      ClubChatMessage.find({ _id: null }).lean(),
-      ClubBudget.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubResult.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubCertificate.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubRedemption.find(campusFilter).sort({ createdAt: -1 }).lean(),
+      ClubPosition.find({ ...campusFilter, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
+      ClubPositionRequest.find(campusFilter).sort({ createdAt: -1 }).lean(),
+      ClubActivity.find(campusFilter).sort({ createdAt: -1 }).lean(),
+      ClubSuggestion.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
+      ClubPost.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
+      ClubAnnouncement.find({ ...studentCampusOrGlobal, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
+      Promise.resolve([]),
+      ClubBudget.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
+      ClubResult.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
+      ClubCertificate.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
+      ClubRedemption.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
       Promise.resolve([]),
       ClubWorkflow.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubNotification.find(campusFilter).sort({ createdAt: -1 }).limit(30).lean(),
-      isStudent ? ensureStudentState(req.user) : Promise.resolve(null),
+      ClubNotification.find(studentCampusOrGlobal).sort({ createdAt: -1 }).limit(30).lean(),
+      Promise.resolve(null),
       Promise.resolve([]),
-      ClubGoodie.find({ ...campusFilter, isDeleted: { $ne: true } }).sort({ points: 1 }).lean(),
-      ClubFaq.find({ ...campusFilter, isDeleted: { $ne: true } }).sort({ sortOrder: 1, createdAt: 1 }).lean(),
-      ClubBadge.find({ ...campusFilter, isDeleted: { $ne: true } }).sort({ createdAt: 1 }).lean(),
+      ClubGoodie.find({ ...studentCampusOrGlobal, isDeleted: { $ne: true } }).sort({ points: 1 }).lean(),
+      ClubFaq.find({ ...studentCampusOrGlobal, isDeleted: { $ne: true } }).sort({ sortOrder: 1, createdAt: 1 }).lean(),
+      ClubBadge.find({ ...studentCampusOrGlobal, isDeleted: { $ne: true } }).sort({ createdAt: 1 }).lean(),
       ClubNotificationTemplate.find(campusFilter).sort({ createdAt: -1 }).lean(),
-      ClubAchievementCard.find(campusFilter).sort({ createdAt: -1 }).lean(),
+      ClubAchievementCard.find(studentCampusOrGlobal).sort({ createdAt: -1 }).lean(),
     ]);
 
     members = await dedupeClubMembers(members);
+
+    // Club Admins / SSE / SE only see roster + ops for clubs they are assigned to.
+    if (isDedicatedClubAdmin || isAssignedFieldStaff) {
+      const managedClubIds = new Set(
+        (clubs || [])
+          .filter((club) => {
+            if (isAssignedFieldStaff) return isClubLinkedFieldStaff(req.user, club);
+            if (isClubOwnerOrCoordinator(req.user, club)) return true;
+            return !club.createdByUserId && !String(club.coordinatorId || '').trim();
+          })
+          .map((club) => String(club._id))
+      );
+      const inManagedClub = (row) => {
+        const clubId = String(row?.clubId?._id || row?.clubId || '');
+        if (!clubId) return !isAssignedFieldStaff;
+        return managedClubIds.has(clubId);
+      };
+      members = (members || []).filter((member) => managedClubIds.has(String(member.clubId)));
+      positions = (positions || []).filter(inManagedClub);
+      positionRequests = (positionRequests || []).filter(inManagedClub);
+      activities = (activities || []).filter(inManagedClub);
+      budgets = (budgets || []).filter(inManagedClub);
+      results = (results || []).filter(inManagedClub);
+      certificates = (certificates || []).filter(inManagedClub);
+      announcements = (announcements || []).filter(inManagedClub);
+      clubWorkflows = (clubWorkflows || []).filter(inManagedClub);
+      posts = (posts || []).filter(inManagedClub);
+      suggestions = (suggestions || []).filter(inManagedClub);
+      redemptions = (redemptions || []).filter(inManagedClub);
+      notifications = (notifications || []).filter(inManagedClub);
+      achievementCards = (achievementCards || []).filter(inManagedClub);
+      // Campus-level catalogs (goodies/faqs/badges/templates) stay visible on this campus.
+    }
 
     const students = candidateUsers.map((u) => ({
       _id: u._id,
@@ -1229,83 +1943,6 @@ router.get('/bootstrap', requireClubUser, async (req, res) => {
       studentEmail: u.email || '',
       department: 'Campus Student',
     }));
-
-    if (isStudent) {
-      const uid = String(req.user._id);
-      const joinedClubIds = new Set(
-        members.filter((m) => isApprovedMemberStatus(m.status)).map((m) => String(m.clubId))
-      );
-      const joinedIdList = [...joinedClubIds].filter(isValidObjectId);
-      activities = activities.filter((activity) => isPublishedSchedule(activity));
-      if (joinedIdList.length) {
-        const [joinedPosts, joinedNotices] = await Promise.all([
-          ClubPost.find({ clubId: { $in: joinedIdList } }).sort({ createdAt: -1 }).lean(),
-          ClubAnnouncement.find({ clubId: { $in: joinedIdList }, isDeleted: { $ne: true } })
-            .sort({ createdAt: -1 })
-            .lean(),
-        ]);
-        posts = joinedPosts;
-        announcements = dedupeById([...announcements, ...joinedNotices]);
-      } else {
-        posts = [];
-      }
-      announcements = announcements.filter(
-        (item) => !item.status || item.status === 'published' || String(item.submittedByUserId) === uid
-      );
-      chatMessages = [];
-      if (joinedClubIds.size) {
-        const joinedRoster = await ClubMember.find({
-          clubId: { $in: [...joinedClubIds] },
-          status: { $in: APPROVED_MEMBER_STATUSES },
-        })
-          .sort({ createdAt: -1 })
-          .lean();
-        members = await dedupeClubMembers([...members, ...joinedRoster]);
-      }
-      suggestions = suggestions.filter((s) => String(s.studentUserId) === uid);
-      certificates = certificates.filter((c) => String(c.studentUserId) === uid);
-      redemptions = redemptions.filter((r) => String(r.studentUserId) === uid);
-      positionRequests = positionRequests.filter((r) => String(r.studentUserId) === uid);
-      budgets = budgets.filter(
-        (b) => String(b.submittedByUserId) === uid || String(b.requestedByUserId) === uid
-      );
-      achievementCards = achievementCards.filter(
-        (card) =>
-          String(card.createdByUserId) === uid ||
-          (card.clubId && joinedClubIds.has(String(card.clubId)))
-      );
-
-      const ownCampusIds = (campuses || [])
-        .map((campus) => campus?._id)
-        .filter((id) => isValidObjectId(id))
-        .map((id) => String(id));
-      const joinedCampusIds = (clubs || [])
-        .filter((club) => joinedClubIds.has(String(club._id)))
-        .map((club) => club.collegeId)
-        .filter((id) => isValidObjectId(id))
-        .map((id) => String(id));
-      const rewardCampusIds = [...new Set([...ownCampusIds, ...joinedCampusIds])];
-      if (rewardCampusIds.length) {
-        await Promise.all(rewardCampusIds.slice(0, 8).map((id) => ensureCampusCatalog(id)));
-        [goodies, faqs, badges] = await Promise.all([
-          ClubGoodie.find({ collegeId: { $in: rewardCampusIds }, isDeleted: { $ne: true } })
-            .sort({ points: 1 })
-            .lean(),
-          ClubFaq.find({ collegeId: { $in: rewardCampusIds }, isDeleted: { $ne: true } })
-            .sort({ sortOrder: 1, createdAt: 1 })
-            .lean(),
-          ClubBadge.find({ collegeId: { $in: rewardCampusIds }, isDeleted: { $ne: true } })
-            .sort({ createdAt: 1 })
-            .lean(),
-        ]);
-      }
-
-      clubWorkflows = [];
-      notificationTemplates = [];
-      notifications = (notifications || []).filter(
-        (item) => !item.role || item.role === 'student' || String(item.userId) === uid
-      );
-    }
 
     let catalogCampuses = [];
     if (cmsRole === 'club_admin') {
@@ -1358,6 +1995,7 @@ router.get('/bootstrap', requireClubUser, async (req, res) => {
         name: req.user.name,
         email: req.user.email,
         mobile: req.user.mobile,
+        isMainInstituteAdmin: isMainInstituteAdminUser(req.user),
         role: req.user.role,
       },
       studentState,
@@ -1559,13 +2197,54 @@ router.get('/placement/centers', requireClubUser, requireStaff, async (req, res)
   }
 });
 
+router.get('/campus-club-admins', requireClubUser, requireStaff, async (req, res) => {
+  try {
+    const collegeId = req.query.collegeId || req.clubAccess?.activeCampusId;
+    if (!isValidObjectId(collegeId)) {
+      return res.json({ status: true, data: [], canAssignOwner: canAssignClubOwner(req) });
+    }
+    if (denyCampus(req, res, collegeId)) return;
+    const data = await listCampusClubAdmins(collegeId);
+    return res.json({ status: true, data, canAssignOwner: canAssignClubOwner(req) });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
+
+router.get('/campus-club-staff', requireClubUser, requireStaff, async (req, res) => {
+  try {
+    const collegeId = req.query.collegeId || req.clubAccess?.activeCampusId;
+    if (!isValidObjectId(collegeId)) {
+      return res.json({ status: true, data: [] });
+    }
+    if (denyCampus(req, res, collegeId)) return;
+    const data = await listCampusClubFieldStaff(collegeId);
+    return res.json({ status: true, data });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
+
 router.post('/clubs', requireClubUser, requirePermission('clubs.create'), async (req, res) => {
   try {
     const placement = await resolveClubPlacement(req, req.body);
     if (placement.error) {
       return res.status(400).json({ status: false, message: placement.error });
     }
+    const ownerResult = await resolveClubOwnerUserId(
+      req,
+      placement.collegeId,
+      req.body.ownerUserId || req.body.createdByUserId
+    );
+    if (ownerResult.error) {
+      return res.status(400).json({ status: false, message: ownerResult.error });
+    }
     const clubType = req.body.clubType || req.body.category || 'Creative';
+    const requestedStaffIds = parseStaffUserIds(req.body);
+    // Creating SSE/SE is automatically linked to the club they set up.
+    if (isFieldStaffCmsRole(req.clubAccess?.cmsRole)) {
+      requestedStaffIds.push(String(req.user._id));
+    }
     const club = await Club.create({
       name: req.body.name,
       tagline: req.body.tagline || '',
@@ -1578,7 +2257,9 @@ router.post('/clubs', requireClubUser, requirePermission('clubs.create'), async 
       projectId: placement.projectId,
       centerId: placement.centerId,
       coordinatorId: req.body.coordinatorId || '',
-      createdByUserId: req.user._id,
+      createdByUserId: ownerResult.ownerId,
+      adminUserIds: withClubAdmins(ownerResult.ownerId),
+      staffUserIds: withClubStaffIds(requestedStaffIds),
       createdByRole: req.clubAccess.cmsRole,
       eligibility: req.body.eligibility || '',
       joiningMethod: 'Approval Required',
@@ -1600,6 +2281,7 @@ router.put('/clubs/:clubId', requireClubUser, requirePermission('clubs.edit'), a
     const existing = await Club.findById(clubId);
     if (!existing) return res.status(404).json({ status: false, message: 'Club not found' });
     if (denyCampus(req, res, existing.collegeId)) return;
+    if (denyClubStaffManage(req, res, existing)) return;
     const clubType = req.body.clubType || req.body.category;
     const placement = await resolveClubPlacement(req, req.body);
     if (placement.error) {
@@ -1620,14 +2302,93 @@ router.put('/clubs/:clubId', requireClubUser, requirePermission('clubs.edit'), a
       interests: req.body.interests,
       featured: Boolean(req.body.featured),
     };
-    const club = await Club.findByIdAndUpdate(
-      clubId,
-      update,
-      { new: true }
-    );
-
+    const canSetStaff =
+      canAssignClubOwner(req) ||
+      req.clubAccess?.cmsRole === 'club_admin' ||
+      req.clubAccess?.cmsRole === 'institute';
+    const shouldSetStaff =
+      canSetStaff && (req.body.staffUserIds != null || req.body.staffUserId != null);
+    const nextStaffIds = shouldSetStaff ? withClubStaffIds(parseStaffUserIds(req.body)) : null;
+    // Add/keep Club Admins: Institute Admin / SSE can add another admin; earlier admins remain.
+    let addAdminUserId = null;
+    if (canAssignClubOwner(req) && (req.body.ownerUserId || req.body.createdByUserId)) {
+      const ownerResult = await resolveClubOwnerUserId(
+        req,
+        placement.collegeId || existing.collegeId,
+        req.body.ownerUserId || req.body.createdByUserId
+      );
+      if (ownerResult.error) {
+        return res.status(400).json({ status: false, message: ownerResult.error });
+      }
+      // Keep original primary owner unless club had none; merge admins via $addToSet after update.
+      if (!existing.createdByUserId) {
+        update.createdByUserId = ownerResult.ownerId;
+      }
+      addAdminUserId = ownerResult.ownerId;
+    }
+    await Club.findByIdAndUpdate(clubId, update, { new: true });
+    const clubObjectId = new mongoose.Types.ObjectId(String(clubId));
+    const nativeOps = {};
+    if (nextStaffIds) {
+      // Native $set avoids DocumentArray cast issues (same pattern as adminUserIds).
+      nativeOps.$set = { ...(nativeOps.$set || {}), staffUserIds: nextStaffIds };
+    }
+    if (addAdminUserId) {
+      const toAdd = withClubAdmins(addAdminUserId, [
+        ...clubAdminIdList(existing),
+        existing.createdByUserId,
+      ]);
+      nativeOps.$addToSet = { adminUserIds: { $each: toAdd } };
+    }
+    if (Object.keys(nativeOps).length) {
+      await Club.collection.updateOne({ _id: clubObjectId }, nativeOps);
+    }
+    const club = await Club.findById(clubId)
+      .populate('staffUserIds', 'name email')
+      .populate('adminUserIds', 'name email')
+      .lean();
     return res.json({ status: true, club });
   } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
+
+router.post('/clubs/:clubId/assign-owner', requireClubUser, requireStaff, async (req, res) => {
+  try {
+    if (!canAssignClubOwner(req)) {
+      return res.status(403).json({
+        status: false,
+        message: 'Only Institute Admin or Senior Sales Engineer can add a Club Admin to this club.',
+      });
+    }
+    const club = await Club.findById(req.params.clubId).lean();
+    if (!club || club.isDeleted) return res.status(404).json({ status: false, message: 'Club not found' });
+    if (denyCampus(req, res, club.collegeId)) return;
+    if (denyClubStaffManage(req, res, club)) return;
+    const ownerResult = await resolveClubOwnerUserId(req, club.collegeId, req.body.ownerUserId);
+    if (ownerResult.error) {
+      return res.status(400).json({ status: false, message: ownerResult.error });
+    }
+    // Add admin — earlier owners/admins remain ($addToSet via native driver to avoid
+    // Mongoose DocumentArray cast: Parameter "obj" to Document() must be an object).
+    const toAdd = withClubAdmins(ownerResult.ownerId, [
+      ...clubAdminIdList(club),
+      club.createdByUserId,
+    ]);
+    const clubObjectId = new mongoose.Types.ObjectId(String(club._id));
+    const updateOps = {
+      $addToSet: { adminUserIds: { $each: toAdd } },
+    };
+    if (!club.createdByUserId) {
+      updateOps.$set = {
+        createdByUserId: toAdd[0] || new mongoose.Types.ObjectId(String(ownerResult.ownerId)),
+      };
+    }
+    await Club.collection.updateOne({ _id: clubObjectId }, updateOps);
+    const saved = await Club.findById(clubObjectId).lean();
+    return res.json({ status: true, club: saved });
+  } catch (err) {
+    console.error('assign-owner failed:', err);
     return res.status(500).json({ status: false, message: err.message });
   }
 });
@@ -1637,10 +2398,54 @@ router.delete('/clubs/:clubId', requireClubUser, requirePermission('clubs.edit')
     const club = await Club.findById(req.params.clubId);
     if (!club || club.isDeleted) return res.status(404).json({ status: false, message: 'Club not found' });
     if (denyCampus(req, res, club.collegeId)) return;
+    if (denyClubStaffManage(req, res, club)) return;
     club.isDeleted = true;
     await club.save();
     await ClubPosition.updateMany({ clubId: club._id }, { isDeleted: true });
     return res.json({ status: true });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
+
+router.post('/clubs/:clubId/assign-staff', requireClubUser, requireStaff, async (req, res) => {
+  try {
+    if (
+      !canAssignClubOwner(req) &&
+      req.clubAccess?.cmsRole !== 'club_admin' &&
+      req.clubAccess?.cmsRole !== 'institute'
+    ) {
+      return res.status(403).json({
+        status: false,
+        message: 'Only Institute Admin, Club Admin, or SSE can assign staff to a club.',
+      });
+    }
+    const club = await Club.findById(req.params.clubId);
+    if (!club || club.isDeleted) return res.status(404).json({ status: false, message: 'Club not found' });
+    if (denyCampus(req, res, club.collegeId)) return;
+    if (denyClubStaffManage(req, res, club)) return;
+    const staffIds = parseStaffUserIds(req.body);
+    if (!staffIds.length) {
+      return res.status(400).json({ status: false, message: 'Select at least one SSE or SE.' });
+    }
+    const users = await User.find({ _id: { $in: staffIds } })
+      .select('_id name role permissions status isDeleted')
+      .lean();
+    const validIds = users.filter((user) => isSseOrSeCapableUser(user)).map((user) => String(user._id));
+    if (!validIds.length) {
+      return res.status(400).json({
+        status: false,
+        message: 'Assign only users with Senior Sales Engineer or Sales Engineer role.',
+      });
+    }
+    await Club.collection.updateOne(
+      { _id: club._id },
+      { $addToSet: { staffUserIds: { $each: withClubStaffIds(validIds) } } }
+    );
+    const saved = await Club.findById(club._id)
+      .populate('staffUserIds', 'name email')
+      .lean();
+    return res.json({ status: true, club: saved });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
   }
@@ -1652,6 +2457,7 @@ router.post('/workflows', requireClubUser, requireStaff, async (req, res) => {
     if (!activeCampusId) {
       return res.status(403).json({ status: false, message: 'No campus is assigned to you.' });
     }
+    if (await denyStaffClubOpsByClubId(req, res, req.body.clubId, { required: false })) return;
     const wf = await ClubWorkflow.create({
       clubId: isValidObjectId(req.body.clubId) ? req.body.clubId : undefined,
       collegeId: activeCampusId,
@@ -1676,6 +2482,7 @@ router.post('/clubs/:clubId/members', requireClubUser, requirePermission('member
     const club = await Club.findById(req.params.clubId);
     if (!club) return res.status(404).json({ status: false, message: 'Club not found' });
     if (denyCampus(req, res, club.collegeId)) return;
+    if (denyClubMembershipManage(req, res, club)) return;
 
     const studentUserId = req.body.studentUserId || req.body.studentId;
     const student = isValidObjectId(studentUserId)
@@ -1739,6 +2546,7 @@ router.post('/clubs/:clubId/members/requests', requireClubUser, requirePermissio
   try {
     const club = await Club.findById(req.params.clubId);
     if (!club || club.isDeleted) return res.status(404).json({ status: false, message: 'Club not found' });
+    if (denyCampus(req, res, club.collegeId)) return;
 
     const stuState = await ensureStudentState(req.user);
     const studentEmail = normalizeClubEmail(req.user.email);
@@ -1794,6 +2602,7 @@ router.post('/clubs/:clubId/members/requests', requireClubUser, requirePermissio
         type: 'request',
         clubId: String(club._id),
         memberId: String(member._id),
+        studentUserId: String(member.studentUserId || req.user._id || ''),
         status: member.status,
       });
     }
@@ -1822,6 +2631,7 @@ router.post('/clubs/:clubId/members/leave', requireClubUser, async (req, res) =>
       type: 'leave',
       clubId: String(clubId || ''),
       memberId: String(member._id),
+      studentUserId: String(member.studentUserId || req.user._id || ''),
       status: 'cancelled',
     });
     return res.json({ status: true });
@@ -1836,6 +2646,13 @@ router.post('/members/:memberId/review', requireClubUser, requirePermission('mem
     const member = await ClubMember.findById(req.params.memberId);
     if (!member) return res.status(404).json({ status: false, message: 'Member request not found' });
     if (denyCampus(req, res, member.collegeId)) return;
+    const club = member.clubId
+      ? await Club.findById(member.clubId)
+          .select('collegeId createdByUserId coordinatorId adminUserIds staffUserIds')
+          .lean()
+      : null;
+    if (!club) return res.status(404).json({ status: false, message: 'Club not found for this request' });
+    if (denyClubMembershipManage(req, res, club)) return;
 
     const actor = actorSnapshot(req);
     member.reviewedByUserId = actor.userId;
@@ -1864,6 +2681,7 @@ router.post('/members/:memberId/review', requireClubUser, requirePermission('mem
       type: 'review',
       clubId: String(member.clubId || ''),
       memberId: String(member._id),
+      studentUserId: String(member.studentUserId || ''),
       status: member.status,
     });
     return res.json({ status: true, member });
@@ -1877,6 +2695,13 @@ router.post('/members/:memberId/status', requireClubUser, requirePermission('mem
     const existingMember = await ClubMember.findById(req.params.memberId);
     if (!existingMember) return res.status(404).json({ status: false, message: 'Member not found' });
     if (denyCampus(req, res, existingMember.collegeId)) return;
+    const club = existingMember.clubId
+      ? await Club.findById(existingMember.clubId)
+          .select('collegeId createdByUserId coordinatorId adminUserIds staffUserIds')
+          .lean()
+      : null;
+    if (!club) return res.status(404).json({ status: false, message: 'Club not found for this member' });
+    if (denyClubMembershipManage(req, res, club)) return;
     const { status } = req.body;
     const allowed = ['approved', 'joined', 'blocked', 'rejected', 'pending'];
     if (!allowed.includes(status)) {
@@ -1902,6 +2727,13 @@ router.post('/members/:memberId/status', requireClubUser, requirePermission('mem
       update.blockedByRole = actor.role;
     }
     const member = await ClubMember.findByIdAndUpdate(req.params.memberId, update, { new: true });
+    emitClubMembership(member?.collegeId || existingMember.collegeId, {
+      type: 'status',
+      clubId: String(member?.clubId || existingMember.clubId || ''),
+      memberId: String(member?._id || existingMember._id),
+      studentUserId: String(member?.studentUserId || existingMember.studentUserId || ''),
+      status: member?.status || nextStatus,
+    });
     return res.json({ status: true, member });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
@@ -1911,19 +2743,52 @@ router.post('/members/:memberId/status', requireClubUser, requirePermission('mem
 // ============================================================================
 // 5. POSITIONS & ROLE REQUESTS
 // ============================================================================
+
+async function countAssignedSeats(positionId) {
+  return ClubPositionRequest.countDocuments({
+    positionId,
+    status: 'assigned',
+  });
+}
+
+/** Keep Open / Filled in sync with assigned seat count. */
+async function syncPositionSeatStatus(positionId) {
+  const position = await ClubPosition.findById(positionId);
+  if (!position || position.isDeleted) return null;
+  const filled = await countAssignedSeats(position._id);
+  const seats = Math.max(1, Number(position.seats) || 1);
+  const nextStatus = filled >= seats ? 'Filled' : 'Open';
+  if (position.status !== nextStatus) {
+    position.status = nextStatus;
+    await position.save();
+  }
+  return { position, filled, seats };
+}
+
+function positionTermFields(body = {}) {
+  return {
+    termLabel: String(body.termLabel || '').trim(),
+    termStart: String(body.termStart || '').trim(),
+    termEnd: String(body.termEnd || '').trim(),
+  };
+}
+
 router.post('/clubs/:clubId/positions', requireClubUser, requirePermission('positions.create'), async (req, res) => {
   try {
     const club = await Club.findById(req.params.clubId);
     if (!club) return res.status(404).json({ status: false, message: 'Club not found' });
     if (denyCampus(req, res, club.collegeId)) return;
+    if (denyClubStaffManage(req, res, club)) return;
 
+    const term = positionTermFields(req.body);
     const position = await ClubPosition.create({
       clubId: club._id,
       collegeId: club.collegeId,
       title: req.body.title,
       description: req.body.description || '',
-      seats: Number(req.body.seats) || 1,
+      seats: Math.max(1, Number(req.body.seats) || 1),
       status: req.body.status || 'Open',
+      ...term,
     });
 
     return res.json({ status: true, position });
@@ -1937,17 +2802,19 @@ router.put('/positions/:positionId', requireClubUser, requirePermission('positio
     const existingPosition = await ClubPosition.findById(req.params.positionId);
     if (!existingPosition) return res.status(404).json({ status: false, message: 'Position not found' });
     if (denyCampus(req, res, existingPosition.collegeId)) return;
-    const position = await ClubPosition.findByIdAndUpdate(
-      req.params.positionId,
-      {
-        title: req.body.title,
-        description: req.body.description,
-        seats: Number(req.body.seats) || 1,
-        status: req.body.status,
-      },
-      { new: true }
-    );
-    return res.json({ status: true, position });
+    if (await denyStaffClubOpsByClubId(req, res, existingPosition.clubId, { required: true })) return;
+    const term = positionTermFields(req.body);
+    const seats = Math.max(1, Number(req.body.seats) || existingPosition.seats || 1);
+    await ClubPosition.findByIdAndUpdate(req.params.positionId, {
+      title: req.body.title,
+      description: req.body.description,
+      seats,
+      ...(req.body.status ? { status: req.body.status } : {}),
+      ...term,
+    });
+    // Prefer seat-driven Open/Filled over a stale manual status.
+    const synced = await syncPositionSeatStatus(req.params.positionId);
+    return res.json({ status: true, position: synced?.position || existingPosition });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
   }
@@ -1958,6 +2825,7 @@ router.delete('/positions/:positionId', requireClubUser, requirePermission('posi
     const position = await ClubPosition.findById(req.params.positionId);
     if (!position || position.isDeleted) return res.status(404).json({ status: false, message: 'Position not found' });
     if (denyCampus(req, res, position.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, position.clubId, { required: true })) return;
     position.isDeleted = true;
     await position.save();
     return res.json({ status: true });
@@ -1969,16 +2837,58 @@ router.delete('/positions/:positionId', requireClubUser, requirePermission('posi
 router.post('/positions/:positionId/requests', requireClubUser, requirePermission('positions.request'), async (req, res) => {
   try {
     const position = await ClubPosition.findById(req.params.positionId);
-    if (!position) return res.status(404).json({ status: false, message: 'Position not found' });
+    if (!position || position.isDeleted) {
+      return res.status(404).json({ status: false, message: 'Position not found' });
+    }
     if (denyCampus(req, res, position.collegeId)) return;
 
-    const existing = await ClubPositionRequest.findOne({
+    const campusSetting = await ClubCampusSetting.findOne({ collegeId: position.collegeId }).lean();
+    if (campusSetting && campusSetting.positionsFeatureEnabled === false) {
+      return res.status(400).json({ status: false, message: 'Club positions are not open right now.' });
+    }
+
+    if (String(position.status || '') === 'Filled') {
+      return res.status(400).json({ status: false, message: 'This position is already filled.' });
+    }
+
+    const isMember = await isStudentClubMember(req, position.clubId);
+    if (!isMember) {
+      return res.status(403).json({
+        status: false,
+        message: 'Join this club and get approved before requesting a position.',
+      });
+    }
+
+    const filled = await countAssignedSeats(position._id);
+    const seats = Math.max(1, Number(position.seats) || 1);
+    if (filled >= seats) {
+      await syncPositionSeatStatus(position._id);
+      return res.status(400).json({ status: false, message: 'All seats for this position are filled.' });
+    }
+
+    const existingActive = await ClubPositionRequest.findOne({
       positionId: position._id,
       studentUserId: req.user._id,
-      status: 'pending',
+      status: { $in: ['pending', 'recommended', 'assigned'] },
     });
-    if (existing) {
-      return res.json({ status: true, duplicate: true, request: existing });
+    if (existingActive) {
+      if (existingActive.status === 'assigned') {
+        return res.status(400).json({ status: false, message: 'You already hold this position.' });
+      }
+      return res.json({ status: true, duplicate: true, request: existingActive });
+    }
+
+    // One open request per club at a time (campus-clean elections).
+    const otherOpen = await ClubPositionRequest.findOne({
+      clubId: position.clubId,
+      studentUserId: req.user._id,
+      status: { $in: ['pending', 'recommended'] },
+    });
+    if (otherOpen) {
+      return res.status(400).json({
+        status: false,
+        message: 'You already have an open position request in this club. Wait for it to be decided.',
+      });
     }
 
     const stuState = await ensureStudentState(req.user);
@@ -2008,6 +2918,7 @@ router.post('/position-requests/:requestId/review', requireClubUser, async (req,
     const requestDoc = await ClubPositionRequest.findById(req.params.requestId);
     if (!requestDoc) return res.status(404).json({ status: false, message: 'Position request not found' });
     if (denyCampus(req, res, requestDoc.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, requestDoc.clubId, { required: true })) return;
 
     const permKey =
       decision === 'recommend'
@@ -2030,6 +2941,13 @@ router.post('/position-requests/:requestId/review', requireClubUser, async (req,
       }
     }
 
+    if (!['pending', 'recommended'].includes(String(requestDoc.status || ''))) {
+      return res.status(400).json({
+        status: false,
+        message: `This request is already ${requestDoc.status}.`,
+      });
+    }
+
     const actor = actorSnapshot(req);
     const statusMap = {
       recommend: 'recommended',
@@ -2037,31 +2955,53 @@ router.post('/position-requests/:requestId/review', requireClubUser, async (req,
       assign: 'assigned',
       reject: 'rejected',
     };
-    requestDoc.status = statusMap[decision] || 'rejected';
-    requestDoc.reviewedByUserId = actor.userId;
-    requestDoc.reviewedByName = actor.name;
-    requestDoc.reviewedAt = actor.at;
+    const nextStatus = statusMap[decision] || 'rejected';
+
     if (decision === 'recommend') {
+      requestDoc.status = 'recommended';
       requestDoc.recommendedByUserId = actor.userId;
       requestDoc.recommendedByName = actor.name;
       requestDoc.recommendedAt = actor.at;
+      requestDoc.reviewedByUserId = actor.userId;
+      requestDoc.reviewedByName = actor.name;
+      requestDoc.reviewedAt = actor.at;
+      await requestDoc.save();
+      return res.json({ status: true, request: requestDoc });
     }
+
     if (decision === 'approve' || decision === 'assign') {
-      const position = await ClubPosition.findById(requestDoc.positionId).select('seats').lean();
-      const seatLimit = Number(position?.seats) || 0;
-      if (seatLimit > 0) {
-        const filled = await ClubPositionRequest.countDocuments({
-          positionId: requestDoc.positionId,
-          status: 'assigned',
-        });
-        if (filled >= seatLimit) {
-          return res.status(400).json({ status: false, message: 'All seats for this position are filled.' });
-        }
+      const seatCheck = await syncPositionSeatStatus(requestDoc.positionId);
+      const seats = seatCheck?.seats || 1;
+      const filled = seatCheck?.filled || 0;
+      if (filled >= seats) {
+        return res.status(400).json({ status: false, message: 'All seats for this position are filled.' });
       }
+      // Student must still be an approved club member at assign time.
+      const member = await findClubMemberByIdentity(requestDoc.clubId, {
+        userId: requestDoc.studentUserId,
+      });
+      if (!member || !isApprovedMemberStatus(member.status)) {
+        return res.status(400).json({
+          status: false,
+          message: 'Student must be an approved club member before they can be assigned a position.',
+        });
+      }
+      requestDoc.status = 'assigned';
       requestDoc.assignedByUserId = actor.userId;
       requestDoc.assignedByName = actor.name;
       requestDoc.assignedAt = actor.at;
+      requestDoc.reviewedByUserId = actor.userId;
+      requestDoc.reviewedByName = actor.name;
+      requestDoc.reviewedAt = actor.at;
+      await requestDoc.save();
+      await syncPositionSeatStatus(requestDoc.positionId);
+      return res.json({ status: true, request: requestDoc });
     }
+
+    requestDoc.status = nextStatus;
+    requestDoc.reviewedByUserId = actor.userId;
+    requestDoc.reviewedByName = actor.name;
+    requestDoc.reviewedAt = actor.at;
     await requestDoc.save();
     return res.json({ status: true, request: requestDoc });
   } catch (err) {
@@ -2090,6 +3030,8 @@ router.post('/activities', requireClubUser, async (req, res) => {
           message: 'Only a student assigned as Club Captain can request an activity.',
         });
       }
+    } else if (cmsRole !== 'student') {
+      if (await denyStaffClubOpsByClubId(req, res, req.body.clubId, { required: true })) return;
     }
 
     const startDate = req.body.startDate || req.body.date || '';
@@ -2139,6 +3081,8 @@ router.put('/activities/:activityId', requireClubUser, requirePermission('activi
     const existing = await ClubActivity.findById(req.params.activityId);
     if (!existing) return res.status(404).json({ status: false, message: 'Activity not found' });
     if (denyCampus(req, res, existing.collegeId)) return;
+    const targetClubId = isValidObjectId(req.body.clubId) ? req.body.clubId : existing.clubId;
+    if (await denyStaffClubOpsByClubId(req, res, targetClubId, { required: true })) return;
     const startDate = req.body.startDate || req.body.date || existing.startDate || existing.date;
     const activity = await ClubActivity.findByIdAndUpdate(
       req.params.activityId,
@@ -2177,6 +3121,9 @@ router.post('/activities/:activityId/schedule-workflow', requireClubUser, async 
     const activity = await ClubActivity.findById(req.params.activityId);
     if (!activity) return res.status(404).json({ status: false, message: 'Activity not found' });
     if (denyCampus(req, res, activity.collegeId)) return;
+    if (req.clubAccess?.cmsRole !== 'student') {
+      if (await denyStaffClubOpsByClubId(req, res, activity.clubId, { required: true })) return;
+    }
     const { action } = req.body;
     const permKey =
       action === 'schedule' || action === 'unpublish'
@@ -2241,7 +3188,7 @@ router.post('/activities/:activityId/register', requireClubUser, requirePermissi
   try {
     const activity = await ClubActivity.findById(req.params.activityId);
     if (!activity) return res.status(404).json({ status: false, message: 'Activity not found' });
-    if (!(await isStudentClubMember(req, activity.clubId)) && denyCampus(req, res, activity.collegeId)) return;
+    if (await denyActivityRegistrationAccess(req, res, activity)) return;
     if (!isPublishedSchedule(activity) && req.clubAccess.cmsRole === 'student') {
       return res.status(403).json({ status: false, message: 'This activity is not scheduled yet.' });
     }
@@ -2285,7 +3232,7 @@ router.post('/activities/:activityId/cancel', requireClubUser, requirePermission
   try {
     const activity = await ClubActivity.findById(req.params.activityId);
     if (!activity) return res.status(404).json({ status: false, message: 'Activity not found' });
-    if (!(await isStudentClubMember(req, activity.clubId)) && denyCampus(req, res, activity.collegeId)) return;
+    if (await denyActivityRegistrationAccess(req, res, activity)) return;
 
     const existing = activity.registrations.find(
       (r) => String(r.studentUserId) === String(req.user._id)
@@ -2329,6 +3276,7 @@ router.post(
       const activity = await ClubActivity.findById(req.params.activityId);
       if (!activity) return res.status(404).json({ status: false, message: 'Activity not found' });
       if (denyCampus(req, res, activity.collegeId)) return;
+      if (await denyStaffClubOpsByClubId(req, res, activity.clubId, { required: true })) return;
 
       const reg = activity.registrations.id(req.params.registrationId);
       if (reg) {
@@ -2436,6 +3384,7 @@ router.delete('/suggestions/:suggestionId', requireClubUser, async (req, res) =>
     if (!isOwner && !STAFF_CMS_ROLES.includes(req.clubAccess?.cmsRole)) {
       return res.status(403).json({ status: false, message: 'You can only withdraw your own club idea.' });
     }
+    if (!isOwner && denyCampus(req, res, suggestion.collegeId)) return;
     await ClubSuggestion.findByIdAndDelete(req.params.suggestionId);
     return res.json({ status: true });
   } catch (err) {
@@ -2488,6 +3437,7 @@ router.post('/posts', requireClubUser, async (req, res) => {
         return res.status(403).json({ status: false, message: 'You do not have permission for this action.' });
       }
       if (denyCampus(req, res, club.collegeId)) return;
+      if (denyClubStaffManage(req, res, club)) return;
     }
     const { activeCampusId } = req.clubAccess;
 
@@ -2496,6 +3446,7 @@ router.post('/posts', requireClubUser, async (req, res) => {
     if (!text && !mediaUrl) {
       return res.status(400).json({ status: false, message: 'Write something or add a photo.' });
     }
+    if (rejectBadMediaUrl(res, mediaUrl)) return;
     const post = await ClubPost.create({
       clubId: club?._id,
       collegeId: club?.collegeId || activeCampusId,
@@ -2521,6 +3472,9 @@ router.delete('/posts/:postId', requireClubUser, async (req, res) => {
   try {
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
+    if (!(await canAccessClubPost(req, post))) {
+      return res.status(403).json({ status: false, message: 'You do not have access to this post.' });
+    }
     const isAuthor = String(post.authorUserId) === String(req.user._id);
     if (!isAuthor && !canCms(req, 'posts.moderate')) {
       return res.status(403).json({ status: false, message: 'You can only delete your own posts.' });
@@ -2536,6 +3490,9 @@ router.post('/posts/:postId/like', requireClubUser, requirePermission('posts.int
   try {
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
+    if (!(await canAccessClubPost(req, post))) {
+      return res.status(403).json({ status: false, message: 'You do not have access to this post.' });
+    }
 
     const uid = String(req.user._id);
     const liked = post.likes.includes(uid);
@@ -2551,6 +3508,9 @@ router.post('/posts/:postId/comments', requireClubUser, requirePermission('posts
   try {
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
+    if (!(await canAccessClubPost(req, post))) {
+      return res.status(403).json({ status: false, message: 'You do not have access to this post.' });
+    }
 
     post.comments.push({
       authorUserId: req.user._id,
@@ -2569,6 +3529,9 @@ router.delete('/posts/:postId/comments/:commentId', requireClubUser, async (req,
   try {
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
+    if (!(await canAccessClubPost(req, post))) {
+      return res.status(403).json({ status: false, message: 'You do not have access to this post.' });
+    }
     const comment = post.comments.find((c) => String(c._id) === String(req.params.commentId));
     const isAuthor = comment && String(comment.authorUserId) === String(req.user._id);
     if (!isAuthor && !canCms(req, 'posts.moderate')) {
@@ -2587,6 +3550,9 @@ router.post('/posts/:postId/report', requireClubUser, requirePermission('posts.i
   try {
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
+    if (!(await canAccessClubPost(req, post))) {
+      return res.status(403).json({ status: false, message: 'You do not have access to this post.' });
+    }
 
     const reporter = req.user.name || String(req.user._id);
     if (!post.reports.includes(reporter)) {
@@ -2604,6 +3570,9 @@ router.post('/posts/:postId/share', requireClubUser, requirePermission('posts.in
   try {
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
+    if (!(await canAccessClubPost(req, post))) {
+      return res.status(403).json({ status: false, message: 'You do not have access to this post.' });
+    }
     const uid = String(req.user._id);
     if (!post.shares.includes(uid)) {
       post.shares = [...(post.shares || []), uid];
@@ -2620,6 +3589,7 @@ router.post('/posts/:postId/resolve-report', requireClubUser, requirePermission(
     const post = await ClubPost.findById(req.params.postId);
     if (!post) return res.status(404).json({ status: false, message: 'Post not found' });
     if (denyCampus(req, res, post.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, post.clubId, { required: true })) return;
     const actor = actorSnapshot(req);
     post.reportStatus = 'resolved';
     post.resolvedByUserId = actor.userId;
@@ -2650,6 +3620,9 @@ router.post('/announcements', requireClubUser, async (req, res) => {
       return res.status(403).json({ status: false, message: 'No campus is assigned to you.' });
     }
     if (canPublish && denyCampus(req, res, collegeId)) return;
+    if (canPublish && (await denyStaffClubOpsByClubId(req, res, req.body.clubId, { required: needsAssignedClubScope(req) }))) {
+      return;
+    }
     const actor = actorSnapshot(req);
     const announcement = await ClubAnnouncement.create({
       collegeId,
@@ -2677,6 +3650,9 @@ router.post('/announcements/:announcementId/review', requireClubUser, requirePer
       return res.status(404).json({ status: false, message: 'Announcement not found' });
     }
     if (denyCampus(req, res, announcement.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, announcement.clubId, { required: Boolean(announcement.clubId) })) {
+      return;
+    }
     const actor = actorSnapshot(req);
     announcement.status = req.body.decision === 'reject' ? 'rejected' : 'published';
     announcement.reviewedByUserId = actor.userId;
@@ -2696,6 +3672,9 @@ router.delete('/announcements/:announcementId', requireClubUser, requirePermissi
       return res.status(404).json({ status: false, message: 'Announcement not found' });
     }
     if (denyCampus(req, res, announcement.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, announcement.clubId, { required: Boolean(announcement.clubId) })) {
+      return;
+    }
     announcement.isDeleted = true;
     await announcement.save();
     return res.json({ status: true });
@@ -2704,35 +3683,11 @@ router.delete('/announcements/:announcementId', requireClubUser, requirePermissi
   }
 });
 
-router.post('/chat', requireClubUser, requirePermission('chat.use'), async (req, res) => {
-  try {
-    const club = isValidObjectId(req.body.clubId) ? await Club.findById(req.body.clubId) : null;
-    if (!club) return res.status(404).json({ status: false, message: 'Club not found' });
-    if (denyCampus(req, res, club.collegeId)) return;
-    if (req.clubAccess.cmsRole === 'student' && !(await isJoinedClubMember(club._id, req.user._id))) {
-      return res.status(403).json({ status: false, message: 'Join this club before chatting.' });
-    }
-    const { activeCampusId } = req.clubAccess;
-
-    const chatMessage = await ClubChatMessage.create({
-      clubId: club?._id,
-      collegeId: club?.collegeId || activeCampusId,
-      authorUserId: req.user._id,
-      author: req.body.author || req.user.name || 'Member',
-      body: req.body.body,
-    });
-    emitClubChat(club._id, {
-      id: String(chatMessage._id),
-      clubId: String(club._id),
-      author: chatMessage.author,
-      authorUserId: String(req.user._id),
-      body: chatMessage.body,
-      createdAt: chatMessage.createdAt,
-    });
-    return res.json({ status: true, chatMessage });
-  } catch (err) {
-    return res.status(500).json({ status: false, message: err.message });
-  }
+router.post('/chat', requireClubUser, requirePermission('chat.use'), async (_req, res) => {
+  return res.status(403).json({
+    status: false,
+    message: 'Intra-club chat is not enabled in this release.',
+  });
 });
 
 // ============================================================================
@@ -2747,6 +3702,7 @@ router.post('/budgets', requireClubUser, async (req, res) => {
     }
     const club = isValidObjectId(req.body.clubId) ? await Club.findById(req.body.clubId) : null;
     if (club && denyCampus(req, res, club.collegeId)) return;
+    if (canPrepare && (await denyStaffClubOpsByClubId(req, res, req.body.clubId, { required: true }))) return;
     const { activeCampusId } = req.clubAccess;
     const actor = actorSnapshot(req);
     const collegeId = club?.collegeId || activeCampusId || (await resolveStudentCollegeId(req));
@@ -2761,6 +3717,7 @@ router.post('/budgets', requireClubUser, async (req, res) => {
       const existing = await ClubBudget.findById(req.body.id);
       if (!existing) return res.status(404).json({ status: false, message: 'Budget not found' });
       if (denyCampus(req, res, existing.collegeId)) return;
+      if (await denyStaffClubOpsByClubId(req, res, existing.clubId || req.body.clubId, { required: true })) return;
       const budget = await ClubBudget.findByIdAndUpdate(
         req.body.id,
         {
@@ -2817,6 +3774,7 @@ router.post('/budgets/:budgetId/workflow', requireClubUser, requireStaff, async 
     const existingBudget = await ClubBudget.findById(req.params.budgetId);
     if (!existingBudget) return res.status(404).json({ status: false, message: 'Budget not found' });
     if (denyCampus(req, res, existingBudget.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, existingBudget.clubId, { required: true })) return;
     const actor = actorSnapshot(req);
     if (action === 'request') {
       update.requestedByUserId = actor.userId;
@@ -2843,6 +3801,7 @@ router.post('/results', requireClubUser, requirePermission('results.declare'), a
   try {
     const club = isValidObjectId(req.body.clubId) ? await Club.findById(req.body.clubId) : null;
     if (club && denyCampus(req, res, club.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, req.body.clubId, { required: true })) return;
     const { activeCampusId } = req.clubAccess;
 
     const actor = actorSnapshot(req);
@@ -2875,6 +3834,7 @@ router.post('/certificates', requireClubUser, requirePermission('certificates.ge
     }
     const club = isValidObjectId(req.body.clubId) ? await Club.findById(req.body.clubId) : null;
     if (club && denyCampus(req, res, club.collegeId)) return;
+    if (await denyStaffClubOpsByClubId(req, res, req.body.clubId, { required: true })) return;
     const { activeCampusId } = req.clubAccess;
 
     let activityDoc = null;
@@ -2932,9 +3892,12 @@ router.get('/certificates/:certificateId/file', requireClubUser, async (req, res
   try {
     const cert = await ClubCertificate.findById(req.params.certificateId);
     if (!cert) return res.status(404).json({ status: false, message: 'Certificate not found' });
-    if (denyCampus(req, res, cert.collegeId)) return;
-    if (req.clubAccess.cmsRole === 'student' && String(cert.studentUserId) !== String(req.user._id)) {
-      return res.status(403).json({ status: false, message: 'You can only download your own certificates.' });
+    if (req.clubAccess.cmsRole === 'student') {
+      if (String(cert.studentUserId) !== String(req.user._id)) {
+        return res.status(403).json({ status: false, message: 'You can only download your own certificates.' });
+      }
+    } else if (denyCampus(req, res, cert.collegeId)) {
+      return;
     }
 
     const templateId = resolveCertificateTemplateId(req.query.templateId || cert.templateId);

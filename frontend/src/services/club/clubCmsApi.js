@@ -26,6 +26,14 @@ export const clubCmsApi = {
     request('get', '/placement/centers', undefined, projectId ? { projectId } : undefined),
   createClub: (payload) => request('post', '/clubs', payload),
   updateClub: (clubId, payload) => request('put', `/clubs/${clubId}`, payload),
+  assignClubOwner: (clubId, ownerUserId) =>
+    request('post', `/clubs/${clubId}/assign-owner`, { ownerUserId }),
+  assignClubStaff: (clubId, staffUserIds) =>
+    request('post', `/clubs/${clubId}/assign-staff`, { staffUserIds }),
+  listCampusClubAdmins: (collegeId) =>
+    request('get', '/campus-club-admins', undefined, collegeId ? { collegeId } : undefined),
+  listCampusClubStaff: (collegeId) =>
+    request('get', '/campus-club-staff', undefined, collegeId ? { collegeId } : undefined),
   deleteClub: (clubId) => request('delete', `/clubs/${clubId}`),
   addMember: (clubId, payload) => request('post', `/clubs/${clubId}/members`, payload),
   requestMembership: (clubId, note) => request('post', `/clubs/${clubId}/members/requests`, { note }),

@@ -6,6 +6,7 @@ import { StatusBadge } from '../Components/cms/StatusBadge';
 import { useClub } from '../../../../contexts/ClubContext';
 import { usePermission } from '../hooks/usePermission';
 import { isApprovedMemberStatus } from '../../../../config/club/membership';
+import { staffManageableClubs } from '../../../../services/club/clubLiveState';
 
 const parseClubDate = (value) => {
   if (!value) return null;
@@ -60,9 +61,12 @@ export const MembersPage = () => {
   const [tab, setTab] = useState('requests');
   const [confirmAction, setConfirmAction] = useState(null);
 
+  const manageableClubs = useMemo(() => staffManageableClubs(state.clubs), [state.clubs]);
+
   const allRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return state.clubs.flatMap((club) =>
+    // Club Admins only see membership for clubs they own/coordinate.
+    return manageableClubs.flatMap((club) =>
       (club.members || [])
         .filter((member) => !filterClubId || club.id === filterClubId)
         .filter(
@@ -79,7 +83,7 @@ export const MembersPage = () => {
           canManage: club.canManage !== false,
         }))
     );
-  }, [state.clubs, filterClubId, query]);
+  }, [manageableClubs, filterClubId, query]);
 
   const requests = allRows.filter((row) => statusKey(row.status) === 'pending');
   const members = allRows.filter((row) => isApprovedMemberStatus(row.status));
@@ -276,8 +280,8 @@ export const MembersPage = () => {
             onChange={(e) => setFilterClubId(e.target.value)}
             aria-label="Filter by club"
           >
-            <option value="">All clubs</option>
-            {state.clubs.map((club) => (
+            <option value="">All clubs you manage</option>
+            {manageableClubs.map((club) => (
               <option key={club.id} value={club.id}>
                 {club.name}
               </option>

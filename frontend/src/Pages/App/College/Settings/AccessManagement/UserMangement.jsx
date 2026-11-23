@@ -26,6 +26,7 @@ import {
 
 const UserManagement = ({
   users = [],
+  loading = false,
   handleAddUser,
   handleEditUser,
   allRoles = {},
@@ -362,6 +363,15 @@ const UserManagement = ({
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="py-5 text-center text-muted">
+        <div className="spinner-border text-primary mb-3" role="status" aria-label="Loading users" />
+        <div>Loading active users…</div>
+      </div>
+    );
+  }
 
   if (viewMode === 'matrix') {
     return (

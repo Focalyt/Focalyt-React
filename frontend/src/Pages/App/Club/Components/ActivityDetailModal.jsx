@@ -2,10 +2,12 @@ import React from 'react';
 import { Bookmark, Calendar, MapPin, Users, X } from 'lucide-react';
 import { useClub } from '../../../../contexts/ClubContext';
 import { modeLabel } from '../../../../config/club/labels';
+import { studentCanActInClub } from '../../../../config/club/membership';
 
 export const ActivityDetailModal = ({ activity, onClose }) => {
   const {
     state,
+    mode,
     isActivitySaved,
     isActivityRegistered,
     toggleSaveActivity,
@@ -22,6 +24,8 @@ export const ActivityDetailModal = ({ activity, onClose }) => {
   const inCharge = state.people.find((p) => p.id === liveActivity.inChargeId);
   const seatsLeft = Math.max(0, liveActivity.capacity - liveActivity.registrations.length);
   const isFull = seatsLeft === 0;
+  const canJoinEvent =
+    mode !== 'student' || studentCanActInClub(state.clubs, state.currentStudent, liveActivity.clubId);
 
   return (
     <div
@@ -98,10 +102,15 @@ export const ActivityDetailModal = ({ activity, onClose }) => {
             <button
               type="button"
               className="fc-btn fc-btn-primary"
-              disabled={isFull}
+              disabled={isFull || !canJoinEvent}
+              title={
+                !canJoinEvent
+                  ? 'Join this club and get approved before registering.'
+                  : undefined
+              }
               onClick={() => registerForActivity(liveActivity.id)}
             >
-              Join event
+              {!canJoinEvent ? 'Join club first' : isFull ? 'Full' : 'Join event'}
             </button>
           )}
         </div>

@@ -57,9 +57,8 @@ const AccessManagement = () => {
   const [editUser, setEditUser] = useState(null);
 
   // All users data
-  const [users, setUsers] = useState([
-    
-  ]);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   const [enhancedEntities, setEnhancedEntities] = useState({
     VERTICAL: [
@@ -208,27 +207,26 @@ const AccessManagement = () => {
     setShowAddRole(true);
   };
   useEffect(() => {
-    fetchVerticals()
-    fetchProjects()
-    fetchCenters()
-    fetchCourses()
-    fetchBatches()
-    fetchUsers()
+    // Load users first so the Active Users list appears quickly.
+    fetchUsers().finally(() => {
+      // Catalog data can load after users — needed for Add/Edit modals, not the list.
+      fetchVerticals();
+      fetchProjects();
+      fetchCenters();
+      fetchCourses();
+      fetchBatches();
+    });
   }, []);
 
-
-  
-  
-
   const fetchUsers = async () => {
+    setUsersLoading(true);
     try {
       const response = await axios.get(`${backendUrl}/college/users`, {
-        headers: { 'x-auth': token }
+        headers: { 'x-auth': token },
+        params: { limit: 500 },
       });
   
       if (response.data.success) {
-        console.log('response.data.data.users', response.data.data)
-        // Update users state with detailed access summary
         setUsers(response.data.data.users.map(user => ({
           user_id: user._id,
           name: user.name,
@@ -236,13 +234,14 @@ const AccessManagement = () => {
           mobile: user.mobile,
           designation: user.designation,
           status: user.status? 'active' : 'inactive',
-          reporting_managers: user.accessSummary?.reportingManagers || 0,
+          reporting_managers: Array.isArray(user.reporting_managers)
+            ? user.reporting_managers.length
+            : (user.accessSummary?.reportingManagers || 0),
           role: user.role,
           roleId: user.roleId,
-          access_level: user.access_level,
+          access_level: user.access_level || user.permissions?.permission_type,
           permissions: user.permissions,
           my_team: user.my_team,
-          // ✅ NEW: Add detailed access summary
           accessSummary: user.accessSummary || {},
           fullPermissions: user.fullPermissions || {},
           college: user.college || {},
@@ -251,6 +250,8 @@ const AccessManagement = () => {
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+    } finally {
+      setUsersLoading(false);
     }
   };
 
@@ -394,6 +395,7 @@ const fetchBatches = async () => {
         return (
           <UserManagement
             users={users}
+            loading={usersLoading}
             handleAddUser={handleAddUser}
             handleEditUser={handleEditUser}
             onStatusChange={handleUserStatusChange}

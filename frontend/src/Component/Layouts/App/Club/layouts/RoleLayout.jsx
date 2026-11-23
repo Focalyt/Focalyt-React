@@ -68,7 +68,8 @@ export const RoleLayout = () => {
               : 'Student Club — browse every club created by Club Admins.'}
         </div>
       )}
-      {isStaff && !isLiveMode && (
+      {/* Demo role switcher / mock data is disabled for production club portals */}
+      {false && isStaff && !isLiveMode && (
         <>
           <div className="cms-demo-banner">
             Simulated Club frontend only — actions stay in this browser and are not saved to a server.
