@@ -32,6 +32,10 @@ const {
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
+const {
+	applyCandidateEligibility,
+	candidateFromAuthHeader,
+} = require('../../../helpers/qualificationEligibility');
 const { uploadSinglefile } = require('../functions/images');
 const { updateSpreadSheetCarrerValues } = require('../services/googleservice');
 const { baseUrl } = require('../../../config');
@@ -317,6 +321,9 @@ router.get("/joblisting", async (req, res) => {
 			])
 			: (filter["experience"] = { $lte: experience });
 	}
+
+	const listingCandidate = await candidateFromAuthHeader(req);
+	filter = await applyCandidateEligibility(filter, listingCandidate);
 
 	let populate = [
 		{

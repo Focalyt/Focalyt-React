@@ -1,5 +1,6 @@
 const express = require('express');
 const { Qualification, QualificationCourse, SubQualification } = require('../../models');
+const { parseQualificationLevel } = require('../../../helpers/qualificationEligibility');
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ router.get('/', async (req, res) => {
       const page = parseInt(req.query.page, 10) || 1;
       const count = await Qualification.countDocuments({});
       const qualifications = await Qualification.find({})
-        .select('name status basic')
+        .select('name status basic level')
         .sort({ createdAt: -1 })
         .skip(perPage * (page - 1))
         .limit(perPage)
@@ -25,7 +26,7 @@ router.get('/', async (req, res) => {
     }
 
     const qualifications = await Qualification.find({ status: true })
-      .select('name status basic')
+      .select('name status basic level')
       .sort({ name: 1 })
       .lean();
 
@@ -45,13 +46,17 @@ router.post('/', async (req, res) => {
     if (!name) {
       return res.status(400).json({ status: false, message: 'Please enter qualification' });
     }
+    const parsedLevel = parseQualificationLevel(req.body.level);
+    if (parsedLevel.error) {
+      return res.status(400).json({ status: false, message: parsedLevel.error });
+    }
 
     const existing = await Qualification.findOne({ name });
     if (existing) {
       return res.status(400).json({ status: false, message: 'Qualification already exists.' });
     }
 
-    const qualification = await Qualification.create({ name, status: true });
+    const qualification = await Qualification.create({ name, level: parsedLevel.level, status: true });
     return res.json({
       status: true,
       message: 'Qualification added successfully!',
@@ -75,6 +80,10 @@ router.put('/:id', async (req, res) => {
     if (!name) {
       return res.status(400).json({ status: false, message: 'Please enter qualification' });
     }
+    const parsedLevel = parseQualificationLevel(req.body.level);
+    if (parsedLevel.error) {
+      return res.status(400).json({ status: false, message: parsedLevel.error });
+    }
 
     const existing = await Qualification.findOne({
       _id: { $ne: req.params.id },
@@ -86,8 +95,8 @@ router.put('/:id', async (req, res) => {
 
     const qualification = await Qualification.findByIdAndUpdate(
       req.params.id,
-      { name },
-      { new: true }
+      { $set: { name, level: parsedLevel.level } },
+      { new: true, runValidators: true }
     );
 
     if (!qualification) {

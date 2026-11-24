@@ -51,6 +51,11 @@
                           
                           </div>
                           <% } %>
+                        <div class="col-xl-3 mb-1">
+                          <label>Qualification Level</label>
+                          <input type="number" class="form-control" name="level" min="0" step="1" required
+                            value="<%= quaLevel != null ? quaLevel : '' %>" placeholder="Qualification Level">
+                        </div>
                         <div class="col-xl-4 mb-1">
                           <br>
                           <% if (quaName) { %>
@@ -114,6 +119,7 @@
                       <thead>
                         <tr>
                           <th>Qualification </th>
+                          <th>Level</th>
                           <% if (view === false) { %>
                           <th>Status</th>
                           
@@ -128,6 +134,9 @@
                             <tr>
                               <td>
                                 <%= l.name %>
+                              </td>
+                              <td>
+                                <%= l.level != null ? l.level : '—' %>
                               </td>
                               
                               <% if (view === true) { %>
@@ -147,11 +156,9 @@
                                
                                 
                                 <td valign="middle">
-                                  <% if (l.basic !== true) { %>
                                   <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin/qualification/edit/<%= l._id %>">
                                     <i class="feather icon-edit fa-lg primary"></i>
                                   </a>
-                                  <% }%>
                                 </td>
                                 <% }%>
   

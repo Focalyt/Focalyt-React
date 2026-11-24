@@ -860,6 +860,41 @@ async function findStudentColleges(user) {
     .lean();
 }
 
+/** Campuses implied by clubs this user owns / admins / coordinates. */
+async function loadCampusesFromOwnedClubs(userId) {
+  if (!isValidObjectId(userId)) return [];
+  const owned = await Club.find({
+    isDeleted: { $ne: true },
+    $or: [
+      { createdByUserId: userId },
+      { adminUserIds: userId },
+      { coordinatorId: String(userId) },
+    ],
+  })
+    .select('collegeId')
+    .lean();
+  const collegeIds = [
+    ...new Set(
+      (owned || [])
+        .map((club) => String(club.collegeId || ''))
+        .filter((id) => isValidObjectId(id))
+    ),
+  ];
+  if (!collegeIds.length) return [];
+  return College.find({ _id: { $in: collegeIds }, isDeleted: { $ne: true } })
+    .select(COLLEGE_SELECT)
+    .lean();
+}
+
+function mergeCampusesById(...lists) {
+  const byId = new Map();
+  lists.flat().forEach((campus) => {
+    if (!campus?._id) return;
+    byId.set(String(campus._id), campus);
+  });
+  return [...byId.values()];
+}
+
 async function resolveUserCampusesAndRole(user, queryCollegeId) {
   const roleNum = Number(user.role);
   let cmsRole = 'student';
@@ -960,9 +995,14 @@ async function resolveUserCampusesAndRole(user, queryCollegeId) {
     // Do not collapse them to a single login campus or those clubs disappear from the dashboard.
     const isDedicatedClubAdmin =
       Boolean(customPerms.can_be_club_admin) && permType !== 'Admin' && roleNum !== 5;
-    campuses = isDedicatedClubAdmin
-      ? allConcernCampuses
-      : scopeToLoginCampus(allConcernCampuses, loginCollegeId);
+    if (isDedicatedClubAdmin) {
+      // Concern-person campuses + campuses of clubs they already own/admin.
+      // Without owned-club campuses, admins missing from college._concernPerson get an empty admin list.
+      const ownedCampuses = await loadCampusesFromOwnedClubs(user._id);
+      campuses = mergeCampusesById(allConcernCampuses, ownedCampuses);
+    } else {
+      campuses = scopeToLoginCampus(allConcernCampuses, loginCollegeId);
+    }
   } else if (roleNum === 1) {
     const assignments = await ClubStaffAssignment.find({ userId: user._id }).lean();
     if (assignments.length > 0) {
@@ -1467,6 +1507,30 @@ async function ensureCampusCatalog(collegeId) {
   );
 }
 
+function normalizeClubTypes(list) {
+  // Empty is allowed — campuses start with zero types until Settings adds some.
+  const source = Array.isArray(list) ? list : [];
+  const seen = new Set();
+  const out = [];
+  source.forEach((raw) => {
+    const value = String(raw || '').trim();
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(value.slice(0, 60));
+  });
+  return out;
+}
+
+function clubTypesFromSetting(campusSetting) {
+  // Missing field on old docs: treat as empty (not legacy defaults).
+  if (!campusSetting || !Object.prototype.hasOwnProperty.call(campusSetting, 'clubTypes')) {
+    return [];
+  }
+  return normalizeClubTypes(campusSetting.clubTypes);
+}
+
 function emptyBootstrapPayload(req, cmsRole, permissions, campuses) {
   return {
     status: true,
@@ -1484,7 +1548,10 @@ function emptyBootstrapPayload(req, cmsRole, permissions, campuses) {
       role: req.user.role,
     },
     studentState: null,
-    settings: { positionsFeatureEnabled: true },
+    settings: {
+      positionsFeatureEnabled: true,
+      clubTypes: [],
+    },
     clubs: [],
     members: [],
     positions: [],
@@ -1740,6 +1807,7 @@ async function bootstrapStudentCms(req, res) {
         campusSetting?.positionsFeatureEnabled !== undefined
           ? campusSetting.positionsFeatureEnabled
           : true,
+      clubTypes: clubTypesFromSetting(campusSetting),
     },
     clubs,
     members,
@@ -1779,6 +1847,21 @@ router.get('/bootstrap', requireClubUser, async (req, res) => {
 
     if (isStudent) {
       return bootstrapStudentCms(req, res);
+    }
+
+    // Club Admin with owned clubs but no college._concernPerson still needs a campus scope.
+    if (
+      (!activeCampusId || !campuses.length) &&
+      cmsRole === 'club_admin' &&
+      !isMainInstituteAdminUser(req.user)
+    ) {
+      const ownedCampuses = await loadCampusesFromOwnedClubs(req.user._id);
+      if (ownedCampuses.length) {
+        campuses = mergeCampusesById(campuses, ownedCampuses);
+        activeCampusId = campuses[0] ? String(campuses[0]._id) : null;
+        req.clubAccess.campuses = campuses;
+        req.clubAccess.activeCampusId = activeCampusId;
+      }
     }
 
     if (!activeCampusId || !campuses.length) {
@@ -2004,6 +2087,7 @@ router.get('/bootstrap', requireClubUser, async (req, res) => {
           campusSetting?.positionsFeatureEnabled !== undefined
             ? campusSetting.positionsFeatureEnabled
             : true,
+        clubTypes: clubTypesFromSetting(campusSetting),
       },
       clubs,
       members,
@@ -2098,6 +2182,31 @@ router.put('/campuses/:collegeId/settings/positions-feature', requireClubUser, r
       { upsert: true, new: true }
     );
     return res.json({ status: true, setting });
+  } catch (err) {
+    return res.status(500).json({ status: false, message: err.message });
+  }
+});
+
+router.put('/campuses/:collegeId/settings/club-types', requireClubUser, async (req, res) => {
+  try {
+    const canManageTypes =
+      canCms(req, 'settings.manage') || canCms(req, 'clubs.create') || canCms(req, 'clubs.edit');
+    if (!canManageTypes) {
+      return res.status(403).json({ status: false, message: 'You cannot manage club types.' });
+    }
+    if (denyCampus(req, res, req.params.collegeId)) return;
+    const { collegeId } = req.params;
+    const clubTypes = normalizeClubTypes(req.body?.clubTypes);
+    const setting = await ClubCampusSetting.findOneAndUpdate(
+      { collegeId },
+      { $set: { clubTypes } },
+      { upsert: true, new: true }
+    );
+    return res.json({
+      status: true,
+      setting,
+      clubTypes: normalizeClubTypes(setting?.clubTypes),
+    });
   } catch (err) {
     return res.status(500).json({ status: false, message: err.message });
   }

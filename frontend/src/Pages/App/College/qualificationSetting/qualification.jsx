@@ -16,6 +16,7 @@ const Qualification = ({ view = false }) => {
 
     const [qual, setQual] = useState([]);
     const [name, setName] = useState('');
+    const [level, setLevel] = useState('');
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -53,6 +54,7 @@ const Qualification = ({ view = false }) => {
 
     const resetForm = () => {
         setName('');
+        setLevel('');
         setIsEditing(false);
         setEditingId(null);
     };
@@ -64,6 +66,11 @@ const Qualification = ({ view = false }) => {
             showAlert('Please enter qualification', 'error');
             return;
         }
+        const parsedLevel = Number(level);
+        if (level === '' || !Number.isInteger(parsedLevel) || parsedLevel < 0) {
+            showAlert('Please enter qualification level', 'error');
+            return;
+        }
 
         try {
             setLoading(true);
@@ -73,7 +80,7 @@ const Qualification = ({ view = false }) => {
             const response = await fetch(url, {
                 method,
                 headers,
-                body: JSON.stringify({ name })
+                body: JSON.stringify({ name, level: parsedLevel })
             });
             const data = await response.json();
 
@@ -97,6 +104,7 @@ const Qualification = ({ view = false }) => {
 
     const handleEdit = (item) => {
         setName(item.name || '');
+        setLevel(item.level === 0 || item.level ? String(item.level) : '');
         setIsEditing(true);
         setEditingId(item._id);
     };
@@ -235,6 +243,21 @@ const Qualification = ({ view = false }) => {
                                                     />
                                                 </div>
 
+                                                <div className="col-xl-3 mb-1">
+                                                    <label>Qualification Level</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-control"
+                                                        min="0"
+                                                        step="1"
+                                                        required
+                                                        name="level"
+                                                        placeholder="Qualification Level"
+                                                        value={level}
+                                                        onChange={(e) => setLevel(e.target.value)}
+                                                    />
+                                                </div>
+
                                                 <div className="col-xl-4 mb-1 qs-form-actions">
                                                     <button
                                                         type="submit"
@@ -279,6 +302,7 @@ const Qualification = ({ view = false }) => {
                                                 <thead>
                                                     <tr>
                                                         <th>Qualification</th>
+                                                        <th>Level</th>
                                                         {view ? (
                                                             <th>Status</th>
                                                         ) : (
@@ -293,6 +317,7 @@ const Qualification = ({ view = false }) => {
                                                     {qual.map((l) => (
                                                         <tr key={l._id}>
                                                             <td>{l.name}</td>
+                                                            <td>{l.level === 0 || l.level ? l.level : '—'}</td>
 
                                                             {view ? (
                                                                 <td>{l.status ? 'True' : 'False'}</td>
@@ -306,16 +331,14 @@ const Qualification = ({ view = false }) => {
                                                                         />
                                                                     </td>
                                                                     <td className="qs-action-cell">
-                                                                        {l.basic !== true && (
-                                                                            <button
-                                                                                type="button"
-                                                                                className="qs-edit-btn"
-                                                                                onClick={() => handleEdit(l)}
-                                                                            >
-                                                                                <i className="feather icon-edit"></i>
-                                                                                Edit
-                                                                            </button>
-                                                                        )}
+                                                                        <button
+                                                                            type="button"
+                                                                            className="qs-edit-btn"
+                                                                            onClick={() => handleEdit(l)}
+                                                                        >
+                                                                            <i className="feather icon-edit"></i>
+                                                                            Edit
+                                                                        </button>
                                                                     </td>
                                                                 </>
                                                             )}

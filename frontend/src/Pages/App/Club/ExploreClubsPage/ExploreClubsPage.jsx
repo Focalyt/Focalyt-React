@@ -5,7 +5,7 @@ import { useClub } from '../../../../contexts/ClubContext';
 import { ClubCard } from '../Components/ClubCard';
 import { ClubDetailModal } from '../Components/ClubDetailModal';
 import { ActivityDetailModal } from '../Components/ActivityDetailModal';
-import { CATEGORY_FILTERS, categoryLabel } from '../../../../config/club/labels';
+import { categoryFiltersFromTypes, categoryLabel } from '../../../../config/club/labels';
 
 export const ExploreClubsPage = () => {
   const { state } = useClub();
@@ -16,6 +16,10 @@ export const ExploreClubsPage = () => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedClub, setSelectedClub] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const categoryFilters = useMemo(
+    () => categoryFiltersFromTypes(state.settings?.clubTypes || []),
+    [state.settings?.clubTypes]
+  );
 
   useEffect(() => {
     const paramInterest = searchParams.get('interest');
@@ -76,7 +80,7 @@ export const ExploreClubsPage = () => {
           </div>
 
           <div className="chip-group" role="tablist" aria-label="Filter clubs by category">
-            {CATEGORY_FILTERS.map((tab) => {
+            {categoryFilters.map((tab) => {
               const active = activeCategory === tab.value;
               return (
                 <button

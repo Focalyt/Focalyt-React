@@ -4,6 +4,7 @@ import { clubCmsApi } from '../services/club/clubCmsApi';
 import { emptyLiveCmsState, isLiveMongoId, mapLiveCmsToState } from '../services/club/clubLiveState';
 import {
   isLiveClubMode,
+  isMainInstituteAdmin,
   isStaffClubMode,
   readAssignedCollegesFromSession,
 } from '../config/club/clubAuthSession';
@@ -33,6 +34,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
   const [livePermissions, setLivePermissions] = useState(null);
   const [livePermissionMatrix, setLivePermissionMatrix] = useState(null);
   const [managesAllCampuses, setManagesAllCampuses] = useState(false);
+  const [isMainInstituteAdminLive, setIsMainInstituteAdminLive] = useState(() => isMainInstituteAdmin());
   const [assignedColleges, setAssignedColleges] = useState(() => readAssignedCollegesFromSession());
   const [state, setState] = useState(() => {
     if (isLiveMode) {
@@ -109,6 +111,9 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
       setLivePermissions(payload.permissions || null);
       setLivePermissionMatrix(payload.permissionMatrix || null);
       setManagesAllCampuses(nextManagesAll);
+      setIsMainInstituteAdminLive(
+        Boolean(payload.currentUser?.isMainInstituteAdmin) || isMainInstituteAdmin()
+      );
       setState(
         mapLiveCmsToState(
           null,
@@ -144,6 +149,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
       setLivePermissions(null);
       setLivePermissionMatrix(null);
       setManagesAllCampuses(false);
+      setIsMainInstituteAdminLive(isMainInstituteAdmin());
       setState(emptyLiveCmsState(assignedCollegesRef.current));
       setCmsStatus('error');
       const networkFail = !err.response && /network error/i.test(err.message || '');
@@ -985,6 +991,39 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
     [activeRole, assignedColleges, mode, notify, refreshLiveCms]
   );
 
+  const setClubTypes = useCallback(
+    (clubTypes) => {
+      const nextTypes = Array.isArray(clubTypes)
+        ? clubTypes.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+      if (isLiveMode) {
+        const collegeId = assignedColleges[0]?._id;
+        if (!isLiveMongoId(collegeId)) {
+          notify('Action not allowed', 'No assigned campus is available for this setting.', 'info');
+          return;
+        }
+        clubCmsApi
+          .setClubTypes(collegeId, nextTypes)
+          .then((res) => {
+            if (!res.status) throw new Error(res.message);
+            notify('Club types updated', 'These types appear when creating or suggesting a club.');
+            return refreshLiveCms(collegeId);
+          })
+          .catch((err) => notify('Could not save club types', err.response?.data?.message || err.message, 'info'));
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        settings: {
+          ...(prev.settings || {}),
+          clubTypes: nextTypes,
+        },
+      }));
+      notify('Club types updated', 'These types appear when creating or suggesting a club.');
+    },
+    [assignedColleges, isLiveMode, notify, refreshLiveCms]
+  );
+
   const requestPosition = useCallback(
     (payload) => {
       if (isLiveMode) {
@@ -1741,6 +1780,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
         refreshLiveCms,
         assignedColleges,
         managesAllCampuses,
+        isMainInstituteAdminLive,
         activeRole,
         setDemoRole,
         basePath,
@@ -1775,6 +1815,7 @@ export const ClubProvider = ({ children, mode = 'student', basePath = '/candidat
         upsertPosition,
         deletePosition,
         setPositionsFeatureEnabled,
+        setClubTypes,
         requestPosition,
         reviewPositionRequest,
         upsertBudget,

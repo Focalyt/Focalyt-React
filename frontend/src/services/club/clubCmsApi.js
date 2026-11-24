@@ -47,6 +47,8 @@ export const clubCmsApi = {
     request('get', `/campuses/${collegeId}/students`, undefined, search ? { search } : undefined),
   setPositionsFeature: (collegeId, enabled) =>
     request('put', `/campuses/${collegeId}/settings/positions-feature`, { enabled }),
+  setClubTypes: (collegeId, clubTypes) =>
+    request('put', `/campuses/${collegeId}/settings/club-types`, { clubTypes }),
   setPermissionMatrix: (collegeId, permissionMatrix) =>
     request('put', `/campuses/${collegeId}/settings/permission-matrix`, { permissionMatrix }),
   requestPosition: (positionId, note) => request('post', `/positions/${positionId}/requests`, { note }),

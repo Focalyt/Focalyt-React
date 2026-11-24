@@ -1,5 +1,6 @@
 const express = require("express");
 const { Qualification, QualificationCourse, SubQualification } = require("../../models");
+const { parseQualificationLevel } = require("../../../helpers/qualificationEligibility");
 const { isAdmin } = require("../../../helpers");
 const qualificationCourse = require("../../models/qualificationCourse");
 const router = express.Router();
@@ -17,15 +18,16 @@ router
 			const p = parseInt(req.query.page, 10);
 			const page = p || 1;
 			const quaName = "";
+			const quaLevel = "";
 			const count = await Qualification.countDocuments({});
 			const qualifications = await Qualification.find({})
-				.select("name status basic")
+				.select("name status basic level")
 				.sort({ createdAt: -1 })
 				.skip(perPage * page - perPage)
 				.limit(perPage);
 
 			const qual = await Qualification.find({})
-				.select("name status basic")
+				.select("name status basic level")
 				.sort({ createdAt: -1 })
 				.skip(perPage * page - perPage)
 				.limit(perPage);
@@ -33,6 +35,7 @@ router
 			const totalPages = Math.ceil(count / perPage);
 			return res.render(`${req.vPath}/admin/qualificationSetting/qualification`, {
 				quaName,
+				quaLevel,
 				qualifications,
 				qual,
 				perPage,
@@ -59,9 +62,11 @@ router
 				req.flash("success", "Course added successfully!");
 				return res.redirect("/admin/qualification");
 			} else {
+				const parsedLevel = parseQualificationLevel(req.body.level);
+				if (parsedLevel.error) throw req.ykError(parsedLevel.error);
 				const qual = await Qualification.findOne({ name: req.body.name });
 				if (qual) throw req.ykError("Course already exist!");
-				const qualification = await Qualification.create({ name: req.body.name, status: true })
+				const qualification = await Qualification.create({ name: req.body.name, level: parsedLevel.level, status: true })
 				if (!qualification) {
 					throw req.ykError("qualification not created!");
 				}
@@ -88,12 +93,13 @@ router
 			const page = p || 1;
 			const qualifications = await Qualification.find({ status: true });
 			const qualData = await Qualification.findById(req.params.id).select(
-				"name"
+				"name level"
 			);
 			const quaName = qualData.name ? qualData.name : "";
+			const quaLevel = qualData.level != null ? qualData.level : "";
 			const count = await Qualification.countDocuments({});
 			const qual = await Qualification.find({})
-				.select("name status basic")
+				.select("name status basic level")
 				.sort({ createdAt: -1 })
 				.skip(perPage * page - perPage)
 				.limit(perPage);
@@ -101,6 +107,7 @@ router
 			return res.render(`${req.vPath}/admin/qualificationSetting/qualification`, {
 				qualifications,
 				quaName,
+				quaLevel,
 				perPage,
 				qual,
 				totalPages,
@@ -116,6 +123,8 @@ router
 	.post(async (req, res) => {
 		try {
 			const { name } = req.body;
+			const parsedLevel = parseQualificationLevel(req.body.level);
+			if (parsedLevel.error) throw new Error(parsedLevel.error);
 			const qual = await Qualification.findOne({
 				_id: { $ne: req.params.id },
 				name,
@@ -123,8 +132,8 @@ router
 			if (qual) throw new Error("Course already exist!");
 			const pdata = await Qualification.findByIdAndUpdate(
 				req.params.id,
-				{ name },
-				{ new: true }
+				{ $set: { name, level: parsedLevel.level } },
+				{ new: true, runValidators: true }
 			);
 			if (!pdata) req.ykError("Course not update now!");
 			req.flash("success", "Course updated successfully!");
