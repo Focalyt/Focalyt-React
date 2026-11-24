@@ -7655,6 +7655,8 @@ console.log('API Response:', response.data);
   const milestonePerformanceChips = leadMilestones.map((milestone) => ({
     ...milestone,
     count: Number(milestone.leadCount) || 0,
+    activeCount: Number(milestone.activeCount) || 0,
+    dropoutCount: Number(milestone.dropoutCount) || 0,
   }));
   const milestonePerformanceTotal = reachedMilestoneLeadCount;
 
@@ -16456,9 +16458,9 @@ useEffect(() => {
               fontWeight: 600,
               borderRadius: '999px',
               cursor: 'pointer',
-              color: !activeMilestoneId ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: !activeMilestoneId ? 'rgb(250, 85, 121)' : '#fff',
-              border: !activeMilestoneId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+              color: !activeMilestoneId ? '#fff' : '#66bb6a',
+              backgroundColor: !activeMilestoneId ? '#66bb6a' : '#fff',
+              border: !activeMilestoneId ? 'none' : '1.5px solid #66bb6a',
             }}
             onClick={() => handleMilestoneChipClick(null)}
           >
@@ -16470,20 +16472,31 @@ useEffect(() => {
               <button
                 key={milestone._id || index}
                 type="button"
-                className="b2b-perf-chip"
+                className="b2b-perf-chip b2b-milestone-chip"
                 style={{
-                  padding: '6px 14px',
+                  padding: '6px 10px',
                   fontSize: '12px',
                   fontWeight: 600,
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
-                  backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
-                  border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                  color: isSelected ? '#fff' : '#66bb6a',
+                  backgroundColor: isSelected ? '#66bb6a' : '#fff',
+                  border: isSelected ? 'none' : '1.5px solid #66bb6a',
                 }}
                 onClick={() => handleMilestoneChipClick(milestone)}
+                title={`${milestone.activeCount ?? 0} still in this milestone, ${milestone.dropoutCount ?? 0} dropped out`}
               >
-                {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                <span className="b2b-milestone-chip__side" title="Not dropped out from this milestone">
+                  <span className="b2b-milestone-chip__sign" aria-hidden="true">+</span>
+                  <span className="b2b-milestone-chip__count">{milestone.activeCount ?? 0}</span>
+                </span>
+                <span className="b2b-milestone-chip__label">
+                  {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                </span>
+                <span className="b2b-milestone-chip__side" title="Dropped out from this milestone">
+                  <span className="b2b-milestone-chip__sign" aria-hidden="true">−</span>
+                  <span className="b2b-milestone-chip__count">{milestone.dropoutCount ?? 0}</span>
+                </span>
               </button>
             );
           })}
@@ -17031,6 +17044,40 @@ useEffect(() => {
             min-height: 34px;
             white-space: nowrap;
             flex: 0 0 auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip {
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding-top: 4px;
+            padding-bottom: 4px;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__side {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            min-width: 16px;
+            flex: 0 0 auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__sign {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__count {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chip__label {
+            flex: 1 1 auto;
+            text-align: center;
           }
           .b2b-crm-dashboard .b2b-mobile-hscroll--chips{
             flex-wrap: nowrap;

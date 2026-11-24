@@ -68,33 +68,86 @@ router.get('/', isCollege, async (req, res) => {
       },
       {
         $project: {
-          milestones: {
-            $setUnion: [
-              { $ifNull: ['$milestoneHistory.milestone', []] },
-              {
-                $cond: [
-                  { $ifNull: ['$_milestone', false] },
-                  ['$_milestone'],
-                  [],
+          entries: {
+            $let: {
+              vars: {
+                history: {
+                  $filter: {
+                    input: { $ifNull: ['$milestoneHistory', []] },
+                    as: 'step',
+                    cond: { $ifNull: ['$$step.milestone', false] },
+                  },
+                },
+                currentId: '$_milestone',
+              },
+              in: {
+                $concatArrays: [
+                  {
+                    $map: {
+                      input: '$$history',
+                      as: 'step',
+                      in: {
+                        milestone: '$$step.milestone',
+                        droppedOut: { $eq: ['$$step.droppedOut', true] },
+                      },
+                    },
+                  },
+                  {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ifNull: ['$$currentId', false] },
+                          {
+                            $eq: [
+                              {
+                                $size: {
+                                  $filter: {
+                                    input: '$$history',
+                                    as: 'step',
+                                    cond: { $eq: ['$$step.milestone', '$$currentId'] },
+                                  },
+                                },
+                              },
+                              0,
+                            ],
+                          },
+                        ],
+                      },
+                      [{ milestone: '$$currentId', droppedOut: false }],
+                      [],
+                    ],
+                  },
                 ],
               },
-            ],
+            },
           },
         },
       },
-      { $match: { 'milestones.0': { $exists: true } } },
+      { $match: { 'entries.0': { $exists: true } } },
       {
         $facet: {
           byMilestone: [
-            { $unwind: '$milestones' },
-            { $group: { _id: '$milestones', count: { $sum: 1 } } },
+            { $unwind: '$entries' },
+            {
+              $group: {
+                _id: { lead: '$_id', milestone: '$entries.milestone' },
+                droppedOut: { $max: { $cond: ['$entries.droppedOut', 1, 0] } },
+              },
+            },
+            {
+              $group: {
+                _id: '$_id.milestone',
+                activeCount: { $sum: { $cond: [{ $eq: ['$droppedOut', 0] }, 1, 0] } },
+                dropoutCount: { $sum: { $cond: [{ $eq: ['$droppedOut', 1] }, 1, 0] } },
+              },
+            },
           ],
           leads: [{ $count: 'count' }],
         },
       },
     ]);
     const countByMilestone = new Map(
-      ((counted[0] && counted[0].byMilestone) || []).map((row) => [String(row._id), row.count])
+      ((counted[0] && counted[0].byMilestone) || []).map((row) => [String(row._id), row])
     );
     const reachedLeadCount = counted[0]?.leads?.[0]?.count || 0;
     const data = milestones.map((item) => {
@@ -109,12 +162,17 @@ router.get('/', isCollege, async (req, res) => {
           departmentPositions[departmentId] = position;
         });
       }
+      const counts = countByMilestone.get(String(item._id)) || {};
+      const activeCount = counts.activeCount || 0;
+      const dropoutCount = counts.dropoutCount || 0;
       return {
         _id: item._id,
         title: item.title,
         description: item.description,
         index: item.index,
-        leadCount: countByMilestone.get(String(item._id)) || 0,
+        leadCount: activeCount + dropoutCount,
+        activeCount,
+        dropoutCount,
         assignedDepartments: assignment ? [...assignment.departments] : [],
         assignedProjects: assignment ? [...assignment.projects] : [],
         projectPositions,
