@@ -9,13 +9,7 @@ import { clubCmsApi } from '../../../../services/club/clubCmsApi';
 import { ROLES } from '../../../../config/club/roles';
 import { isMainInstituteAdmin } from '../../../../config/club/clubAuthSession';
 import { staffManageableClubs } from '../../../../services/club/clubLiveState';
-
-const CATEGORIES = [
-  'Creative',
-  'Sports & Games',
-  'Social & Impact',
-  'Tech & Makers',
-];
+import { normalizeClubTypes } from '../../../../config/club/labels';
 
 export const AdminClubsPage = () => {
   const {
@@ -23,6 +17,7 @@ export const AdminClubsPage = () => {
     mode,
     activeRole,
     assignedColleges,
+    isMainInstituteAdminLive,
     upsertClub,
     deleteClub,
     assignClubOwner,
@@ -30,17 +25,18 @@ export const AdminClubsPage = () => {
     setMemberStatus,
   } = useClub();
   const isLiveClubAdmin = mode === 'club_admin' || mode === 'admin' || mode === 'company';
+  const isCampusInstituteAdmin = Boolean(isMainInstituteAdminLive) || isMainInstituteAdmin();
   const assignedInstitutions = isLiveClubAdmin
     ? state.institutions.filter((inst) =>
         (assignedColleges || []).some((college) => String(college._id || college.id) === inst.id)
       )
     : state.institutions;
   const campusOptions = assignedInstitutions.length ? assignedInstitutions : state.institutions;
+  // Dedicated Club Admin / SSE / SE: only assigned clubs. Campus Institute Admin: all campus clubs.
   const scopeToAssignedClubs =
-    (activeRole === ROLES.CLUB_ADMIN && !isMainInstituteAdmin()) ||
-    activeRole === ROLES.SENIOR_SALES_ENGINEER ||
-    activeRole === ROLES.SALES_ENGINEER;
-  // Club Admin / SSE / SE only list clubs they are assigned to; Institute Admin sees campus clubs.
+    ((activeRole === ROLES.CLUB_ADMIN && !isCampusInstituteAdmin) ||
+      activeRole === ROLES.SENIOR_SALES_ENGINEER ||
+      activeRole === ROLES.SALES_ENGINEER);
   const visibleClubs = useMemo(() => {
     if (scopeToAssignedClubs) return staffManageableClubs(state.clubs);
     return state.clubs;
@@ -51,7 +47,11 @@ export const AdminClubsPage = () => {
   const [editingClubId, setEditingClubId] = useState(undefined);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Creative');
+  const clubTypeOptions = useMemo(
+    () => normalizeClubTypes(state.settings?.clubTypes || []),
+    [state.settings?.clubTypes]
+  );
+  const [category, setCategory] = useState('');
   const [institutionId, setInstitutionId] = useState('');
   const [verticalId, setVerticalId] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -73,7 +73,7 @@ export const AdminClubsPage = () => {
   const [reassignClubId, setReassignClubId] = useState(null);
   const [reassignOwnerId, setReassignOwnerId] = useState('');
   const canAssignOwner =
-    isMainInstituteAdmin() || activeRole === ROLES.SENIOR_SALES_ENGINEER;
+    isCampusInstituteAdmin || activeRole === ROLES.SENIOR_SALES_ENGINEER;
 
   const selectedCenter = useMemo(
     () => centers.find((center) => String(center._id) === String(centerId)),
@@ -225,7 +225,7 @@ export const AdminClubsPage = () => {
     setEditingClubId(undefined);
     setName('');
     setDescription('');
-    setCategory('Creative');
+    setCategory(clubTypeOptions[0] || '');
     setInstitutionId(campusOptions[0]?.id || '');
     resetPlacement();
     setCoordinatorId(state.people[0]?.id || '');
@@ -242,7 +242,9 @@ export const AdminClubsPage = () => {
     setEditingClubId(club.id);
     setName(club.name);
     setDescription(club.description);
-    setCategory(club.category);
+    setCategory(
+      clubTypeOptions.includes(club.category) ? club.category : club.category || clubTypeOptions[0]
+    );
     setInstitutionId(club.institutionId);
     setVerticalId(club.verticalId || '');
     setProjectId(club.projectId || '');
@@ -261,7 +263,11 @@ export const AdminClubsPage = () => {
     e.preventDefault();
     const nextErrors = {};
     if (!name.trim()) nextErrors.name = 'Club name is required.';
-    if (!category.trim()) nextErrors.category = 'Type is required.';
+    if (!clubTypeOptions.length) {
+      nextErrors.category = 'Add club types in Settings first.';
+    } else if (!category.trim()) {
+      nextErrors.category = 'Type is required.';
+    }
     if (isLiveClubAdmin) {
       if (!verticalId) nextErrors.verticalId = 'Select a department.';
       if (!projectId) nextErrors.projectId = 'Select a project.';
@@ -682,12 +688,21 @@ export const AdminClubsPage = () => {
                       className="form-select"
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
+                      disabled={!clubTypeOptions.length && !category}
                     >
-                      {CATEGORIES.map((c) => (
+                      {!clubTypeOptions.length ? (
+                        <option value="">No types yet — add in Settings</option>
+                      ) : (
+                        <option value="">Select type</option>
+                      )}
+                      {clubTypeOptions.map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>
                       ))}
+                      {category && !clubTypeOptions.includes(category) ? (
+                        <option value={category}>{category}</option>
+                      ) : null}
                     </select>
                     {errors.category && <span className="form-error">{errors.category}</span>}
                   </div>
