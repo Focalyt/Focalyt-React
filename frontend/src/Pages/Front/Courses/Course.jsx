@@ -11,7 +11,7 @@ import { buildCourseApplyTarget, usePublicApply } from "../../../Component/Publi
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.jpg";
 
-export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback, onLearnMore }) {
+export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback, onLearnMore, callbackLabel = "Call" }) {
   const { openApply } = usePublicApply();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const thumb = resolveMediaUrl(bucketUrl, course?.thumbnail) || THUMB_FALLBACK;
@@ -104,16 +104,16 @@ export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestC
           >
             Share
           </button>
+          <button
+            type="button"
+            className="btn cta-callnow course-callback-btn"
+            data-bs-toggle="modal"
+            data-bs-target="#callbackModal"
+            onClick={() => onRequestCallback(course)}
+          >
+            {callbackLabel}
+          </button>
         </div>
-        <button
-          type="button"
-          className="btn cta-callnow w-100 course-callback-btn"
-          data-bs-toggle="modal"
-          data-bs-target="#callbackModal"
-          onClick={() => onRequestCallback(course)}
-        >
-          Request for Call Back
-        </button>
       </div>
 
       <div className="course_card_footer">
@@ -830,10 +830,18 @@ function Course() {
   display: block; font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4;
 }
 .foc-courses-page .course-action-btns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
   margin-top: 2px;
+}
+.foc-courses-page .course-action-btns > .btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 8px 6px;
+  font-size: 11px;
 }
 .foc-courses-page .btn.shr--width { width: 100%; }
 .foc-courses-page .btn.cta-callnow,
@@ -867,8 +875,8 @@ function Course() {
   color: #fff;
 }
 .foc-courses-page .course-callback-btn {
-  margin-top: 6px;
-  padding: 8px 10px;
+  margin-top: 0;
+  padding: 8px 6px;
 }
 .foc-courses-page .course_card_footer {
   background: var(--home-card-cta);

@@ -6,7 +6,7 @@ import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/digital_marketing.jpg";
 
-export function EventCard({ event, bucketUrl, closed, onPlayVideo }) {
+export function EventCard({ event, bucketUrl, closed, onPlayVideo, onRequestCallback, callbackLabel = "Call" }) {
   const dateFrom = event?.timing?.from ? moment(event.timing.from).format("DD-MM-YYYY") : "NA";
   const dateTo = event?.timing?.to ? moment(event.timing.to).format("DD-MM-YYYY") : "NA";
   const timeFrom = event?.timing?.from ? moment(event.timing.from).format("hh:mm A") : "NA";
@@ -107,6 +107,17 @@ export function EventCard({ event, bucketUrl, closed, onPlayVideo }) {
               Download
             </button>
           )}
+          {onRequestCallback ? (
+            <button
+              type="button"
+              className="btn cta-callnow course-callback-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#callbackModal"
+              onClick={() => onRequestCallback(event)}
+            >
+              {callbackLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </article>

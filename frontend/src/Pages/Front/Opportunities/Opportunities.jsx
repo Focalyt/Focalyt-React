@@ -179,6 +179,22 @@ function Opportunities() {
   }, []);
 
   useEffect(() => {
+    if (!filtersOpen || window.innerWidth > 991) return undefined;
+    const panel = document.querySelector(".nk-filters");
+    if (panel) panel.scrollTop = 0;
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      if (window.innerWidth <= 991) {
+        html.style.overflow = "";
+        body.style.overflow = "";
+      }
+    };
+  }, [filtersOpen]);
+
+  useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
@@ -232,6 +248,12 @@ function Opportunities() {
     setSearchParams(nextParams, { replace: true });
   };
 
+  const catalog = useMemo(() => {
+    if (type === "jobs") return jobs;
+    if (type === "courses") return courses;
+    return events;
+  }, [type, jobs, courses, events]);
+
   const searched = useMemo(() => {
     if (type === "jobs") {
       return jobs.filter((job) => includesText(
@@ -252,16 +274,16 @@ function Opportunities() {
   }, [type, jobs, courses, events, query, location]);
 
   const cityOptions = useMemo(() => {
-    if (type === "jobs") return countBy(searched, (job) => placeLabel(jobCity(job), jobState(job)));
-    if (type === "courses") return countBy(searched, (course) => placeLabel(course.city, course.state));
-    return countBy(searched, (event) => placeLabel(event.location?.city, event.location?.state));
-  }, [type, searched]);
+    if (type === "jobs") return countBy(catalog, (job) => placeLabel(jobCity(job), jobState(job)));
+    if (type === "courses") return countBy(catalog, (course) => placeLabel(course.city, course.state));
+    return countBy(catalog, (event) => placeLabel(event.location?.city, event.location?.state));
+  }, [type, catalog]);
 
   const educationOptions = useMemo(() => {
-    if (type === "jobs") return countBy(searched, (job) => job._qualification?.name || "");
-    if (type === "courses") return countBy(searched, (course) => course.qualification || "");
+    if (type === "jobs") return countBy(catalog, (job) => job._qualification?.name || "");
+    if (type === "courses") return countBy(catalog, (course) => course.qualification || "");
     return [];
-  }, [type, searched]);
+  }, [type, catalog]);
 
   const experienceCeiling = useMemo(() => {
     const max = jobs.reduce((peak, job) => Math.max(peak, Math.ceil(jobYears(job))), 0);
@@ -269,10 +291,10 @@ function Opportunities() {
   }, [jobs]);
 
   const modeOptions = useMemo(() => {
-    if (type === "jobs") return countBy(searched, (job) => job.work || "");
-    if (type === "courses") return countBy(searched, (course) => course.trainingMode || "");
-    return countBy(searched, (event) => event.eventMode || "");
-  }, [type, searched]);
+    if (type === "jobs") return countBy(catalog, (job) => job.work || "");
+    if (type === "courses") return countBy(catalog, (course) => course.trainingMode || "");
+    return countBy(catalog, (event) => event.eventMode || "");
+  }, [type, catalog]);
 
   const sectorOptions = useMemo(() => {
     const source = type === "jobs" ? jobSectors : courseSectors;
@@ -280,14 +302,14 @@ function Opportunities() {
     return source
       .map((sector) => {
         const id = String(sector._id);
-        const count = searched.filter((item) => {
+        const count = catalog.filter((item) => {
           if (type === "jobs") return String(item._industry?._id || "") === id;
           return (item.sectors || []).some((value) => String(value?._id || value) === id);
         }).length;
         return { label: sector.name, id, count };
       })
       .filter((sector) => sector.count > 0);
-  }, [type, searched, jobSectors, courseSectors]);
+  }, [type, catalog, jobSectors, courseSectors]);
 
   const filtered = useMemo(() => {
     let list = searched.filter((item) => {
@@ -374,7 +396,8 @@ function Opportunities() {
     setQuery(draftQuery);
     setLocation(draftLocation);
     setVisible(PAGE_SIZE);
-    document.getElementById("nk-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const results = document.getElementById("nk-results");
+    if (results) results.scrollTop = 0;
   };
 
   const shareJob = async (jobId, jobTitle) => {
@@ -617,6 +640,7 @@ function Opportunities() {
                         bucketUrl={bucketUrl}
                         onPlayVideo={setVideoSrc}
                         onShare={shareJob}
+                        onRequestCallback={(item) => setCallback((prev) => ({ ...prev, courseName: item.title || "" }))}
                         callbackLabel="Call"
                       />
                     ))}
@@ -638,6 +662,8 @@ function Opportunities() {
                         bucketUrl={bucketUrl}
                         closed={eventClosed(event)}
                         onPlayVideo={setVideoSrc}
+                        onRequestCallback={(item) => setCallback((prev) => ({ ...prev, courseName: item.name || item.eventTitle || "" }))}
+                        callbackLabel="Call"
                       />
                     ))}
                   </div>

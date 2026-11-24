@@ -2266,7 +2266,7 @@ const STYLES = `
   padding: 8px 6px;
   font-size: 11px;
 }
-#future-courses .course-action-btns > .course-callback-btn { flex: 1.45 1 0; }
+#future-courses .course-action-btns > .course-callback-btn { flex: 1 1 0; }
 #future-courses .btn.shr--width { width: 100%; }
 #future-courses .btn.cta-callnow,
 #future-courses .btn.cta-callnow.btn-bg-color {

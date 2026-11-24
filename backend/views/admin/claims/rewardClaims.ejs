@@ -562,7 +562,7 @@ function approveClaim(claimId) {
 function confirmApprove() {
   const remarks = $('#approveRemarks').val();
   
-  fetch(`/admin/rewardClaims/${currentClaimId}/approve`, {
+  fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims/${currentClaimId}/approve`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -598,7 +598,7 @@ function confirmReject() {
     return;
   }
   
-  fetch(`/admin/rewardClaims/${currentClaimId}/reject`, {
+  fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims/${currentClaimId}/reject`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -625,7 +625,7 @@ function disburseClaim(claimId) {
     return;
   }
   
-  fetch(`/admin/rewardClaims/${claimId}/disburse`, {
+  fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims/${claimId}/disburse`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -647,7 +647,7 @@ function disburseClaim(claimId) {
 }
 
 function viewClaimDetails(claimId) {
-  fetch(`/admin/rewardClaims/${claimId}`)
+  fetch(`<%= process.env.MIPIE_BACKEND_URL %>/admin/rewardClaims/${claimId}`)
     .then(response => response.json())
     .then(data => {
       if (data.success) {

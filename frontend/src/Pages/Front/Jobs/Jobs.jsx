@@ -38,7 +38,7 @@ function resolveJobVideoUrl(bucketUrl, job) {
   return resolveMediaUrl(bucketUrl, job.jobVideo) || v;
 }
 
-export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare, onLearnMore }) {
+export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare, onLearnMore, onRequestCallback, callbackLabel = "Call" }) {
   const { openApply } = usePublicApply();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const loc = job?.city ? `(${job.city.name}, ${job.state?.name || "NA"})` : "NA";
@@ -123,6 +123,17 @@ export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare, onLear
           >
             Share
           </button>
+          {onRequestCallback ? (
+            <button
+              type="button"
+              className="btn cta-callnow course-callback-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#callbackModal"
+              onClick={() => onRequestCallback(job)}
+            >
+              {callbackLabel}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1786,6 +1797,7 @@ Provide analysis in clear format.`;
                       bucketUrl={bucketUrl}
                       onPlayVideo={setVideoSrc}
                       onShare={handleShare}
+                      onRequestCallback={(job) => setFormData((prev) => ({ ...prev, courseName: job.title || "" }))}
                     />
                 ))}
               </div>
@@ -2222,12 +2234,14 @@ Provide analysis in clear format.`;
 }
 .foc-courses-page .course-meta .m strong { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted2); margin-bottom: 4px; }
 .foc-courses-page .course-meta .m span { display: block; font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.foc-courses-page .course-action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.foc-courses-page .course-action-btns { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 2px; }
+.foc-courses-page .course-action-btns > .btn { flex: 1 1 0; width: auto; min-width: 0; white-space: nowrap; padding: 8px 4px; font-size: 11px; }
 .foc-courses-page .btn.shr--width { width: 100%; }
 .foc-courses-page .btn.cta-callnow, .foc-courses-page .btn.cta-callnow.btn-bg-color { background: var(--home-card-cta); color: #fff; border: 1px solid var(--home-card-cta); border-radius: 50px; font-weight: 600; padding: 8px 10px; font-size: 12px; transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; width: 100%; }
 .foc-courses-page .btn.cta-callnow:not(.btn-bg-color) { background: #fff; color: var(--home-card-cta); }
 .foc-courses-page .btn.cta-callnow:hover, .foc-courses-page .btn.cta-callnow.btn-bg-color:hover { background: var(--home-card-cta-hover); border-color: var(--home-card-cta-hover); color: #fff; }
-.foc-courses-page .course-callback-btn { margin-top: 6px; padding: 8px 10px; }
+.foc-courses-page .course-callback-btn { margin-top: 0; padding: 8px 4px; }
+.foc-courses-page .course-action-btns > .btn.cta-callnow { width: auto; }
 .foc-courses-page .course_card_footer { background: var(--home-card-cta); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-top: 0; text-align: center; padding: 8px 10px; }
 .foc-courses-page .course-learn-more { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: inherit; }
 .foc-courses-page .course-learn-more .learnn { color: #fff; font-size: 13px; font-weight: 600; padding: 4px 0; }
