@@ -1,5 +1,6 @@
 const {
   Candidate,
+  CandidateProfile,
   CandidateCashBack,
   CashBackLogic,
   AppliedJobs,
@@ -9,15 +10,23 @@ const ObjectId = require("mongodb").ObjectId;
 const { candidateCashbackEventName, cashbackRequestStatus, cashbackEventType } = require('../../db/constant')
 const { sendNotification } = require('./notification')
 
+async function findCandidateRecord(id) {
+  if (!id) return null;
+  return (await CandidateProfile.findOne({ _id: id })) || (await Candidate.findOne({ _id: id }));
+}
+
 module.exports.candidateProfileCashBack = async (candidateData) => {
   try {
+    if (!candidateData?._id) return false;
     let event = candidateCashbackEventName.profilecomplete;
-    let candidate = await Candidate.findOne({ _id: candidateData._id });
+    let candidate = await findCandidateRecord(candidateData._id);
+    if (!candidate) return false;
     if (
       candidateData.isProfileCompleted == false &&
       candidate.isProfileCompleted == true
     ) {
       let cashbackDetails = await CashBackLogic.findOne({});
+      if (!cashbackDetails) return false;
       let add = {
         candidateId: candidateData._id,
         eventType: cashbackEventType.credit,
@@ -40,11 +49,12 @@ module.exports.candidateProfileCashBack = async (candidateData) => {
       }
       await sendNotification(data)
       let totalCashback = await CandidateCashBack.aggregate([
-        { $match: { candidateId: ObjectId(candidateData._id) } },
+        { $match: { candidateId: new ObjectId(candidateData._id) } },
         { $group: { _id: "", totalAmount: { $sum: "$amount" } } },
       ]);
+      const walletTotal = totalCashback[0]?.totalAmount || 0;
       data.title = 'Focalyt Earnings'
-      data.message = `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${totalCashback[0].totalAmount}/-.`
+      data.message = `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${walletTotal}/-.`
       await sendNotification(data)
       return true;
     } else {
@@ -57,9 +67,12 @@ module.exports.candidateProfileCashBack = async (candidateData) => {
 
 module.exports.candidateReferalCashBack = async (referral) => {
   try {
+    if (!referral?.referredBy) return false;
     let event = candidateCashbackEventName.referral;
-    let candidate = await Candidate.findOne({ _id: referral.referredBy });
+    let candidate = await findCandidateRecord(referral.referredBy);
+    if (!candidate) return false;
       let cashbackDetails = await CashBackLogic.findOne({});
+      if (!cashbackDetails) return false;
       let add = {
         candidateId: candidate._id,
         eventType: cashbackEventType.credit,
@@ -70,13 +83,14 @@ module.exports.candidateReferalCashBack = async (referral) => {
       
       await CandidateCashBack.create(add);
       let totalCashback = await CandidateCashBack.aggregate([
-        { $match: { candidateId: ObjectId(candidate._id) } },
+        { $match: { candidateId: new ObjectId(candidate._id) } },
         { $group: { _id: "", totalAmount: { $sum: "$amount" } } },
       ]);
+      const walletTotal = totalCashback[0]?.totalAmount || 0;
       let data = {
         title:'Referral Earning',
         _candidate: candidate._id,
-        message : `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${totalCashback[0].totalAmount}/-.`
+        message : `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${walletTotal}/-.`
       }
       await sendNotification(data)
       return true;
@@ -89,10 +103,15 @@ module.exports.candidateReferalCashBack = async (referral) => {
 
 module.exports.candidateVideoCashBack = async (candidateData) => {
   try {
+    if (!candidateData?._id) return false;
     let event = candidateCashbackEventName.videoprofile;
-    let candidate = await Candidate.findOne({ _id: candidateData._id });
-    if (!candidateData.profilevideo && candidate.profilevideo) {
+    let candidate = await findCandidateRecord(candidateData._id);
+    if (!candidate) return false;
+    const prevVideo = candidateData.profilevideo || candidateData.personalInfo?.profilevideo;
+    const currVideo = candidate.profilevideo || candidate.personalInfo?.profilevideo;
+    if (!prevVideo && currVideo) {
       let cashbackDetails = await CashBackLogic.findOne({});
+      if (!cashbackDetails) return false;
       let add = {
         candidateId: candidateData._id,
         eventType: cashbackEventType.credit,
@@ -109,12 +128,13 @@ module.exports.candidateVideoCashBack = async (candidateData) => {
       }
       await CandidateCashBack.create(add);
       let totalCashback = await CandidateCashBack.aggregate([
-        { $match: { candidateId: ObjectId(candidateData._id) } },
+        { $match: { candidateId: new ObjectId(candidateData._id) } },
         { $group: { _id: "", totalAmount: { $sum: "$amount" } } },
       ]);
+      const walletTotal = totalCashback[0]?.totalAmount || 0;
       let data = {
         title:'Focalyt Earnings',
-        message: `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${totalCashback[0].totalAmount}/-.__बधाई हो! आपने रु ${add.amount}/- अर्जित किए हैं | आपका वर्तमान वॉलेट बैलेंस रु ${totalCashback[0].totalAmount}/- है।`,
+        message: `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${walletTotal}/-.__बधाई हो! आपने रु ${add.amount}/- अर्जित किए हैं | आपका वर्तमान वॉलेट बैलेंस रु ${walletTotal}/- है।`,
         _candidate: candidateData._id
       }
       await sendNotification(data)
@@ -129,8 +149,10 @@ module.exports.candidateVideoCashBack = async (candidateData) => {
 
 module.exports.candidateApplyCashBack = async (candidateData) => {
   try {
+    if (!candidateData?._id) return false;
     let event = candidateCashbackEventName.apply;
     let cashbackDetails = await CashBackLogic.findOne({});
+    if (!cashbackDetails) return false;
     let streakDuration = cashbackDetails.streakDuration - 1
 
     let lastApplyCashback = await CandidateCashBack.findOne({
@@ -151,12 +173,13 @@ module.exports.candidateApplyCashBack = async (candidateData) => {
       };
       await CandidateCashBack.create(add);
       let totalCashback = await CandidateCashBack.aggregate([
-        { $match: { candidateId: ObjectId(candidateData._id) } },
+        { $match: { candidateId: new ObjectId(candidateData._id) } },
         { $group: { _id: "", totalAmount: { $sum: "$amount" } } },
       ]);
+      const walletTotal = totalCashback[0]?.totalAmount || 0;
       let data = {
         title:'Focalyt Earnings',
-        message: `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${totalCashback[0].totalAmount}/-.__बधाई हो! आपने रु ${add.amount}/- अर्जित किए हैं | आपका वर्तमान वॉलेट बैलेंस रु ${totalCashback[0].totalAmount}/- है।.`,
+        message: `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${walletTotal}/-.__बधाई हो! आपने रु ${add.amount}/- अर्जित किए हैं | आपका वर्तमान वॉलेट बैलेंस रु ${walletTotal}/- है।.`,
         _candidate: candidateData._id
       }
       await sendNotification(data)
@@ -172,7 +195,9 @@ module.exports.candidateApplyCashBack = async (candidateData) => {
 
 module.exports.candidateHiringStatusCashBack = async (candidateData, event) => {
   try {
+    if (!candidateData?._id) return false;
     let cashbackDetails = await CashBackLogic.findOne({});
+    if (!cashbackDetails) return false;
     let add = {
       candidateId: candidateData._id,
       eventType: cashbackEventType.credit,
@@ -182,12 +207,13 @@ module.exports.candidateHiringStatusCashBack = async (candidateData, event) => {
     };
     let cashbackGiven = await CandidateCashBack.create(add);
     let totalCashback = await CandidateCashBack.aggregate([
-      { $match: { candidateId: ObjectId(candidateData._id) } },
+      { $match: { candidateId: new ObjectId(candidateData._id) } },
       { $group: { _id: "", totalAmount: { $sum: "$amount" } } },
     ]);
+    const walletTotal = totalCashback[0]?.totalAmount || 0;
     let data = {
       title:'Focalyt Earnings',
-      message: `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${totalCashback[0].totalAmount}/-.__बधाई हो! आपने रु ${add.amount}/- अर्जित किए हैं | आपका वर्तमान वॉलेट बैलेंस रु ${totalCashback[0].totalAmount}/- है।.`,
+      message: `Congratulations! You have earned रु ${add.amount}/- Your current Wallet Balance is रु ${walletTotal}/-.__बधाई हो! आपने रु ${add.amount}/- अर्जित किए हैं | आपका वर्तमान वॉलेट बैलेंस रु ${walletTotal}/- है।.`,
       _candidate: candidateData._id
     }
     await sendNotification(data)
@@ -204,13 +230,15 @@ module.exports.candidateHiringStatusCashBack = async (candidateData, event) => {
 
 module.exports.checkCandidateCashBack = async (candidateData) => {
   try {
+    if (!candidateData?._id) return;
     let candidateCashbackDetails = await CandidateCashBack.find({ candidateId: candidateData._id, eventName: candidateCashbackEventName.apply, isPending: true })
     let totalCashback = await CandidateCashBack.aggregate([
-      { $match: { candidateId: ObjectId(candidateData._id)} },
+      { $match: { candidateId: new ObjectId(candidateData._id)} },
       { $group: { _id: "", totalAmount: { $sum: "$amount" } } },
     ]);
     let cashback = totalCashback.length ? totalCashback[0].totalAmount : 0
     let cashbackDetails = await CashBackLogic.findOne({});
+    if (!cashbackDetails) return;
     let streakDuration = cashbackDetails.streakDuration
 
     if(!candidateCashbackDetails.length){

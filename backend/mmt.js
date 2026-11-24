@@ -27,7 +27,7 @@ const {
 } = require("./helpers/clubSocketAuth");
 
 const dns = require('dns');
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
+dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
 // cron api 
 const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular();
@@ -165,10 +165,16 @@ const viewsPath = path.resolve(__dirname, "views");
 // mongoose.set("useFindAndModify", false);
 // mongoose.set("useCreateIndex", true);
 // mongoose.set("useUnifiedTopology", true);
+mongoose.connection.on("error", (err) => {
+	console.error("[MongoDB] Connection error (non-fatal):", err?.message || err);
+});
+
+let httpServerStarted = false;
 async function connectDB() {
 	try {
 		await mongoose.connect(mongodbUri, {
 			socketTimeoutMS: 300000, // Set timeout if required
+			serverSelectionTimeoutMS: 15000,
 		});
 		console.log("Connected to MongoDB");
 		// Pending lead events are claimed only after this connection succeeds.
@@ -179,14 +185,17 @@ async function connectDB() {
 			const workerMessage = workerErr && workerErr.message ? workerErr.message : "unknown error";
 			console.error("[meta] Lead worker failed to start.", workerMessage);
 		}
-		server.listen(port, () => {
-			console.log(`Server running on port ${port}`);
-			process.send = process.send || ((f) => f);
-			process.send("ready");
-		});
+		if (!httpServerStarted) {
+			httpServerStarted = true;
+			server.listen(port, () => {
+				console.log(`Server running on port ${port}`);
+				process.send = process.send || ((f) => f);
+				process.send("ready");
+			});
+		}
 	} catch (err) {
-		console.error("Error connecting to MongoDB:", err.message);
-		process.exit(1); // Exit on connection error
+		console.error("Error connecting to MongoDB (retrying in 5s):", err.message);
+		setTimeout(connectDB, 5000);
 	}
 }
 

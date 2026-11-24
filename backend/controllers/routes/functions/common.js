@@ -225,7 +225,8 @@ module.exports.sendOtptoRegisterCompany = async (req, res) => {
 module.exports.sendOtptoRegister = async (req, res) => {
   try {
 
-    const { mobile, module } = req.body;
+    const { mobile, email, module } = req.body;
+    console.log("[sendOtptoRegister] Request Body:", { mobile, email, module });
     let role = 3
     if (module === 'college') {
       role = 2
@@ -235,16 +236,27 @@ module.exports.sendOtptoRegister = async (req, res) => {
       role = 1
     }
 
-    const user = await User.findOne({ mobile, role });
-    if (user) {
-      return res.send({ status: false, message: 'User already exists, Please login.' });
+    const userByMobile = await User.findOne({ mobile, role, isDeleted: false });
+    if (userByMobile) {
+      console.log("[sendOtptoRegister] User already exists by mobile:", { _id: userByMobile._id, mobile, email: userByMobile.email, role });
+      return res.send({ status: false, message: 'Mobile number already exists, Please login.' });
+    }
+
+    if (email && String(email).trim()) {
+      const userByEmail = await User.findOne({ email: String(email).toLowerCase().trim(), role, isDeleted: false });
+      if (userByEmail) {
+        console.log("[sendOtptoRegister] User already exists by email:", { _id: userByEmail._id, email: userByEmail.email, mobile: userByEmail.mobile, role });
+        return res.send({ status: false, message: 'Email ID already exists, Please login.' });
+      }
     }
 
     const url = msg91Url.replace("<<template>>", templateId).replace("<<mobile>>", mobile).replace("<<auth>>", authKey)
     const data = await axios.get(url);
+    console.log("[sendOtptoRegister] MSG91 response:", data.data);
     if (data.data.type !== 'success') throw req.ykError(data.data.message);
     return res.send({ status: true, message: 'OTP sent successfully!' });
   } catch (err) {
+    console.log("[sendOtptoRegister] Error:", err.message);
     return req.errFunc(err);
   }
 };
@@ -279,6 +291,7 @@ module.exports.verifyOtp = async (req, res) => {
   try {
 
     let { mobile, otp, userInput } = req.body;
+    console.log("[verifyOtp] Request Body:", req.body);
     const auth = authKey;
     if (userInput ) {
       console.log('userInput', userInput, 'module', module)
@@ -302,6 +315,7 @@ module.exports.verifyOtp = async (req, res) => {
       const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${user.mobile}&otp=${otp}`;
     
     const result = await axios.get(url);
+    console.log("[verifyOtp] MSG91 response (userInput):", result.data);
     if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
       return res.send({
         status: true,
@@ -329,6 +343,7 @@ module.exports.verifyOtp = async (req, res) => {
     const url = `https://control.msg91.com/api/verifyRequestOTP.php?authkey=${auth}&mobile=91${mobile}&otp=${otp}`;
     
     const result = await axios.get(url);
+    console.log("[verifyOtp] MSG91 response:", result.data, "| bypass OTP:", otp == '2025');
     if (result.data.type === 'success' || result.data.message === "already_verified" || otp == '2025') {
       return res.send({
         status: true,
@@ -341,6 +356,7 @@ module.exports.verifyOtp = async (req, res) => {
       });
     }}
   } catch (err) {
+    console.log("[verifyOtp] Error:", err.message);
     return req.errFunc(err);
   }
 };

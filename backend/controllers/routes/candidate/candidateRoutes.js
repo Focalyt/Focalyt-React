@@ -355,6 +355,20 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
     // Check if already applied
     if (alreadyApplied) {
+      const hasInProfile = (candidate.appliedCourses || []).some((c) => {
+        const id = c?.courseId || c;
+        return id && id.toString() === courseId.toString();
+      });
+      if (!hasInProfile) {
+        await Candidate.findByIdAndUpdate(candidate._id, {
+          $addToSet: {
+            appliedCourses: {
+              courseId,
+              ...(selectedCenter ? { centerId: selectedCenter } : {}),
+            },
+          },
+        });
+      }
 
       await recordDuplicateReapply({
         candidate,
@@ -364,21 +378,19 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
         collegeId: course.college,
       });
 
-      return res.status(400).json({ status: false, duplicate: true, msg: "Already applied." });
-    };
+      return res.status(200).json({ status: true, duplicate: true, msg: "Already applied." });
+    }
+
+    const appliedCourseItem = { courseId };
+    if (selectedCenter) {
+      appliedCourseItem.centerId = selectedCenter;
+    }
 
     const updateData = {
       $addToSet: {
-        appliedCourses: { courseId }
+        appliedCourses: appliedCourseItem
       }
     };
-
-    if (selectedCenter) {
-      updateData.$addToSet.selectedCenter = {
-        courseId: courseId,
-        centerId: selectedCenter
-      };
-    }
 
     const apply = await Candidate.findOneAndUpdate(
       { mobile: candidateMobile },
@@ -477,7 +489,11 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
 
 
     ];
-    await updateSpreadSheetValues(sheetData);
+    try {
+      await updateSpreadSheetValues(sheetData);
+    } catch (sheetErr) {
+      console.error("Spreadsheet update failed (non-blocking):", sheetErr.message);
+    }
 
     let candidateMob = candidate.mobile;
 
@@ -491,7 +507,7 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
     }
 
 
-    console.log(candidateMob);
+    console.log("Course applied by candidate:", candidateMob);
     return res.status(200).json({ status: true, msg: "Course applied successfully." });
   } catch (error) {
     console.error("Error applying for course:", error.message);
@@ -1437,21 +1453,29 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     const candidate = await Candidate.findOne({
       mobile: mobile,
     });
+    const todayDate = moment().utcOffset('+05:30').startOf('day').toDate();
+    const todayDateString = moment().utcOffset('+05:30').startOf('day').format('YYYY-MM-DD');
     const fields = {
       status: true,
       isDeleted: false,
       $or: [
-        { lastDateForApply: { $gte: moment().utcOffset('+05:30').startOf('day').toDate() } },
+        { lastDateForApply: { $gte: todayDateString } },
+        { lastDateForApply: { $gte: todayDate } },
         { lastDateForApply: { $exists: false } },
         { lastDateForApply: null },
         { lastDateForApply: '' }
       ]
     }
     if (candidate?.appliedCourses?.length > 0) {
-      fields._id = {
-        $nin: candidate.appliedCourses.map(c => new mongoose.Types.ObjectId(c.courseId))
-      };
-
+      const appliedIds = candidate.appliedCourses
+        .map(c => c?.courseId || c)
+        .filter(id => id && mongoose.Types.ObjectId.isValid(String(id)))
+        .map(id => new mongoose.Types.ObjectId(String(id)));
+      if (appliedIds.length > 0) {
+        fields._id = {
+          $nin: appliedIds
+        };
+      }
     }
     console.log('data: ', data);
     if (data['name'] != '' && data.hasOwnProperty('name')) {
@@ -1467,7 +1491,7 @@ router.get("/searchcourses", [isCandidate], async (req, res) => {
     }
     let count = 0;
     console.log('fields: ', JSON.stringify(fields));
-    let courses = await Courses.find(fields).populate("sectors");
+    let courses = await Courses.find(fields).populate("sectors").sort({ createdAt: -1 });
     count = await Courses.countDocuments(fields);
     const totalPages = Math.ceil(count / perPage);
 
@@ -1530,7 +1554,14 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
 
 
     let canApply = false;
-    if (candidate.name && candidate.mobile && candidate.sex &&  candidate.personalInfo.currentAddress && candidate.highestQualification) {
+    if (
+      candidate &&
+      candidate.name &&
+      candidate.mobile &&
+      candidate.sex &&
+      (candidate.personalInfo?.currentAddress?.fullAddress || candidate.personalInfo?.currentAddress?.city) &&
+      candidate.highestQualification
+    ) {
         canApply = true;
       
     }
@@ -1539,38 +1570,32 @@ router.get("/course/:courseId/", isCandidate, async (req, res) => {
     
 
     let isApplied = false;
-    let assignedCourseData = null;
+    let assignedCourseData = await AppliedCourses.findOne({
+      _candidate: candidate._id,
+      _course: new mongoose.Types.ObjectId(courseId)
+    }).lean();
 
-    if (candidate.appliedCourses && candidate.appliedCourses.length > 0) {
-      const applied = candidate.appliedCourses.find(c => {
-        return c.courseId && c.courseId.toString() === courseId.toString();
-      });
+    const appliedInProfile = (candidate.appliedCourses || []).find(c => {
+      const id = c?.courseId || c;
+      return id && id.toString() === courseId.toString();
+    });
 
-      console.log('applied', applied) 
+    if (appliedInProfile || assignedCourseData) {
+      isApplied = true;
 
+      if (course?.registrationCharges) {
+        course.registrationCharges = course.registrationCharges.toString().replace(/,/g, '');
+      }
 
-      if (applied) {
-        isApplied = true;
-
-        assignedCourseData = await AppliedCourses.findOne({
-          _candidate: candidate._id,
-          _course: new mongoose.Types.ObjectId(courseId)
-        }).lean();
-
-        if (course?.registrationCharges) {
-          course.registrationCharges = course.registrationCharges.toString().replace(/,/g, '');
-        }
-
-        if (assignedCourseData) {
-          course.remarks = assignedCourseData.remarks;
-          course.assignDate = assignedCourseData.assignDate
-            ? moment(assignedCourseData.assignDate).format('DD MMM YYYY')
-            : "";
-          course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
-          // Add batchId from assignedCourseData (field name is 'batch' in model)
-          course.batchId = assignedCourseData.batch || null;
-          console.log('Batch ID assigned to course:', course.batchId);
-        }
+      if (assignedCourseData) {
+        course.remarks = assignedCourseData.remarks;
+        course.assignDate = assignedCourseData.assignDate
+          ? moment(assignedCourseData.assignDate).format('DD MMM YYYY')
+          : "";
+        course.registrationStatus = assignedCourseData.registrationFee || 'Unpaid';
+        // Add batchId from assignedCourseData (field name is 'batch' in model)
+        course.batchId = assignedCourseData.batch || null;
+        console.log('Batch ID assigned to course:', course.batchId);
       }
     }
 
@@ -1737,7 +1762,7 @@ router.get("/appliedCourses", [isCandidate], async (req, res) => {
       status: true
     });
 
-    if (!candidate || !candidate?.appliedCourses?.length) {
+    if (!candidate) {
       return res.json({
         courses: [],
         totalPages: 0,
@@ -2145,23 +2170,29 @@ router
     if (personalInfo && typeof personalInfo === 'object') {
       Object.entries(personalInfo).forEach(([key, val]) => {
         if (val !== "") {
-          if (key !== "location") {
+          if (key !== "location" && key !== "currentAddress") {
             updatedFields[`personalInfo.${key}`] = val;
           }
         }
       });
 
-      // ✅ Handle Geo Location
-      if (personalInfo.latitude && personalInfo.longitude) {
-        updatedFields["personalInfo.location"] = {
+      const addrSource = personalInfo.currentAddress || personalInfo.location || (
+        (personalInfo.latitude || personalInfo.longitude || personalInfo.fullAddress)
+          ? personalInfo
+          : null
+      );
+
+      if (addrSource) {
+        const lat = parseFloat(addrSource.latitude ?? addrSource.coordinates?.[1] ?? 0) || 0;
+        const lng = parseFloat(addrSource.longitude ?? addrSource.coordinates?.[0] ?? 0) || 0;
+        updatedFields["personalInfo.currentAddress"] = {
           type: "Point",
-          coordinates: [
-            parseFloat(personalInfo.longitude || 0),
-            parseFloat(personalInfo.latitude || 0)
-          ],
-          fullAddress: personalInfo.fullAddress || "",
-          state: personalInfo.state || "",
-          city: personalInfo.city || ""
+          coordinates: [lng, lat],
+          latitude: String(addrSource.latitude ?? (lat || "")),
+          longitude: String(addrSource.longitude ?? (lng || "")),
+          fullAddress: addrSource.fullAddress || "",
+          state: addrSource.state || "",
+          city: addrSource.city || ""
         };
       }
     }

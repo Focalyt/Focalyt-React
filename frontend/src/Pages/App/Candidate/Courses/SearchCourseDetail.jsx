@@ -158,13 +158,21 @@ const CourseDetails = () => {
   // }, [courseId]);
 
   useEffect(() => {
-    if (candidate) {   
+    if (candidate) {
+      const currentAddr = candidate?.personalInfo?.currentAddress || candidate?.personalInfo?.location || {};
       setSex(candidate.sex || '');
       setDob(candidate.dob ? moment(candidate.dob).format("YYYY-MM-DD") : '');
-      setTotalExperience(candidate?.personalInfo?.totalExperience || '');
-      setHighestQualification(candidate.highestQualification?._id || '');
-      setAddress(candidate?.personalInfo?.location?.fullAddress || '');
-
+      setTotalExperience(
+        candidate?.personalInfo?.totalExperience !== undefined && candidate?.personalInfo?.totalExperience !== null
+          ? String(candidate.personalInfo.totalExperience)
+          : ''
+      );
+      setHighestQualification(candidate.highestQualification?._id || candidate.highestQualification || '');
+      setAddress(currentAddr.fullAddress || '');
+      setCity(currentAddr.city || '');
+      setState(currentAddr.state || '');
+      setLatitude(currentAddr.latitude ?? (Array.isArray(currentAddr.coordinates) ? currentAddr.coordinates[1] : ''));
+      setLongitude(currentAddr.longitude ?? (Array.isArray(currentAddr.coordinates) ? currentAddr.coordinates[0] : ''));
     }
   }, [candidate]);
   const applyCourse = async (courseId) => {
@@ -182,6 +190,7 @@ const CourseDetails = () => {
           'x-auth': localStorage.getItem('token')
         }
       });
+      setIsApplied(true);
       await trackMetaConversion({
         eventName: "CourseApply",
         sourceUrl: window.location.href,
@@ -362,44 +371,59 @@ const CourseDetails = () => {
     return div.textContent || div.innerText || "";
   };
   const handleProfileSubmit = async () => {
+    const latNum = parseFloat(latitude) || 0;
+    const lngNum = parseFloat(longitude) || 0;
 
     const profileData = {
       highestQualification,
       sex,
       dob,
       personalInfo: {
+        currentAddress: {
+          type: 'Point',
+          coordinates: [lngNum, latNum],
+          state: state || '',
+          city: city || '',
+          fullAddress: address || '',
+          longitude: String(longitude || ''),
+          latitude: String(latitude || ''),
+        },
         location: {
           state,
           city,
           fullAddress: address,
           longitude,
           latitude,
-
         },
         totalExperience,
-
-
       },
-
       isExperienced: totalExperience == 0 ? false : true
-    }
-
+    };
 
     try {
       await axios.post(`${backendUrl}/candidate/myprofile`, profileData, {
         headers: { 'x-auth': localStorage.getItem('token') }
       });
 
+      await axios.post(
+        `${backendUrl}/candidate/course/${course._id}/apply`,
+        { selectedCenter },
+        {
+          headers: { 'x-auth': localStorage.getItem('token') }
+        }
+      );
 
-      await axios.post(`${backendUrl}/candidate/course/${course._id}/apply`, {}, {
-        headers: { 'x-auth': localStorage.getItem('token') }
-      });
+      setCanApply(true);
+      setIsApplied(true);
 
       // ⛔️ CLOSE the complete profile modal
       closeApplyModal();
 
-      setShowCongratulationModal(true);
-      // window.location.reload();
+      if (course.registrationCharges > 0) {
+        handlePayment(course._id);
+      } else {
+        setShowCongratulationModal(true);
+      }
     } catch (err) {
       console.error("Profile update or apply failed:", err);
     }
@@ -1340,10 +1364,21 @@ const CourseDetails = () => {
                     className="form-control"
                     id="address-location"
                     placeholder="City/ शहर"
-                    value={candidate.personalInfo.currentAddress.fullAddress}
+                    value={address || ''}
                     onChange={(e) => setAddress(e.target.value)}
                   />
                 </label>
+                {centerRequired && Array.isArray(course?.center) && course.center.length > 0 && (
+                  <label className="reg-modal__field">
+                    Training center
+                    <select onChange={(e) => setSelectedCenter(e.target.value)} className="form-control" value={selectedCenter}>
+                      <option value="" disabled>Select center</option>
+                      {course.center.map((q) => (
+                        <option key={q._id} value={q._id}>{q.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
               <div className="reg-modal__foot">
                 <button type="button" onClick={() => handleProfileSubmit()} id="updateAndApply" className="reg-modal__btn">Update and Apply</button>
