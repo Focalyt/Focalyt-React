@@ -329,6 +329,9 @@ const FrontHeader = () => {
                     <li className="nav-item nav-item-has-children">
                       <Link to="/about" className="nav-link-item drop-trigger" onClick={(e) => handleNavLinkClick(e, "/about")}>About Us</Link>
                     </li>
+                    <li className="nav-item">
+                      <Link className='nav-link-item drop-trigger' to="/opportunities" onClick={(e) => handleNavLinkClick(e, "/opportunities")}>Explore</Link>
+                    </li>
                     {/* <li className="nav-item">
                       <Link className='nav-link-item drop-trigger' to="/socialimpact">Social Impact</Link>
                     </li> */}
@@ -391,9 +394,9 @@ const FrontHeader = () => {
 
                         <ul className="dropdown-menu" id="loginDropdown">
                           <li>
-                            <Link to={`${backendUrl}/company/login`} className="dropdown-item">
+                          <a href={`${backendUrl}/company/login`} className="dropdown-item">
                               Login as Company
-                            </Link>
+                            </a>
                           </li>
                           <li>
                             <Link to="/candidate/login" className="dropdown-item">

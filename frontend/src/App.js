@@ -56,6 +56,7 @@ import Shortlisting from './Pages/App/Candidate/Jobs/Shortlisting';
 import SocialImpact from './Pages/Front/SocialImpact/SocialImpact';
 import StuLabs from './Pages/Front/Labs/StuLabs';
 import Event from './Pages/Front/Event/Event';
+import Opportunities from './Pages/Front/Opportunities/Opportunities';
 import AdminLayout from './Component/Layouts/Admin';
 import CandidateLogin from './Pages/App/Candidate/Login/CandidateLogin';
 import CandidateViewJobs from './Pages/App/Candidate/Jobs/CandidateViewJobs';
@@ -273,6 +274,7 @@ const Layout = () => {
         <Route path="/socialimpact" element={<SocialImpact />} />
         <Route path="/stulabs" element={<StuLabs />} />
         <Route path="/events" element={<Event />} />
+        <Route path="/opportunities" element={<Opportunities />} />
         <Route path="/studentRegistration" element={<Registration />} />
         <Route path="/lrp-lead" element={<LrpLead />} />
         <Route path="/application" element={<Application />} />
