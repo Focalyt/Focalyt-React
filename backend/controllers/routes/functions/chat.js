@@ -17,6 +17,7 @@ const { sendNotification } = require('./services/notification');
 const { CandidateValidators } = require('../../helpers/validators')
 const { updateSpreadSheetValues } = require("./services/googleservice")
 const { candidateProfileCashBack, candidateVideoCashBack, candidateApplyCashBack, checkCandidateCashBack, candidateReferalCashBack } = require('./services/cashback')
+const { qualificationEligibilityMessage } = require('../../../helpers/qualificationEligibility');
 
 const chatRoutes = express.Router();
 const commonRoutes = express.Router();
@@ -214,6 +215,10 @@ commonRoutes.post("/applyjob/:id", async (req, res) => {
 
 		if (!candidate) {
 			return res.send({ status: false, msg: "Candidate not found!" });
+		}
+		const qualificationMismatch = await qualificationEligibilityMessage(vacancy, candidate);
+		if (qualificationMismatch) {
+			return res.send({ status: false, msg: qualificationMismatch });
 		}
 		if (candidate.appliedJobs && candidate.appliedJobs.includes(jobId)) {
 			return res.send({ status: false, msg: "Already Applied" });

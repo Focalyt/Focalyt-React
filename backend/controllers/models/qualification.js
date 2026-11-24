@@ -3,6 +3,7 @@ const { Schema } = mongoose;
 
 const qualificationSchema = new Schema({
   name: { type: String, unique: true },
+  level: { type: Number, min: 0 },
   status: { type: Boolean, default: true },
   basic: { type: Boolean },
  

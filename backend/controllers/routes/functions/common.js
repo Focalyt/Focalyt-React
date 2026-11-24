@@ -44,6 +44,7 @@ const {
 const Candidate = require('../../models/candidateProfile');
 const { mobileLookupValues, markLeadDuplicateOnReapply, ensureCandidateUser } = require('../../../helpers/b2cDuplicate');
 const { jobProfileMatchMessage, jobFieldMessage } = require('../../../helpers/jobProfileMatch');
+const { qualificationEligibilityMessage } = require('../../../helpers/qualificationEligibility');
 
 module.exports.getProfileDetail = async (req, res) => {
   try {
@@ -1382,17 +1383,23 @@ module.exports.jobFieldCheck = async (req, res) => {
       return res.send({ status: false, message: 'Choose date of birth or qualification to check.' });
     }
     const vacancy = await Vacancy.findById(req.params.id)
-      .select('ageMin ageMax _qualification')
-      .populate({ path: '_qualification', select: 'name' })
+      .select('ageMin ageMax _qualification _subQualification')
+      .populate({ path: '_qualification', select: 'name level' })
       .lean();
     if (!vacancy) {
       return res.send({ status: false, message: 'Job not found.' });
     }
-    const value = field === 'dob' ? dob : qualificationId;
+    const message = field === 'dob'
+      ? (jobFieldMessage(vacancy, field, dob) || '')
+      : await qualificationEligibilityMessage(
+        vacancy,
+        { highestQualification: qualificationId, qualifications: [{ education: qualificationId }] },
+        { includeCourses: false }
+      );
     return res.send({
       status: true,
       field,
-      message: jobFieldMessage(vacancy, field, value) || '',
+      message,
     });
   } catch (err) {
     return res.send({ status: false, message: err.message || 'Failed to check this field.' });
@@ -1431,7 +1438,7 @@ module.exports.publicApply = async (req, res) => {
 
     if (kind === 'job') {
       const vacancy = await Vacancy.findById(id)
-        .select('_id _company collegeAcNo ageMin ageMax _qualification')
+        .select('_id _company collegeAcNo ageMin ageMax _qualification _subQualification')
         .lean();
       if (!vacancy) {
         return res.send({ status: false, message: 'Job not found.' });
@@ -1440,6 +1447,10 @@ module.exports.publicApply = async (req, res) => {
       const profileMismatch = jobProfileMatchMessage(vacancy, candidate);
       if (profileMismatch) {
         return res.send({ status: false, message: profileMismatch });
+      }
+      const qualificationMismatch = await qualificationEligibilityMessage(vacancy, candidate);
+      if (qualificationMismatch) {
+        return res.send({ status: false, message: qualificationMismatch });
       }
 
       await Candidate.findOneAndUpdate(

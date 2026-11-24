@@ -77,6 +77,10 @@ const {
 
 const Candidate = require("../../models/candidateProfile")
 const { jobProfileMatchMessage } = require("../../../helpers/jobProfileMatch");
+const {
+  applyCandidateEligibility,
+  qualificationEligibilityMessage,
+} = require("../../../helpers/qualificationEligibility");
 const users = require("../../models/users");
 const multer = require('multer');
 const crypto = require("crypto");
@@ -1047,6 +1051,11 @@ router.get("/searchjob", [isCandidate], async (req, res) => {
       { 'company.0.name': { $regex: name, $options: 'i' } }
     ];
   }
+
+  const listingCandidate = await Candidate.findOne({ mobile: req.user?.mobile })
+    .select('highestQualification qualifications')
+    .lean();
+  filter = await applyCandidateEligibility(filter, listingCandidate);
 
   // Reference data
   const [allQualification, allIndustry, allStates, skills] = await Promise.all([
@@ -2433,6 +2442,10 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
   if (profileMismatch) {
     return res.send({ status: false, msg: profileMismatch });
   }
+  const qualificationMismatch = await qualificationEligibilityMessage(vacancy, candidate);
+  if (qualificationMismatch) {
+    return res.send({ status: false, msg: qualificationMismatch });
+  }
 
   let referrerId = candidate?.referredBy;
   console.log('[JOB_APPLY] Starting - refCode:', refCode, 'candidate.referredBy:', candidate?.referredBy, 'candidateId:', candidate._id);
@@ -3003,6 +3016,10 @@ router.post("/job/:jobId/registerInterviews", [isCandidate], async (req, res) =>
     return res.send({ status: false, msg: "Vacancy not Found!" });
   }
   let candidate = await Candidate.findOne({ mobile: candidateMobile });
+  const qualificationMismatch = await qualificationEligibilityMessage(vacancy, candidate);
+  if (qualificationMismatch) {
+    return res.send({ status: false, msg: qualificationMismatch });
+  }
   let coins = await CoinsAlgo.findOne({});
   let coinsDeducted
   coinsDeducted = vacancy.applyReduction > 0 ? vacancy.applyReduction : coins.job
@@ -3843,6 +3860,7 @@ router.get(
         { 'company.0.name': { "$regex": name, "$options": "i" } }
       ]
     }
+    filter = await applyCandidateEligibility(filter, candidate);
     let jobDistance = Infinity
     if (distance && distance != 'all' && distance != '0') {
       jobDistance = Number(distance) * 1000
