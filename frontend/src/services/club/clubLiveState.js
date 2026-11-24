@@ -1,5 +1,6 @@
 import { createClubArtworkDataUrl } from '../../Pages/App/Club/data/mockData';
 import { getClubTheme } from '../../config/club/clubThemes';
+import { normalizeClubTypes } from '../../config/club/labels';
 
 const asId = (value) => String(value?._id || value || '');
 
@@ -63,7 +64,7 @@ export function emptyLiveCmsState(assignedColleges = []) {
     announcements: [],
     chatMessages: [],
     faqs: [],
-    settings: { positionsFeatureEnabled: true },
+    settings: { positionsFeatureEnabled: true, clubTypes: [] },
     currentStudent: {
       id: '',
       name: '',
@@ -583,6 +584,9 @@ export function mapLiveCmsToState(_prev, payload = {}, assignedColleges = []) {
       positionsFeatureEnabled: payload.settings
         ? payload.settings.positionsFeatureEnabled !== false
         : true,
+      clubTypes: Array.isArray(payload.settings?.clubTypes)
+        ? normalizeClubTypes(payload.settings.clubTypes)
+        : [],
       institutePoints: payload.institutePoints || payload.settings?.institutePoints || 0,
     },
   };

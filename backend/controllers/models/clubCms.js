@@ -411,10 +411,15 @@ const clubStudentStateSchema = new Schema(
   { timestamps: true }
 );
 
+const DEFAULT_CLUB_TYPES = ['Creative', 'Sports & Games', 'Social & Impact', 'Tech & Makers'];
+
 const clubCampusSettingSchema = new Schema(
   {
     collegeId: { type: ObjectId, ref: 'College', required: true, unique: true },
     positionsFeatureEnabled: { type: Boolean, default: true },
+    // Campus-managed club type/category options shown in Create Club and student suggest forms.
+    // Starts empty — admins add types in Settings.
+    clubTypes: { type: [String], default: [] },
     permissionMatrix: { type: Schema.Types.Mixed, default: null },
     institutePoints: { type: Number, default: 0 },
     institutePointsLedger: {
@@ -527,6 +532,7 @@ module.exports = {
   ClubWorkflow: model('ClubWorkflow', clubWorkflowSchema),
   ClubNotification: model('ClubNotification', clubNotificationSchema),
   ClubStudentState: model('ClubStudentState', clubStudentStateSchema),
+  DEFAULT_CLUB_TYPES,
   ClubCampusSetting: model('ClubCampusSetting', clubCampusSettingSchema),
   ClubStaffAssignment: model('ClubStaffAssignment', clubStaffAssignmentSchema),
   ClubGoodie: model('ClubGoodie', clubGoodieSchema),

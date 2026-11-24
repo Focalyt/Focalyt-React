@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -19,7 +19,7 @@ import { ClubCard } from '../Components/ClubCard';
 import { ActivityCard } from '../Components/ActivityCard';
 import { ClubDetailModal } from '../Components/ClubDetailModal';
 import { ActivityDetailModal } from '../Components/ActivityDetailModal';
-import { CATEGORY_OPTIONS } from '../../../../config/club/labels';
+import { categoryOptionsFromTypes } from '../../../../config/club/labels';
 import { studentCanActInClub } from '../../../../config/club/membership';
 
 export const DiscoverPage = () => {
@@ -37,12 +37,16 @@ export const DiscoverPage = () => {
   } = useClub();
   const canJoinFeatured = (activity) =>
     studentCanActInClub(state.clubs, state.currentStudent, activity?.clubId);
+  const categoryOptions = useMemo(
+    () => categoryOptionsFromTypes(state.settings?.clubTypes || []),
+    [state.settings?.clubTypes]
+  );
 
   const [selectedClub, setSelectedClub] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
 
   const [clubName, setClubName] = useState('');
-  const [clubCategory, setClubCategory] = useState('Creative');
+  const [clubCategory, setClubCategory] = useState('');
   const [clubDescription, setClubDescription] = useState('');
   const [whyNeeded, setWhyNeeded] = useState('');
   const [expectedFormat, setExpectedFormat] = useState('');
@@ -75,6 +79,11 @@ export const DiscoverPage = () => {
     const nextErrors = {};
     if (!clubName.trim()) {
       nextErrors.clubName = 'Please enter a proposed club name.';
+    }
+    if (!categoryOptions.length) {
+      nextErrors.clubCategory = 'Club types are not set up yet. Ask your campus admin.';
+    } else if (!clubCategory.trim()) {
+      nextErrors.clubCategory = 'Please choose a category.';
     }
     if (!clubDescription.trim()) {
       nextErrors.clubDescription = 'Please describe what the club is about.';
@@ -516,13 +525,20 @@ export const DiscoverPage = () => {
                     className="form-select"
                     value={clubCategory}
                     onChange={(e) => setClubCategory(e.target.value)}
+                    disabled={!categoryOptions.length}
                   >
-                    {CATEGORY_OPTIONS.map((cat) => (
+                    {!categoryOptions.length ? (
+                      <option value="">No club types available yet</option>
+                    ) : (
+                      <option value="">Select category</option>
+                    )}
+                    {categoryOptions.map((cat) => (
                       <option key={cat.value} value={cat.value}>
                         {cat.label}
                       </option>
                     ))}
                   </select>
+                  {errors.clubCategory ? <span className="form-error">{errors.clubCategory}</span> : null}
                 </div>
 
                 <div className="form-field full-width">
