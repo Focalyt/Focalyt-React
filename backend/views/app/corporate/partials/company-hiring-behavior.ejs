@@ -87,7 +87,7 @@
         const headers = { Accept: 'application/json', 'Content-Type': 'application/json' };
         const token = localStorage.getItem('token');
         if (token) headers['x-auth'] = token;
-        const response = await fetch('/company/candidate/hiring-stage', {
+        const response = await fetch('<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/hiring-stage', {
           method: 'POST',
           headers,
           credentials: 'same-origin',

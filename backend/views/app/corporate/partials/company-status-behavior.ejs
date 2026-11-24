@@ -10,7 +10,7 @@
     const token = localStorage.getItem('token');
     if (token) headers['x-auth'] = token;
     if (payload) headers['Content-Type'] = 'application/json';
-    const response = await fetch(url, { method: payload ? 'POST' : 'GET', headers, credentials: 'same-origin', ...(payload ? { body: JSON.stringify(payload) } : {}) });
+    const response = await fetch('<%= process.env.MIPIE_BACKEND_URL %>' + url, { method: payload ? 'POST' : 'GET', headers, credentials: 'same-origin', ...(payload ? { body: JSON.stringify(payload) } : {}) });
     if (response.redirected || response.status === 401 || response.status === 403) throw new Error('Please sign in again to update status.');
     if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('Unable to update status. Please try again.');
     const data = await response.json();

@@ -8,7 +8,7 @@
     const headers = { Accept: 'application/json' };
     const token = localStorage.getItem('token'); if (token) headers['x-auth'] = token;
     if (payload) headers['Content-Type'] = 'application/json';
-    const response = await fetch('/company/candidate/' + encodeURIComponent(card.dataset.candidateId) + '/followups' + (id ? '/' + encodeURIComponent(id) : ''), {
+    const response = await fetch('<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/' + encodeURIComponent(card.dataset.candidateId) + '/followups' + (id ? '/' + encodeURIComponent(id) : ''), {
       method, headers, credentials: 'same-origin', ...(payload ? { body: JSON.stringify(payload) } : {}),
     });
     if (response.redirected || response.status === 401 || response.status === 403) throw new Error('Please sign in again to manage follow-ups.');

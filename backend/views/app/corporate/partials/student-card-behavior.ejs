@@ -126,7 +126,7 @@
       if (card.dataset.applicationId) params.set('applicationId', card.dataset.applicationId);
       const headers = { Accept: 'application/json' };
       const token = localStorage.getItem('token'); if (token) headers['x-auth'] = token;
-      const response = await fetch('/company/candidate/' + encodeURIComponent(card.dataset.candidateId) + '/card-details?' + params, { headers, credentials: 'same-origin' });
+      const response = await fetch('<%= process.env.MIPIE_BACKEND_URL %>/company/candidate/' + encodeURIComponent(card.dataset.candidateId) + '/card-details?' + params, { headers, credentials: 'same-origin' });
       if (response.redirected || response.status === 401 || response.status === 403) throw new Error('Please sign in again to view candidate details.');
       const type = response.headers.get('content-type') || '';
       if (!type.includes('application/json')) throw new Error('Unable to load candidate details. Please try again.');

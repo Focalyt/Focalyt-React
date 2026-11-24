@@ -1419,7 +1419,7 @@
             const stateId = event.target.value;
             let body = { stateId: stateId };
             const selectCase = document.getElementById(cityId);
-            $.get('/company/getcitiesbyId', body).done((res) => {
+            $.get('<%= process.env.MIPIE_BACKEND_URL %>/company/getcitiesbyId', body).done((res) => {
               $(`select#${cityId} option.companycitylist`).remove();
               let options;
               for (let i = 0; i < res.cityValues.length; i++) {
