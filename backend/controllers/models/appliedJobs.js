@@ -33,6 +33,20 @@ const appliedJobsSchema = new Schema(
     department: { type: ObjectId, ref: "Vertical" },
     leadStatus: { type: ObjectId, ref: "Status", index: true },
     leadSubstatus: { type: ObjectId, index: true },
+    _milestone: {
+      type: ObjectId,
+      ref: "B2cMilestone",
+    },
+    // Reached milestones stay here. Moving forward appends the next step.
+    milestoneHistory: [{
+      milestone: { type: ObjectId, ref: "B2cMilestone", required: true },
+      title: { type: String, trim: true, default: "" },
+      reachedAt: { type: Date, default: Date.now },
+      reachedBy: { type: ObjectId, ref: "User" },
+      droppedOut: { type: Boolean, default: false },
+      droppedAt: { type: Date },
+      droppedBy: { type: ObjectId, ref: "User" },
+    }],
     leadOwner: { type: ObjectId, ref: "User", index: true },
     leadCoOwner: { type: ObjectId, ref: "User" },
     leadCoOwner2: { type: ObjectId, ref: "User" },

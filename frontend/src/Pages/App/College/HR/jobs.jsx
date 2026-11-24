@@ -359,10 +359,13 @@ const mapHrLeadToB2cProfile = (lead) => {
     },
     _course: {
       name: jobName,
+      project: lead?.project || null,
       projectName,
       typeOfProject: departmentName,
       docsRequired: jobDocs,
     },
+    _milestone: lead?._milestone || null,
+    milestoneHistory: Array.isArray(lead?.milestoneHistory) ? lead.milestoneHistory : [],
     _center: null,
     project: lead?.project || null,
     vertical: lead?.department || null,
@@ -7652,13 +7655,35 @@ console.log('API Response:', response.data);
     }
     return Number(crmFilters.find((filter) => filter._id === 'all' || !filter._id)?.count) || performanceTotalCount || 0;
   })();
-  const milestonePerformanceChips = leadMilestones.map((milestone) => ({
-    ...milestone,
-    count: Number(milestone.leadCount) || 0,
-    activeCount: Number(milestone.activeCount) || 0,
-    dropoutCount: Number(milestone.dropoutCount) || 0,
-  }));
-  const milestonePerformanceTotal = reachedMilestoneLeadCount;
+  const milestoneProjectId = String(cycleFilters.project || '');
+  const milestoneProjectChoices = useMemo(() => {
+    const assignedIds = new Set();
+    (leadMilestones || []).forEach((milestone) => {
+      (milestone.assignedProjects || []).forEach((projectId) => assignedIds.add(String(projectId)));
+    });
+    const choices = (cycleProjectOptions || []).filter((option) => assignedIds.has(String(option.value)));
+    if (milestoneProjectId && !choices.some((option) => String(option.value) === milestoneProjectId)) {
+      const current = (cycleProjectOptions || []).find((option) => String(option.value) === milestoneProjectId);
+      if (current) choices.unshift(current);
+    }
+    return choices;
+  }, [leadMilestones, cycleProjectOptions, milestoneProjectId]);
+  const milestonePerformanceChips = useMemo(() => {
+    if (!milestoneProjectId) return [];
+    const positionOf = (milestone) => {
+      const position = Number(milestone.projectPositions?.[milestoneProjectId]);
+      return Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER;
+    };
+    return (leadMilestones || [])
+      .filter((milestone) => (milestone.assignedProjects || []).map(String).includes(milestoneProjectId))
+      .sort((a, b) => positionOf(a) - positionOf(b))
+      .map((milestone) => ({
+        ...milestone,
+        count: Number(milestone.leadCount) || 0,
+        activeCount: Number(milestone.activeCount) || 0,
+        dropoutCount: Number(milestone.dropoutCount) || 0,
+      }));
+  }, [leadMilestones, milestoneProjectId]);
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action, AI Call)
   useEffect(() => {
@@ -7958,7 +7983,7 @@ console.log('API Response:', response.data);
   };
 
   const getProfileProject = (profile) => {
-    const project = profile?._course?.project || profile?._course?.projectInfo;
+    const project = profile?._course?.project || profile?._course?.projectInfo || profile?.project;
     const first = Array.isArray(project) ? project[0] : project;
     return {
       id: idOf(first),
@@ -7985,11 +8010,15 @@ console.log('API Response:', response.data);
       .map((step) => ({
         id: idOf(step?.milestone || step?._id),
         title: step?.title || '',
+        droppedOut: step?.droppedOut === true,
       }))
       .filter((step) => step.title || step.id);
   };
 
+  const isMilestoneDroppedOut = (profile) => getMilestoneTrail(profile).some((step) => step.droppedOut);
+
   const getNextMilestone = (profile, rows) => {
+    if (isMilestoneDroppedOut(profile)) return null;
     const list = Array.isArray(rows) ? rows : [];
     const reachedIds = new Set(getMilestoneTrail(profile).map((step) => step.id).filter(Boolean));
     const currentId = getProfileMilestoneId(profile) || [...reachedIds].pop() || '';
@@ -8008,6 +8037,7 @@ console.log('API Response:', response.data);
       id: idOf(stored) || latest?.id || '',
       title: storedTitle || latest?.title || '',
       previous: trail.length >= 2 ? trail[trail.length - 2] : null,
+      droppedOut: trail.some((step) => step.droppedOut),
       trail,
     };
   };
@@ -8033,6 +8063,11 @@ console.log('API Response:', response.data);
 
   const submitLeadMilestoneForm = async (profile) => {
     if (!profile?._id || leadMilestoneSavingId) return;
+    if (isMilestoneDroppedOut(profile)) {
+      const dropped = getMilestoneTrail(profile).find((step) => step.droppedOut);
+      setLeadMilestoneError(`This lead dropped out from "${dropped?.title || 'a milestone'}". The next milestone cannot be updated.`);
+      return;
+    }
     const milestone = leadMilestoneRows.find((item) => String(item._id) === String(leadMilestoneForm.milestoneId));
     if (!milestone) {
       setLeadMilestoneError('Select the next milestone');
@@ -8051,7 +8086,9 @@ console.log('API Response:', response.data);
     setLeadMilestoneSavingId(milestone._id);
     try {
       const response = await axios.put(
-        `${backendUrl}/college/lead/milestone_change/${profile._id}`,
+        profile.isHrJobLead
+          ? `${backendUrl}/college/hr/leads/${profile._id}/milestone`
+          : `${backendUrl}/college/lead/milestone_change/${profile._id}`,
         { _milestone: milestone._id },
         { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
       );
@@ -8069,6 +8106,40 @@ console.log('API Response:', response.data);
     } catch (error) {
       console.error('Error saving lead milestone:', error);
       setLeadMilestoneError(error.response?.data?.message || 'Failed to save milestone');
+    } finally {
+      setLeadMilestoneSavingId(null);
+    }
+  };
+
+  const markLeadMilestoneDropout = async (profile, milestoneId, milestoneTitle) => {
+    if (!profile?._id || !milestoneId || leadMilestoneSavingId) return;
+    const confirmed = window.confirm(
+      `Mark dropout on "${milestoneTitle || 'this milestone'}"? The next milestone cannot be updated.`
+    );
+    if (!confirmed) return;
+    setLeadMilestoneError('');
+    setLeadMilestoneSavingId(milestoneId);
+    try {
+      const response = await axios.put(
+        profile.isHrJobLead
+          ? `${backendUrl}/college/hr/leads/${profile._id}/milestone-dropout`
+          : `${backendUrl}/college/lead/milestone_dropout/${profile._id}`,
+        { milestoneId },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!response.data?.success) {
+        setLeadMilestoneError(response.data?.message || 'Failed to mark dropout');
+        return;
+      }
+      applySavedLeadMilestone(
+        profile,
+        response.data.data?._milestone || profile._milestone,
+        response.data.data?.milestoneHistory || []
+      );
+      fetchLeadMilestones();
+    } catch (error) {
+      console.error('Error marking milestone dropout:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to mark dropout');
     } finally {
       setLeadMilestoneSavingId(null);
     }
@@ -8103,7 +8174,7 @@ console.log('API Response:', response.data);
         ? rows
           .filter((item) => (item.assignedProjects || []).map(String).includes(projectId))
           .sort((a, b) => projectPosition(a) - projectPosition(b))
-        : rows;
+        : [];
       setLeadMilestoneRows(matched);
       const following = getNextMilestone(profile, matched);
       setLeadMilestoneForm({ milestoneId: following?._id || '' });
@@ -8115,8 +8186,10 @@ console.log('API Response:', response.data);
     }
   };
 
+  const isWonLeadStatus = (profile) => String(profile?._leadStatus?.title || '').trim().toLowerCase() === 'won';
+
   const renderLeadMilestoneButton = (profile, extraClassName = '') => {
-    if (!profile?.admissionDone) return null;
+    if (!isWonLeadStatus(profile)) return null;
     const current = getCurrentMilestone(profile);
     const label = current.title || 'Milestone';
     const fromTitle = current.previous?.title || '';
@@ -8124,7 +8197,7 @@ console.log('API Response:', response.data);
       <button
         type="button"
         className={`lead-card-kyc-dash__btn lead-card-kyc-dash__btn--milestone${extraClassName ? ` ${extraClassName}` : ''}`}
-        title={fromTitle ? `${label} · came from ${fromTitle}` : label}
+        title={current.droppedOut ? `${label} · Dropout` : (fromTitle ? `${label} · came from ${fromTitle}` : label)}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -8132,7 +8205,8 @@ console.log('API Response:', response.data);
         }}
       >
         <span className="lead-milestone-btn__now">{label}</span>
-        {fromTitle ? <span className="lead-milestone-btn__from">from {fromTitle}</span> : null}
+        {current.droppedOut ? <span className="lead-milestone-btn__from">Dropout</span> : null}
+        {!current.droppedOut && fromTitle ? <span className="lead-milestone-btn__from">from {fromTitle}</span> : null}
       </button>
     );
   };
@@ -16447,59 +16521,83 @@ useEffect(() => {
         </div>
       </div>
       <div className="b2b-dash-section mt-3">
-        <span className="b2b-dash-section__label">Milestone</span>
-        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
-          <button
-            type="button"
-            className="b2b-perf-chip"
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '999px',
-              cursor: 'pointer',
-              color: !activeMilestoneId ? '#fff' : '#66bb6a',
-              backgroundColor: !activeMilestoneId ? '#66bb6a' : '#fff',
-              border: !activeMilestoneId ? 'none' : '1.5px solid #66bb6a',
-            }}
-            onClick={() => handleMilestoneChipClick(null)}
+        <label className="b2b-dash-section__label" htmlFor="hrMilestoneProject">Milestones</label>
+        <div className="b2b-milestone-row d-flex flex-nowrap gap-2 align-items-center pt-1">
+          <select
+            id="hrMilestoneProject"
+            className="b2b-milestone-project"
+            aria-label="Project"
+            value={milestoneProjectId}
+            onChange={(event) => handleCycleFilterChange('project', event.target.value)}
           >
-            All ({milestonePerformanceTotal})
-          </button>
-          {milestonePerformanceChips.map((milestone, index) => {
-            const isSelected = activeMilestoneId === milestone._id;
-            return (
+            <option value="">Select project</option>
+            {milestoneProjectChoices.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          {!milestoneProjectId && (
+            <span className="b2b-milestone-project-hint">Choose a project to see its milestones</span>
+          )}
+          {milestoneProjectId && (
+            <div className="b2b-milestone-chips b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center">
               <button
-                key={milestone._id || index}
                 type="button"
-                className="b2b-perf-chip b2b-milestone-chip"
+                className="b2b-perf-chip"
                 style={{
-                  padding: '6px 10px',
+                  padding: '6px 14px',
                   fontSize: '12px',
                   fontWeight: 600,
                   borderRadius: '999px',
                   cursor: 'pointer',
-                  color: isSelected ? '#fff' : '#66bb6a',
-                  backgroundColor: isSelected ? '#66bb6a' : '#fff',
-                  border: isSelected ? 'none' : '1.5px solid #66bb6a',
+                  color: filterData.reachedMilestone === 'true' && !activeMilestoneId ? '#fff' : '#66bb6a',
+                  backgroundColor: filterData.reachedMilestone === 'true' && !activeMilestoneId ? '#66bb6a' : '#fff',
+                  border: filterData.reachedMilestone === 'true' && !activeMilestoneId ? 'none' : '1.5px solid #66bb6a',
                 }}
-                onClick={() => handleMilestoneChipClick(milestone)}
-                title={`${milestone.activeCount ?? 0} still in this milestone, ${milestone.dropoutCount ?? 0} dropped out`}
+                onClick={() => handleMilestoneChipClick(null)}
               >
-                <span className="b2b-milestone-chip__side" title="Not dropped out from this milestone">
-                  <span className="b2b-milestone-chip__sign" aria-hidden="true">+</span>
-                  <span className="b2b-milestone-chip__count">{milestone.activeCount ?? 0}</span>
-                </span>
-                <span className="b2b-milestone-chip__label">
-                  {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
-                </span>
-                <span className="b2b-milestone-chip__side" title="Dropped out from this milestone">
-                  <span className="b2b-milestone-chip__sign" aria-hidden="true">−</span>
-                  <span className="b2b-milestone-chip__count">{milestone.dropoutCount ?? 0}</span>
-                </span>
+                All
               </button>
-            );
-          })}
+              {milestonePerformanceChips.length === 0 && (
+                <span className="text-muted" style={{ fontSize: 12, fontWeight: 600 }}>
+                  No milestones on this project
+                </span>
+              )}
+              {milestonePerformanceChips.map((milestone, index) => {
+                const isSelected = activeMilestoneId === milestone._id;
+                return (
+                  <button
+                    key={milestone._id || index}
+                    type="button"
+                    className="b2b-perf-chip b2b-milestone-chip"
+                    style={{
+                      padding: '6px 10px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                      cursor: 'pointer',
+                      color: isSelected ? '#fff' : '#66bb6a',
+                      backgroundColor: isSelected ? '#66bb6a' : '#fff',
+                      border: isSelected ? 'none' : '1.5px solid #66bb6a',
+                    }}
+                    onClick={() => handleMilestoneChipClick(milestone)}
+                    title={`${milestone.activeCount ?? 0} still in this milestone, ${milestone.dropoutCount ?? 0} dropped out`}
+                  >
+                    <span className="b2b-milestone-chip__side" title="Not dropped out from this milestone">
+                      <span className="b2b-milestone-chip__sign" aria-hidden="true">+</span>
+                      <span className="b2b-milestone-chip__count">{milestone.activeCount ?? 0}</span>
+                    </span>
+                    <span className="b2b-milestone-chip__label">
+                      {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+                    </span>
+                    <span className="b2b-milestone-chip__side" title="Dropped out from this milestone">
+                      <span className="b2b-milestone-chip__sign" aria-hidden="true">−</span>
+                      <span className="b2b-milestone-chip__count">{milestone.dropoutCount ?? 0}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -17044,6 +17142,47 @@ useEffect(() => {
             min-height: 34px;
             white-space: nowrap;
             flex: 0 0 auto;
+          }
+          .b2b-crm-dashboard .b2b-milestone-row {
+            flex-wrap: nowrap;
+            min-width: 0;
+          }
+          .b2b-crm-dashboard .b2b-milestone-project {
+            width: 118px;
+            min-width: 118px;
+            max-width: 118px;
+            height: 32px;
+            padding: 0 26px 0 10px;
+            border-radius: 999px;
+            border: 1.5px solid #66bb6a;
+            color: #66bb6a;
+            font-weight: 600;
+            font-size: 12px;
+            line-height: 30px;
+            background-color: #fff;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2366bb6a' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 10px 7px;
+            appearance: none;
+            outline: none;
+            cursor: pointer;
+            flex: 0 0 118px;
+          }
+          .b2b-crm-dashboard .b2b-milestone-project:focus {
+            box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.22);
+          }
+          .b2b-crm-dashboard .b2b-milestone-project-hint {
+            color: #9ca3af;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+          }
+          .b2b-crm-dashboard .b2b-milestone-chips {
+            flex: 1 1 auto;
+            min-width: 0;
+            flex-wrap: nowrap;
+            overflow-x: auto;
           }
           .b2b-crm-dashboard .b2b-milestone-chip {
             justify-content: space-between;
@@ -18799,27 +18938,45 @@ useEffect(() => {
                   <div className="modal-body">
                     {(() => {
                       const current = getCurrentMilestone(leadMilestoneProfile);
+                      const droppedSteps = current.trail.filter((step) => step.droppedOut);
                       if (!current.trail.length && !current.title) return null;
                       const steps = current.trail.length
                         ? current.trail
-                        : [{ id: current.id, title: current.title }];
+                        : [{ id: current.id, title: current.title, droppedOut: current.droppedOut }];
                       return (
-                        <div className="lead-milestone-path mb-3">
-                          {steps.map((step, index) => {
-                            const isNow = index === steps.length - 1;
-                            const isFrom = steps.length >= 2 && index === steps.length - 2;
-                            const stepLabel = isNow ? 'Now' : isFrom ? 'Came from' : 'Earlier';
-                            return (
-                              <div className="lead-milestone-path__step" key={`${step.id || step.title}-${index}`}>
-                                {index > 0 ? <span className="lead-milestone-path__arrow" aria-hidden="true">→</span> : null}
-                                <div className={`lead-milestone-path__card${isNow ? ' lead-milestone-path__card--now' : ''}${isFrom ? ' lead-milestone-path__card--from' : ''}`}>
-                                  <span className="lead-milestone-path__label">{stepLabel}</span>
-                                  <span className="lead-milestone-path__title">{step.title || 'Milestone'}</span>
+                        <>
+                          <div className="lead-milestone-path mb-3">
+                            {steps.map((step, index) => {
+                              const isNow = index === steps.length - 1;
+                              const isFrom = !step.droppedOut && steps.length >= 2 && index === steps.length - 2;
+                              const stepLabel = step.droppedOut ? 'Dropout' : isNow ? 'Now' : isFrom ? 'Came from' : 'Earlier';
+                              return (
+                                <div className="lead-milestone-path__step" key={`${step.id || step.title}-${index}`}>
+                                  {index > 0 ? <span className="lead-milestone-path__arrow" aria-hidden="true">→</span> : null}
+                                  <div className={`lead-milestone-path__card${isNow ? ' lead-milestone-path__card--now' : ''}${isFrom ? ' lead-milestone-path__card--from' : ''}${step.droppedOut ? ' lead-milestone-path__card--dropout' : ''}`}>
+                                    <span className="lead-milestone-path__label">{stepLabel}</span>
+                                    <span className="lead-milestone-path__title">{step.title || 'Milestone'}</span>
+                                    {step.id && !step.droppedOut ? (
+                                      <button
+                                        type="button"
+                                        className="lead-milestone-path__dropout"
+                                        disabled={Boolean(leadMilestoneSavingId)}
+                                        onClick={() => markLeadMilestoneDropout(leadMilestoneProfile, step.id, step.title)}
+                                      >
+                                        {String(leadMilestoneSavingId) === String(step.id) ? 'Saving...' : 'Dropout'}
+                                      </button>
+                                    ) : null}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                          {droppedSteps.length ? (
+                            <div className="text-danger small mb-3">
+                              Dropped out from <strong>{droppedSteps.map((step) => step.title).join(', ')}</strong>. The next milestone cannot be updated.
+                            </div>
+                          ) : null}
+                        </>
                       );
                     })()}
                     <form
@@ -18836,7 +18993,7 @@ useEffect(() => {
                           className="form-select border-0 bgcolor"
                           id="leadMilestoneSelect"
                           value={leadMilestoneForm.milestoneId}
-                          disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId)}
+                          disabled={leadMilestoneLoading || Boolean(leadMilestoneSavingId) || isMilestoneDroppedOut(leadMilestoneProfile)}
                           style={{
                             height: '42px',
                             paddingTop: '8px',
@@ -18852,7 +19009,9 @@ useEffect(() => {
                           <option value="">
                             {leadMilestoneLoading
                               ? 'Loading milestones...'
-                              : getNextMilestone(leadMilestoneProfile, leadMilestoneRows)
+                              : isMilestoneDroppedOut(leadMilestoneProfile)
+                                ? 'Dropped out'
+                                : getNextMilestone(leadMilestoneProfile, leadMilestoneRows)
                                 ? 'Select next milestone'
                                 : 'Last milestone reached'}
                           </option>
@@ -33382,6 +33541,11 @@ max-width: 600px;
           border-color: #818cf8;
         }
 
+        .lead-milestone-path__card--dropout{
+          background: #fef2f2;
+          border-color: #f87171;
+        }
+
         .lead-milestone-path__label{
           font-size: 10px;
           font-weight: 700;
@@ -33392,6 +33556,10 @@ max-width: 600px;
 
         .lead-milestone-path__card--now .lead-milestone-path__label{
           color: #4338ca;
+        }
+
+        .lead-milestone-path__card--dropout .lead-milestone-path__label{
+          color: #b91c1c;
         }
 
         .lead-milestone-path__card--from .lead-milestone-path__label{
@@ -33405,6 +33573,24 @@ max-width: 600px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .lead-milestone-path__dropout{
+          margin-top: 4px;
+          border: 0;
+          border-radius: 999px;
+          background: #dc2626;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          line-height: 1;
+          padding: 4px 8px;
+          cursor: pointer;
+        }
+
+        .lead-milestone-path__dropout:disabled{
+          opacity: 0.7;
+          cursor: default;
         }
 
         .lead-milestone-path__meta,
