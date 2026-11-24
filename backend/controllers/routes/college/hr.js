@@ -21,7 +21,10 @@ const Company = require('../../models/company');
 const createHrHiring = require('./hrHiring');
 const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 const B2cStatusAssignment = require('../../models/b2cStatusAssignment');
+const B2cMilestone = require('../../models/b2cMilestone');
+const B2cMilestoneAssignment = require('../../models/b2cMilestoneAssignment');
 const { getStatusProjectScope, getAssignedForProjects } = require('../../../helpers/b2cStatusAssignment');
+const { ensureMilestonePositions } = require('../../../helpers/b2cMilestoneAssignment');
 
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
 const HR_DOCUMENT_TYPES = [
@@ -732,6 +735,7 @@ const APPLY_LEAD_POPULATE = [
   { path: 'assignedTo', select: 'name email' },
   { path: 'project', select: 'name' },
   { path: 'department', select: 'name' },
+  { path: '_milestone', select: 'title description' },
   { path: 'logs.user', select: 'name email' },
   STATUS_POPULATE,
 ];
@@ -803,6 +807,20 @@ const mapApplyToLead = (apply, statusIndex) => {
         mandatory: !!doc.mandatory,
       })),
     leadStatus: statusDoc || null,
+    _milestone: apply._milestone && typeof apply._milestone === 'object'
+      ? {
+        _id: apply._milestone._id,
+        title: apply._milestone.title || '',
+        description: apply._milestone.description || '',
+      }
+      : (apply._milestone || null),
+    milestoneHistory: (apply.milestoneHistory || []).map((row) => ({
+      milestone: row.milestone,
+      title: row.title || '',
+      reachedAt: row.reachedAt || null,
+      droppedOut: row.droppedOut === true,
+      droppedAt: row.droppedAt || null,
+    })),
     leadSubstatus: sub?._id || apply.leadSubstatus || null,
     subStatusTitle: resolvedSubTitle,
     leadOwner,
@@ -2836,6 +2854,274 @@ router.get('/leads/:id/reapply-history', isCollege, async (req, res) => {
   } catch (error) {
     console.error('[HR leads] reapply history error:', error);
     return res.status(500).json({ success: false, message: 'Failed to retrieve job applications' });
+  }
+});
+
+const hrMilestoneHistoryPayload = (rows) => (rows || []).map((row) => ({
+  milestone: row.milestone,
+  title: row.title || '',
+  reachedAt: row.reachedAt || null,
+  droppedOut: row.droppedOut === true,
+  droppedAt: row.droppedAt || null,
+}));
+
+const hrLeadProjectId = (loaded) => {
+  const ref = loaded?.apply?.project || loaded?.candidate?.project || loaded?.job?.project || null;
+  return ref?._id || ref || null;
+};
+
+const hrLeadStatusTitle = (loaded) => String(
+  loaded?.apply?.leadStatus?.title || loaded?.lead?.statusTitle || ''
+).trim().toLowerCase();
+
+const orderedHrProjectMilestones = async (collegeId, projectId) => {
+  await ensureMilestonePositions(collegeId);
+  const assignedRows = await B2cMilestoneAssignment.find({
+    college: collegeId,
+    project: projectId,
+  }).sort({ index: 1, createdAt: 1 }).select('milestone').lean();
+  const docs = await B2cMilestone.find({
+    _id: { $in: assignedRows.map((row) => row.milestone) },
+    college: collegeId,
+  }).select('_id title').lean();
+  const byId = new Map(docs.map((item) => [String(item._id), item]));
+  return assignedRows.map((row) => byId.get(String(row.milestone))).filter(Boolean);
+};
+
+// Same Won-status milestone path as B2C, stored on the job application.
+router.put('/leads/:id/milestone', isCollege, async (req, res) => {
+  try {
+    const milestoneId = req.body._milestone;
+    const collegeId = req.user?.college?._id;
+    if (!collegeId) {
+      return res.status(400).json({ success: false, message: 'College not found for this user' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(String(milestoneId || ''))) {
+      return res.status(400).json({ success: false, message: 'Invalid lead or milestone' });
+    }
+
+    const loaded = await loadAppliedLead(req.params.id, collegeId);
+    if (!loaded) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+    if (hrLeadStatusTitle(loaded) !== 'won') {
+      return res.status(400).json({ success: false, message: 'Milestone can be set when the lead status is Won' });
+    }
+
+    const milestone = await B2cMilestone.findOne({ _id: milestoneId, college: collegeId }).lean();
+    if (!milestone) {
+      return res.status(404).json({ success: false, message: 'Milestone not found' });
+    }
+
+    const projectId = hrLeadProjectId(loaded);
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: "This lead's job has no project, so it has no milestones" });
+    }
+    const assigned = await B2cMilestoneAssignment.findOne({
+      college: collegeId,
+      milestone: milestone._id,
+      project: projectId,
+    }).select('_id').lean();
+    if (!assigned) {
+      return res.status(400).json({ success: false, message: "This milestone is not aligned to the lead's project" });
+    }
+
+    const apply = loaded.apply;
+    const savedMilestone = {
+      _id: milestone._id,
+      title: milestone.title,
+      description: milestone.description || '',
+    };
+    if (!Array.isArray(apply.milestoneHistory)) apply.milestoneHistory = [];
+    if (!Array.isArray(apply.logs)) apply.logs = [];
+    const reachedIds = new Set(apply.milestoneHistory.map((row) => String(row.milestone)));
+    if (apply._milestone && !reachedIds.has(String(apply._milestone._id || apply._milestone))) {
+      const existingId = apply._milestone._id || apply._milestone;
+      const existing = apply._milestone.title
+        ? apply._milestone
+        : await B2cMilestone.findById(existingId).select('title').lean();
+      if (existing) {
+        apply.milestoneHistory.push({
+          milestone: existing._id || existingId,
+          title: existing.title || '',
+          reachedAt: apply.updatedAt || new Date(),
+          reachedBy: req.user._id,
+        });
+        reachedIds.add(String(existing._id || existingId));
+      }
+    }
+
+    const droppedRow = apply.milestoneHistory.find((row) => row.droppedOut);
+    if (droppedRow) {
+      return res.status(400).json({
+        success: false,
+        message: `This lead dropped out from "${droppedRow.title || 'a milestone'}". The next milestone cannot be updated.`,
+      });
+    }
+
+    const ordered = await orderedHrProjectMilestones(collegeId, projectId);
+    const orderedIds = ordered.map((item) => String(item._id));
+    const currentRow = apply.milestoneHistory.length
+      ? apply.milestoneHistory[apply.milestoneHistory.length - 1]
+      : null;
+    const currentId = currentRow ? String(currentRow.milestone) : '';
+    const requestedId = String(milestone._id);
+
+    if (reachedIds.has(requestedId)) {
+      if (requestedId === currentId) {
+        apply._milestone = milestone._id;
+        await apply.save();
+        return res.json({
+          success: true,
+          message: 'Milestone already reached',
+          data: { _id: apply._id, _milestone: savedMilestone, milestoneHistory: hrMilestoneHistoryPayload(apply.milestoneHistory) },
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: `"${milestone.title}" is already reached and stays on this lead`,
+      });
+    }
+
+    const currentPos = currentId ? orderedIds.indexOf(currentId) : -1;
+    const nextId = !currentId
+      ? (orderedIds[0] || '')
+      : (currentPos >= 0 ? (orderedIds[currentPos + 1] || '') : (orderedIds.find((itemId) => !reachedIds.has(itemId)) || ''));
+    if (!nextId) {
+      return res.status(400).json({ success: false, message: 'This lead is already on the last milestone' });
+    }
+    if (requestedId !== nextId) {
+      const nextMilestone = ordered.find((item) => String(item._id) === nextId);
+      return res.status(400).json({
+        success: false,
+        message: `Move only to the next milestone${nextMilestone?.title ? `: ${nextMilestone.title}` : ''}. Earlier milestones stay reached.`,
+      });
+    }
+
+    const previousTitle = apply.milestoneHistory.length
+      ? (apply.milestoneHistory[apply.milestoneHistory.length - 1].title || '')
+      : '';
+    apply.milestoneHistory.push({
+      milestone: milestone._id,
+      title: milestone.title,
+      reachedAt: new Date(),
+      reachedBy: req.user._id,
+    });
+    apply._milestone = milestone._id;
+    apply.logs.push({
+      user: req.user._id,
+      timestamp: new Date(),
+      action: previousTitle
+        ? `Milestone moved from "${previousTitle}" to "${milestone.title}". "${previousTitle}" stays reached.`
+        : `Milestone set to "${milestone.title}"`,
+      remarks: '',
+    });
+    await apply.save();
+
+    return res.json({
+      success: true,
+      message: 'Milestone updated',
+      data: { _id: apply._id, _milestone: savedMilestone, milestoneHistory: hrMilestoneHistoryPayload(apply.milestoneHistory) },
+    });
+  } catch (error) {
+    console.error('[HR Lead Milestone Change] Error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
+  }
+});
+
+router.put('/leads/:id/milestone-dropout', isCollege, async (req, res) => {
+  try {
+    const requestedMilestoneId = req.body.milestoneId;
+    const collegeId = req.user?.college?._id;
+    if (!collegeId) {
+      return res.status(400).json({ success: false, message: 'College not found for this user' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(String(requestedMilestoneId || ''))) {
+      return res.status(400).json({ success: false, message: 'Invalid lead or milestone' });
+    }
+
+    const loaded = await loadAppliedLead(req.params.id, collegeId);
+    if (!loaded) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+    if (hrLeadStatusTitle(loaded) !== 'won') {
+      return res.status(400).json({ success: false, message: 'Milestone dropout can be set when the lead status is Won' });
+    }
+
+    const apply = loaded.apply;
+    if (!Array.isArray(apply.milestoneHistory)) apply.milestoneHistory = [];
+    if (!Array.isArray(apply.logs)) apply.logs = [];
+    const currentMilestoneId = apply._milestone?._id || apply._milestone;
+    if (currentMilestoneId && !apply.milestoneHistory.some((item) => String(item.milestone) === String(currentMilestoneId))) {
+      apply.milestoneHistory.push({
+        milestone: currentMilestoneId,
+        title: apply._milestone?.title || '',
+        reachedAt: apply.updatedAt || new Date(),
+        reachedBy: req.user._id,
+        droppedOut: false,
+      });
+    }
+
+    const milestone = await B2cMilestone.findOne({ _id: requestedMilestoneId, college: collegeId }).select('title description').lean();
+    if (!milestone) {
+      return res.status(404).json({ success: false, message: 'Milestone not found' });
+    }
+    const projectId = hrLeadProjectId(loaded);
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: "This lead's job has no project, so it has no milestones" });
+    }
+    const assigned = await B2cMilestoneAssignment.findOne({
+      college: collegeId,
+      milestone: milestone._id,
+      project: projectId,
+    }).select('_id').lean();
+    if (!assigned) {
+      return res.status(400).json({ success: false, message: "This milestone is not aligned to the lead's project" });
+    }
+
+    const row = apply.milestoneHistory.find((item) => String(item.milestone) === String(milestone._id));
+    if (!row) {
+      return res.status(400).json({ success: false, message: 'Save this milestone on the lead before marking dropout' });
+    }
+    const milestoneTitle = row.title || milestone.title || '';
+    if (row.droppedOut) {
+      return res.status(400).json({
+        success: false,
+        message: `This lead already dropped out from "${milestoneTitle}"`,
+      });
+    }
+
+    row.droppedOut = true;
+    row.droppedAt = new Date();
+    row.droppedBy = req.user._id;
+    apply.logs.push({
+      user: req.user._id,
+      timestamp: new Date(),
+      action: `Dropped out from milestone "${milestoneTitle}". The next milestone cannot be updated.`,
+      remarks: '',
+    });
+    await apply.save();
+
+    const savedMilestone = apply._milestone
+      ? {
+        _id: currentMilestoneId,
+        title: apply._milestone.title || '',
+        description: apply._milestone.description || '',
+      }
+      : null;
+
+    return res.json({
+      success: true,
+      message: `Dropped out from "${milestoneTitle}"`,
+      data: {
+        _id: apply._id,
+        _milestone: savedMilestone,
+        milestoneHistory: hrMilestoneHistoryPayload(apply.milestoneHistory),
+      },
+    });
+  } catch (error) {
+    console.error('[HR Lead Milestone Dropout] Error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
   }
 });
 
