@@ -1,0 +1,41 @@
+.meta-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.meta-table {
+  width: max-content;
+  min-width: 100%;
+  margin-bottom: 0;
+}
+
+.meta-table th,
+.meta-table td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.meta-ellipsis {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.meta-ellipsis-name {
+  max-width: 190px;
+}
+
+.meta-ellipsis-status {
+  max-width: 140px;
+}
+
+.meta-table td.meta-actions {
+  white-space: nowrap;
+}
+
+.meta-table td.meta-actions .btn + .btn {
+  margin-left: 6px;
+}

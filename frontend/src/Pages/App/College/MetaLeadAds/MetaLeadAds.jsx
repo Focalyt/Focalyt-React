@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import { createMetaClient } from './metaLeadAdsApi';
 import MappingModal from './MappingModal';
+import './MetaLeadAds.css';
 import {
   adsQuery,
   applyFormCatalog,
@@ -344,43 +345,41 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
                 <div className="alert alert-light">No advertisements have been discovered yet.</div>
               )}
               {ads.length > 0 && (
-                <div className="table-responsive">
-                  <table className="table table-striped">
+                <div className="meta-table-wrap">
+                  <table className="table table-striped meta-table">
                     <thead>
                       <tr>
-                        <th>Ad Name</th>
-                        <th>Ad ID</th>
-                        <th>Campaign ID</th>
-                        <th>Facebook Page ID</th>
-                        <th>Facebook Form ID</th>
-                        <th>Form Name</th>
-                        <th>Effective Ad Status</th>
-                        <th>Form Discovery Status</th>
-                        <th>Last Synced</th>
+                        <ClipHead>Ad Name</ClipHead>
+                        <ClipHead>Ad ID</ClipHead>
+                        <ClipHead>Campaign ID</ClipHead>
+                        <ClipHead>Facebook Page ID</ClipHead>
+                        <ClipHead>Facebook Form ID</ClipHead>
+                        <ClipHead>Form Name</ClipHead>
+                        <ClipHead>Effective Ad Status</ClipHead>
+                        <ClipHead>Form Discovery Status</ClipHead>
+                        <ClipHead>Last Synced</ClipHead>
                       </tr>
                     </thead>
                     <tbody>
-                      {ads.map(ad => (
-                        <tr key={ad.adId}>
-                          <td>{ad.adName || '—'}</td>
-                          <td>{ad.adId}</td>
-                          <td>{ad.campaignId || '—'}</td>
-                          <td>{ad.pageId || '—'}</td>
-                          <td>{ad.formId || '—'}</td>
-                          <td>
-                            {ad.formName || '—'}
-                            {ad.formMetadataStatus === 'unavailable' && (
-                              <div className="text-warning">Form details unavailable</div>
-                            )}
-                            {ad.discoveryStatus === 'form_unresolved' && (
-                              <div className="text-warning">This ad cannot be mapped until a single lead form is discovered.</div>
-                            )}
-                          </td>
-                          <td>{ad.effectiveStatus || '—'}</td>
-                          <td>{discoveryLabel(ad.discoveryStatus)}</td>
-                          <td>{formatWhen(ad.lastSyncedAt)}</td>
-                        </tr>
-                      ))}
+                      {ads.map(ad => {
+                        const formNotes = [
+                          ad.formMetadataStatus === 'unavailable' ? 'Form details unavailable' : '',
+                          ad.discoveryStatus === 'form_unresolved' ? 'This ad cannot be mapped until a single lead form is discovered.' : '',
+                        ].filter(Boolean).join(' ');
+                        return (
+                          <tr key={ad.adId}>
+                            <Clip value={ad.adName} wide />
+                            <Clip value={ad.adId} />
+                            <Clip value={ad.campaignId} />
+                            <Clip value={ad.pageId} />
+                            <Clip value={ad.formId} />
+                            <Clip value={ad.formName} wide extra={formNotes} />
+                            <Clip value={ad.effectiveStatus} status />
+                            <Clip value={discoveryLabel(ad.discoveryStatus)} status />
+                            <Clip value={formatWhen(ad.lastSyncedAt)} />
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -419,40 +418,41 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
                 <div className="alert alert-light">No lead forms are available to map.</div>
               )}
               {visibleRows.length > 0 && (
-                <div className="table-responsive">
-                  <table className="table table-striped">
+                <div className="meta-table-wrap">
+                  <table className="table table-striped meta-table">
                     <thead>
                       <tr>
-                        <th>Facebook Page ID</th>
-                        <th>Facebook Form Name</th>
-                        <th>Form ID</th>
-                        <th>Job</th>
-                        <th>Course</th>
-                        <th>Lead Source</th>
-                        <th>Default Status</th>
-                        <th>Default Substatus</th>
-                        <th>Mapping Status</th>
+                        <ClipHead>Facebook Page ID</ClipHead>
+                        <ClipHead>Facebook Form Name</ClipHead>
+                        <ClipHead>Form ID</ClipHead>
+                        <ClipHead>Job</ClipHead>
+                        <ClipHead>Course</ClipHead>
+                        <ClipHead>Lead Source</ClipHead>
+                        <ClipHead>Default Status</ClipHead>
+                        <ClipHead>Default Substatus</ClipHead>
+                        <ClipHead>Mapping Status</ClipHead>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleRows.map(row => (
+                      {visibleRows.map(row => {
+                        const formNotes = [
+                          row.metadataStatus === 'unavailable' ? 'Form details unavailable' : '',
+                          row.jobId && !row.jobName ? 'Job no longer available' : '',
+                          row.courseId && !row.courseName ? 'Course no longer available' : '',
+                        ].filter(Boolean).join(' ');
+                        return (
                         <tr key={`${row.pageId}-${row.formId}`}>
-                          <td>{row.pageId}</td>
-                          <td>
-                            {row.formName || '—'}
-                            {row.metadataStatus === 'unavailable' && <div className="text-warning">Form details unavailable</div>}
-                            {row.jobId && !row.jobName && <div className="text-warning">Job no longer available</div>}
-                            {row.courseId && !row.courseName && <div className="text-warning">Course no longer available</div>}
-                          </td>
-                          <td>{row.formId}</td>
-                          <td>{row.jobName || '—'}</td>
-                          <td>{row.courseName || '—'}</td>
-                          <td>{row.leadSource || '—'}</td>
-                          <td>{row.defaultStatus || '—'}</td>
-                          <td>{row.defaultSubstatus || '—'}</td>
-                          <td>{row.statusLabel}</td>
-                          <td className="d-flex gap-1">
+                          <Clip value={row.pageId} />
+                          <Clip value={row.formName} wide extra={formNotes} />
+                          <Clip value={row.formId} />
+                          <Clip value={row.jobName} wide />
+                          <Clip value={row.courseName} wide />
+                          <Clip value={row.leadSource} wide />
+                          <Clip value={row.defaultStatus} status />
+                          <Clip value={row.defaultSubstatus} status />
+                          <Clip value={row.statusLabel} status />
+                          <td className="meta-actions">
                             {row.statusLabel === 'Unmapped' && (
                               <button type="button" className="btn btn-sm btn-primary" onClick={() => openCreate(row)}>Map Form</button>
                             )}
@@ -470,7 +470,8 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -535,6 +536,30 @@ export default function MetaLeadAds({ client: clientProp } = {}) {
         </div>
       )}
     </div>
+  );
+}
+
+function clipText(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return '—';
+  return String(value);
+}
+
+function ClipHead({ children }) {
+  return (
+    <th title={children}>
+      <span className="meta-ellipsis">{children}</span>
+    </th>
+  );
+}
+
+function Clip({ value, extra, wide, status }) {
+  const text = clipText(value);
+  const title = extra ? `${text === '—' ? '' : `${text}. `}${extra}` : text;
+  const className = `meta-ellipsis${wide ? ' meta-ellipsis-name' : ''}${status ? ' meta-ellipsis-status' : ''}`;
+  return (
+    <td title={title}>
+      <span className={className}>{text}</span>
+    </td>
   );
 }
 
