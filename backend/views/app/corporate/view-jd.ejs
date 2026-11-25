@@ -143,6 +143,10 @@
                             <input class="form-control" value="<%=jd.payOut%>" readonly>
                           </div>
                           <div class="col-xl-2 mb-1">
+                            <label>Payout Remarks</label>
+                            <input class="form-control" value="<%=jd.payOutRemarks%>" readonly>
+                          </div>
+                          <div class="col-xl-2 mb-1">
                             <label>Tech Skills Required</label>
                             <input class="form-control text-capitalize" value="<%= jd._techSkills?.map((i) => i.name).join(', ') %>" readonly>
                           </div>

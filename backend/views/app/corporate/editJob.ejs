@@ -37,16 +37,16 @@
                                 oninput="this.setCustomValidity('')" required />
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-title">
-                              <label>Title</label><span class="mandatory"> *</span></label>
+                              <label>Designation</label><span class="mandatory"> *</span></label>
                               <input class="form-control" id="jobTitle" type="text" name="title"
                                 value="<%= jd?.title %>" required="required"
-                                oninvalid="this.setCustomValidity('Enter Title Here')" placeholder="Enter the job title"
+                                oninvalid="this.setCustomValidity('Enter Designation Here')" placeholder="Enter the designation"
                                 oninput="this.setCustomValidity('')" maxlength="100" />
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-industry-field">
-                              <label>Industry</label><span class="mandatory"> *</span></label>
+                              <label>Sector</label><span class="mandatory"> *</span></label>
                               <select class="form-control" value="" id="jd-industry" name="_industry" required
-                                oninvalid="this.setCustomValidity('Please Select Industry')"
+                                oninvalid="this.setCustomValidity('Please Select Sector')"
                                 oninput="this.setCustomValidity('')">
                                 <option value="">Select option</option>
                                 <% industry.forEach((item)=>{%>
@@ -101,10 +101,8 @@
                               </select>
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-exp-field-month">
-                              <label>Experience (In Months)</label><span class="mandatory"> *</span></label>
-                              <select class="form-control" id="jd-exp-mon" name="experienceMonths" value="" required
-                                oninvalid="this.setCustomValidity('Please Select Experience in Months')"
-                                oninput="this.setCustomValidity('')">
+                              <label>Experience (In Months)</label>
+                              <select class="form-control" id="jd-exp-mon" name="experienceMonths" value="">
                                 <option value="">Select option</option>
                                 <% if(jd?.experienceMonths) { %>
                                   <option value="<%= jd?.experienceMonths %>" class="text-capitalize" selected>
@@ -263,82 +261,38 @@
                         <div class="card-body">
                           <div class="row">
                             <div class="col-xl-3 mb-1" id="gender-preference">
-                              <div class="demo-inline-spacing" id="gender-preference-div">
-                                <label>Gender Preferences</label><span class="mandatory"> *</span></label>
-                                <br>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="genderPreference" id="genderRadio1"
-                                    value="male" <% if(jd?.genderPreference==='male' ) {%> checked <% } %> />
-                                    <label class="form-check-label" for="genderRadio1">Male</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="genderPreference" id="genderRadio2"
-                                    value="female" <% if(jd?.genderPreference==='female' ) {%> checked <% } %> />
-                                    <label class="form-check-label" for="genderRadio2">Female</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="genderPreference" id="genderRadio3"
-                                    value="no preference" <% if(jd?.genderPreference==='no preference' ||
-                                    !jd?.genderPreference) {%> checked <% } %> />
-                                    <label class="form-check-label" for="genderRadio3">No Preference</label>
-                                </div>
-                              </div>
+                              <label for="gender-preference-select">Gender Preferences</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="gender-preference-select" name="genderPreference" required>
+                                <option value="">Select option</option>
+                                <option value="male" <% if(jd?.genderPreference==='male') { %>selected<% } %>>Male</option>
+                                <option value="female" <% if(jd?.genderPreference==='female') { %>selected<% } %>>Female</option>
+                                <option value="no preference" <% if(jd?.genderPreference==='no preference' || !jd?.genderPreference) { %>selected<% } %>>No Preference</option>
+                              </select>
                             </div>
                             <div class="col-xl-3 mb-1" id="job-type-field">
-                              <div class="demo-inline-spacing" id="type-div">
-                                <label>Type</label><span class="mandatory"> *</span></label>
-                                <br>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="jobType" id="inlineRadio1"
-                                    value="Full Time" <% if(jd?.jobType==='Full Time' ) {%> checked <% } %> />
-                                    <label class="form-check-label" for="inlineRadio1">Full Time</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="jobType" id="inlineRadio2"
-                                    value="Part Time" <% if(jd?.jobType==='Part Time' ) {%> checked <% } %> />
-                                    <label class="form-check-label" for="inlineRadio2">Part Time</label>
-                                </div>
-                              </div>
+                              <label for="job-type">Type</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="job-type" name="jobType" required>
+                                <option value="">Select option</option>
+                                <option value="Full Time" <% if(jd?.jobType==='Full Time') { %>selected<% } %>>Full Time</option>
+                                <option value="Part Time" <% if(jd?.jobType==='Part Time') { %>selected<% } %>>Part Time</option>
+                              </select>
                             </div>
                             <div class="col-xl-3 mb-1" id="jp-comp-field">
-                              <div class="demo-inline-spacing">
-                                <label>Compensation</label><span class="mandatory"> *</span></label>
-                                <br>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="compensation" id="inlineRadio3"
-                                    value="Fixed" <% if(jd?.compensation==='Fixed' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio3">Fixed</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="compensation" id="inlineRadio4"
-                                    value="Incentive Only" <% if(jd?.compensation==='Incentive Only' ) {%> checked <% }
-                                    %>/>
-                                    <label class="form-check-label" for="inlineRadio4">Incentive Only</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="compensation" id="inlineRadio5"
-                                    value="Fixed + Incentive" <% if(jd?.compensation==='Fixed + Incentive' ) {%> checked
-                                  <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio5">Fixed + Incentive</label>
-                                </div>
-                              </div>
+                              <label for="compensation">Compensation</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="compensation" name="compensation" required>
+                                <option value="">Select option</option>
+                                <option value="Fixed" <% if(jd?.compensation==='Fixed') { %>selected<% } %>>Fixed</option>
+                                <option value="Incentive Only" <% if(jd?.compensation==='Incentive Only') { %>selected<% } %>>Incentive Only</option>
+                                <option value="Fixed + Incentive" <% if(jd?.compensation==='Fixed + Incentive') { %>selected<% } %>>Fixed + Incentive</option>
+                              </select>
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-pay-field">
-                              <div class="demo-inline-spacing">
-                                <label>Pay</label><span class="mandatory"> *</span></label>
-                                <br>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="pay" id="inlineRadio6"
-                                    value="On Payrol" <% if(jd?.pay==='On Payrol' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio6">On Payrol</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="pay" id="inlineRadio7"
-                                    value="Freelancer/Consultant" <% if(jd?.pay==='Freelancer/Consultant' ) {%> checked
-                                  <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio7">Freelancer/Consultant</label>
-                                </div>
-                              </div>
+                              <label for="pay-type">Pay</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="pay-type" name="pay" required>
+                                <option value="">Select option</option>
+                                <option value="On Payrol" <% if(jd?.pay==='On Payrol') { %>selected<% } %>>On Payroll</option>
+                                <option value="Freelancer/Consultant" <% if(jd?.pay==='Freelancer/Consultant') { %>selected<% } %>>Freelancer/Consultant</option>
+                              </select>
                             </div>
                           </div>
                           <div class="row">
@@ -395,31 +349,15 @@
                       <div class="card-content">
                         <div class="card-body">
                           <div class="row">
-                            <div class="col-xl-3 mb-1">
-                              <div class="demo-inline-spacing">
-                                <label>Shift</label>
-                                <br>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="shift" id="inlineRadio8"
-                                    value="Day Shift" <% if(jd?.shift==='Day Shift' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio8">Day Shift</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="shift" id="inlineRadio9"
-                                    value="Night Shift" <% if(jd?.shift==='Night Shift' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio9">Night Shift</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="shift" id="rotational"
-                                    value="Rotational" <% if(jd?.shift==='Rotational' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="rotational">Rotational</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="shift" id="inlineRadio10"
-                                    value="NA" <% if(jd?.shift==='NA' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio10">NA</label>
-                                </div>
-                              </div>
+                            <div class="col-xl-3 mb-1" id="shift-choice-field">
+                              <label for="shift">Shift</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="shift" name="shift" required>
+                                <option value="">Select option</option>
+                                <option value="Day Shift" <% if(jd?.shift==='Day Shift') { %>selected<% } %>>Day Shift</option>
+                                <option value="Night Shift" <% if(jd?.shift==='Night Shift') { %>selected<% } %>>Night Shift</option>
+                                <option value="Rotational" <% if(jd?.shift==='Rotational') { %>selected<% } %>>Rotational</option>
+                                <option value="NA" <% if(jd?.shift==='NA') { %>selected<% } %>>NA</option>
+                              </select>
                             </div>
                             <!-- <div class="col-xl-2 mb-1">
                               <label for="timings">Shift Timings</label>
@@ -450,30 +388,14 @@
                               </div>
                             </div>
                             <div class="col-xl-3 mb-1" id="jd-work-field">
-                              <div class="demo-inline-spacing">
-                                <label>Work Type</label><span class="mandatory"> *</span></label>
-                                <br>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="work" id="inlineRadio11"
-                                    value="Work from office" <% if(jd?.work==='Work from office' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio11">Work from office</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="work" id="wfh"
-                                    value="Work from home" <% if(jd?.work==='Work from home' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="wfh">Work from home</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="work" id="inlineRadio12"
-                                    value="Field" <% if(jd?.work==='Field' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio12">Field</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="work" id="inlineRadio13" value="NA"
-                                    <% if(jd?.work==='NA' ) {%> checked <% } %>/>
-                                    <label class="form-check-label" for="inlineRadio13">NA</label>
-                                </div>
-                              </div>
+                              <label for="work-type">Work Type</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="work-type" name="work" required>
+                                <option value="">Select option</option>
+                                <option value="Work from office" <% if(jd?.work==='Work from office') { %>selected<% } %>>Work From Office</option>
+                                <option value="Work from home" <% if(jd?.work==='Work from home') { %>selected<% } %>>Work From Home</option>
+                                <option value="Field" <% if(jd?.work==='Field') { %>selected<% } %>>Field</option>
+                                <option value="NA" <% if(jd?.work==='NA') { %>selected<% } %>>NA</option>
+                              </select>
                             </div>
                             <div class="col-xl-3 mb-1">
                               <label>Additional Benifits</label>
@@ -532,6 +454,11 @@
                                 <option value="NA" <% if(jd?.payOut==='NA' ) {%> selected <% } %>>NA</option>
                               </select>
                             </div>
+                            <div class="col-xl-3 mb-1">
+                              <label for="payout-remarks">Payout Remarks</label>
+                              <textarea id="payout-remarks" name="payOutRemarks" class="form-control" rows="3"
+                                maxlength="150"><%= jd?.payOutRemarks %></textarea>
+                            </div>
 
                             <div class="col-xl-3 mb-1">
                               <label for="techSkills">Tech Skills Required</label>
@@ -586,21 +513,13 @@
                               </select>
                             </div>
 
-                            <div class="col-xl-3 mb-1 fixed" id="salaryRange-field" name="salaryRange">
-                              <label>Salary Range (Monthly in Rs.)</label><span class="mandatory"> *</span></label>
-                              <br />
-                              <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="isFixed" value="true"
-                                  onclick="javascript:salaryCheck();" id="fixedCheck" <% if(jd?.isFixed==true ) {%>
-                                checked <% } %>/>
-                                  <label class="form-check-label" for="inlineRadio88">Fixed</label>
-                              </div>
-                              <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" value="false"
-                                  onclick="javascript:salaryCheck();" name="isFixed" id="defineCheck" <%
-                                  if(jd?.isFixed==false ) {%> checked <% } %>/>
-                                  <label class="form-check-label" for="inlineRadio99">Define Range</label>
-                              </div>
+                            <div class="col-xl-3 mb-1 fixed" id="salaryRange-field">
+                              <label for="salary-type">Salary Range (Monthly in Rs.)</label><span class="mandatory"> *</span>
+                              <select class="form-control" id="salary-type" name="isFixed" onchange="salaryCheck()" required>
+                                <option value="">Select option</option>
+                                <option value="true" <% if(jd?.isFixed==true) { %>selected<% } %>>Fixed</option>
+                                <option value="false" <% if(jd?.isFixed==false) { %>selected<% } %>>Define Range</option>
+                              </select>
                               <div id="ifFixed" <% if(jd?.isFixed!=true ) {%> style="display:none;" <% } %>>
                                   <input class="form-control" placeholder="Fixed amount" type="number" name="amount"
                                     onKeyPress="if(this.value.length==10) return false;" id="fixed-range-input"
@@ -1431,12 +1350,16 @@
             });
           };
           function salaryCheck() {
-            if ($('#fixedCheck').is(":checked")) {
+            const salaryType = $('#salary-type').val();
+            if (salaryType === 'true') {
               $('#ifFixed').show();
               $('#ifdefine').hide();
-            } else {
+            } else if (salaryType === 'false') {
               $('#ifdefine').show();
               $('#ifFixed').hide();
+            } else {
+              $('#ifFixed').hide();
+              $('#ifdefine').hide();
             }
           }
           checkQualificationOptions = () => {
@@ -1720,22 +1643,14 @@
             let phoneNumber = document.getElementById('phoneNumber');
             let email = document.getElementById('email')
             let organizationName = $('#organizationName').val()
-            let typeRadio1 = document.getElementById('inlineRadio1');
-            let typeRadio2 = document.getElementById('inlineRadio2')
-            let compRadio1 = document.getElementById('inlineRadio3');
-            let compRadio2 = document.getElementById('inlineRadio4');
-            let compRadio3 = document.getElementById('inlineRadio5');
-            let payRadio1 = document.getElementById('inlineRadio6');
-            let payRadio2 = document.getElementById('inlineRadio7')
+            let jobType = $('#job-type').val();
+            let compensation = $('#compensation').val();
+            let payType = $('#pay-type').val();
+            let shift = $('#shift').val();
+            let workType = $('#work-type').val();
+            let genderPreference = $('#gender-preference-select').val();
             let minAge = document.getElementById('min-age');
             let maxAge = document.getElementById('max-age');
-            let workRadio1 = document.getElementById('inlineRadio11');
-            let wfh = document.getElementById('wfh');
-            let workRadio2 = document.getElementById('inlineRadio12');
-            let workRadio3 = document.getElementById('inlineRadio13');
-            let genderRadio1 = document.getElementById('genderRadio1');
-            let genderRadio2 = document.getElementById('genderRadio2');
-            let genderRadio3 = document.getElementById('genderRadio3');
             const currentLocation = document.getElementById('work-loc');
             let currentLoc = currentLocation.value;
             let shiftTimingFrom = document.getElementById('timing-from').value;
@@ -1807,27 +1722,34 @@
               $('#err').text('Enter a valid age group')
               flag = false;
             }
-            if (!typeRadio1.checked && !typeRadio2.checked) {
+            if (!jobType) {
               $('#job-type-field').addClass('error')
-              firstError = firstError ? firstError : typeRadio1
+              firstError = firstError ? firstError : $('#job-type')
               flag = false
             }
-            if (!compRadio1.checked && !compRadio2.checked && !compRadio3.checked) {
+            if (!shift) {
+              $('#shift-choice-field').addClass('error')
+              firstError = firstError ? firstError : $('#shift')
+              flag = false
+            }
+            if (!compensation) {
               $('#jp-comp-field').addClass('error')
-              firstError = firstError ? firstError : compRadio1
+              firstError = firstError ? firstError : $('#compensation')
               flag = false
-            } if (!payRadio1.checked && !payRadio2.checked) {
+            } if (!payType) {
               $('#jd-pay-field').addClass('error')
-              firstError = firstError ? firstError : payRadio1
+              firstError = firstError ? firstError : $('#pay-type')
               flag = false
             }
-            if (!workRadio1.checked && !wfh.checked && !workRadio2.checked && !workRadio3.checked) {
+            if (!workType) {
               $('#jd-work-field').addClass('error')
-              firstError = firstError ? firstError : workRadio1
+              firstError = firstError ? firstError : $('#work-type')
               flag = false
-            } if (!document.getElementById('fixedCheck').checked && !document.getElementById('defineCheck').checked) {
+            }
+            const salaryType = $('#salary-type').val();
+            if (!salaryType) {
               $('#salaryRange-field').addClass('error')
-              firstError = firstError ? firstError : document.getElementById('fixedCheck')
+              firstError = firstError ? firstError : $('#salary-type')
               flag = false
             }
             if (organizationName.trim() === '') {
@@ -1835,9 +1757,9 @@
               firstError = firstError ? firstError : $('#organizationName')
               flag = false
             }
-            if (!genderRadio1.checked && !genderRadio2.checked && !genderRadio3.checked) {
+            if (!genderPreference) {
               $('#gender-preference').addClass('error')
-              firstError = firstError ? firstError : $('#genderRadio1')
+              firstError = firstError ? firstError : $('#gender-preference-select')
               flag = false
             }
             if (document.querySelector('#contact-directly-yes').checked) {

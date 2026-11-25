@@ -271,7 +271,7 @@ router.route("/dashboard").get(isCompany, async (req, res) => {
       };
     });
 
-    let qualifications = await Qualification.find({ status: true, isDeleted: false }).select('_id name').sort({ name: 1 });
+    let qualifications = await Qualification.find({ status: true, isDeleted: false }).select('_id name').sort({ level: 1, name: 1 });
     const menu = "dashboard";
     res.render(`${req.vPath}/app/corporate/dashboard`, {
       company,
@@ -430,7 +430,7 @@ router.get("/search-candidates", isCompany, async (req, res) => {
 router.get("/list-candidates", isCompany, async (req, res) => {
   let data = req.query;
   const menu = "list-candidates";
-  const qualification = await Qualification.find({ status: true }).sort({ basic: -1 })
+  const qualification = await Qualification.find({ status: true }).sort({ level: 1, name: 1 })
   const company = await Company.findOne({
     _concernPerson: req.session.user._id,
   });
@@ -657,7 +657,7 @@ router.get("/candidate/shortlisted", isCompany, async (req, res) => {
     }
     const totalPages = Math.ceil(count / perPage);
 
-    const qualification = await Qualification.find({ status: true }).sort({ basic: -1 }).select('_id name')
+    const qualification = await Qualification.find({ status: true }).select('_id name').sort({ level: 1, name: 1 })
     res.render(`${req.vPath}/app/corporate/shortlistedCandidates`, {
       menu,
       candidates: countCandidates[0].data,
@@ -930,7 +930,7 @@ router.get("/candidate/:candidateId", [isCompany], async (req, res) => {
     masked = false;
   }
 
-  const qualification = await Qualification.find({ status: true }).sort({ basic: -1 })
+  const qualification = await Qualification.find({ status: true }).sort({ level: 1, name: 1 })
   const jobs = await Vacancy.find({ _company: company._id, status: true })
   let coins = await CoinsAlgo.findOne({})
   res.render(`${req.vPath}/app/corporate/candidateProfile`, {
@@ -985,7 +985,7 @@ router.get("/newcandidate/:candidateId", [isCompany], async (req, res) => {
 
   console.log('masked', masked)
 
-  const qualification = await Qualification.find({ status: true }).sort({ basic: -1 })
+  const qualification = await Qualification.find({ status: true }).sort({ level: 1, name: 1 })
   const jobs = await Vacancy.find({ _company: company._id, status: true })
   let coins = await CoinsAlgo.findOne({})
   res.render(`${req.vPath}/app/corporate/candidateProfile_copy`, {
@@ -1233,7 +1233,7 @@ router.get("/jobs/:id", isCompany, async (req, res) => {
   ];
 
   let appliedCandidates = await AppliedJobs.find({ _job: req.params.id }).populate(populateForCandidate)
-  let qualifications = await Qualification.find({ status: true }).select('_id name');
+  let qualifications = await Qualification.find({ status: true }).select('_id name').sort({ level: 1, name: 1 });
   console.log('appliedCandidates', appliedCandidates)
   res.render(`${req.vPath}/app/corporate/view-jd`, { menu, jd, appliedCandidates, qualifications });
 });
@@ -1272,7 +1272,7 @@ router.get('/editJobs/:id', isCompany, async (req, res) => {
     const industry = await Industry.find({ status: true });
     const coinsRequired = await CoinsAlgo.findOne().select("contactcoins")
     const jobCategory = await JobCategory.find({ status: true });
-    const qualification = await Qualification.find({ status: true });
+    const qualification = await Qualification.find({ status: true }).sort({ level: 1, name: 1 });
     const techskills = await Skill.find({ type: 'technical', status: true });
     const nontechskills = await Skill.find({ type: 'non technical', status: true });
     const subQualification = await SubQualification.find({ status: true });
@@ -1570,7 +1570,7 @@ router
       const coinsRequired = await CoinsAlgo.findOne().select("contactcoins")
       const industry = await Industry.find({ status: true });
       const jobCategory = await JobCategory.find({ status: true });
-      const qualification = await Qualification.find({ status: true });
+      const qualification = await Qualification.find({ status: true }).sort({ level: 1, name: 1 });
       const subQualification = await SubQualification.find({ status: true });
       const state = await State.find({ countryId: "101" });
       const techskills = await Skill.find({ type: "technical", status: true });
@@ -2232,7 +2232,7 @@ router.get('/onGoingHiring', [isCompany], async (req, res) => {
       }
     ])
 
-    let qualifications = await Qualification.find({ status: true }).select('_id name')
+    let qualifications = await Qualification.find({ status: true }).select('_id name').sort({ level: 1, name: 1 })
     res.render(`${req.vPath}/app/corporate/onGoingHiring`, {
       menu,
       ongoingCandidates,
@@ -2504,9 +2504,7 @@ router.put("/checkvoucher", [isCompany, authenti], async (req, res) => {
 })
 router.get('/nearbyCandidates', [isCompany], async (req, res) => {
   try {
-    let qualification = await Qualification.find({ status: true }).sort({
-      basic: -1,
-    });
+    let qualification = await Qualification.find({ status: true }).sort({ level: 1, name: 1 });
     let subQualification = await SubQualification.find({ status: true })
     let skills = await Skill.find({ status: true })
     let state = await State.find({ countryId: "101", status: { $ne: false } });
