@@ -447,33 +447,60 @@ function AddJob() {
 
   // ---------- Google Places autocomplete ----------
   useEffect(() => {
+    let cancelled = false;
+    let timer = null;
     const scriptId = 'google-maps-script';
-    if (document.getElementById(scriptId)) {
-      initAutocomplete();
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyB7DDN_gUp2zyrlElXtYpjTEQobYiUB9Lg&libraries=places&v=weekly`;
-    script.async = true;
-    script.defer = true;
-    script.onload = initAutocomplete;
-    document.body.appendChild(script);
 
-    function initAutocomplete() {
-      if (!window.google || !workLocRef.current) return;
+    const initAutocomplete = () => {
+      if (cancelled) return;
+      if (!window.google?.maps?.places || !workLocRef.current) {
+        timer = window.setTimeout(initAutocomplete, 200);
+        return;
+      }
+      const hideSearchIcon = () => {
+        const widget = workLocRef.current?.parentElement?.querySelector('gmp-place-autocomplete');
+        if (!widget) return false;
+        if (!widget.querySelector('[slot="input-icon"]')) {
+          const blank = document.createElement('span');
+          blank.slot = 'input-icon';
+          blank.setAttribute('aria-hidden', 'true');
+          widget.appendChild(blank);
+        }
+        return true;
+      };
+      if (workLocRef.current.dataset.placesBound) {
+        if (!hideSearchIcon()) timer = window.setTimeout(initAutocomplete, 150);
+        return;
+      }
+      workLocRef.current.dataset.placesBound = '1';
       const autocomplete = new window.google.maps.places.Autocomplete(workLocRef.current, {
         componentRestrictions: { country: 'in' },
-        types: ['establishment'],
       });
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
-        if (!place.geometry) return;
+        if (!place?.geometry || !workLocRef.current) return;
         updateField('place', workLocRef.current.value);
         updateField('latitude', place.geometry.location.lat());
         updateField('longitude', place.geometry.location.lng());
       });
+      if (!hideSearchIcon()) timer = window.setTimeout(initAutocomplete, 150);
+    };
+
+    if (!document.getElementById(scriptId) && !window.google?.maps) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyB7DDN_gUp2zyrlElXtYpjTEQobYiUB9Lg&libraries=places&v=weekly';
+      script.async = true;
+      script.defer = true;
+      script.onload = initAutocomplete;
+      document.body.appendChild(script);
     }
+    initAutocomplete();
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
   }, []);
 
   const revealNewRow = (selector) => {
@@ -2161,7 +2188,34 @@ function AddJob() {
           pointer-events: none;
         }
         #addJobPage .work-location-field .form-control {
-          padding-left: 38px !important;
+          padding-left: 36px !important;
+        }
+        #addJobPage .work-location-field gmp-place-autocomplete.focalyt-places-input {
+          display: block;
+          width: 100%;
+          min-height: 42px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 10px;
+          background: #f8fafc;
+          color-scheme: light;
+        }
+        #addJobPage .work-location-field gmp-place-autocomplete [slot="input-icon"] {
+          display: inline-block !important;
+          width: 0 !important;
+          height: 0 !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          font-size: 0 !important;
+        }
+        #addJobPage .work-location-field gmp-place-autocomplete::part(input) {
+          /* padding-left: 36px !important; */
+          /* padding-inline-start: 36px !important; */
+          background: transparent;
+          border: 0;
+          font-size: 14px;
+          color: #1e293b;
         }
         #jd-info,
         #jd-info .card,
