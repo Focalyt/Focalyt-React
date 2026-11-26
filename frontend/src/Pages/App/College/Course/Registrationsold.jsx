@@ -106,36 +106,7 @@ const getHrDepartmentIds = (verticalOptions = []) => new Set(
     .map((opt) => String(opt.value))
 );
 
-const shouldIncludeHrLeads = ({
-  cycle = {},
-  filters = {},
-  verticalOptions = [],
-  projectOptions = [],
-  listEndpoint,
-  page,
-} = {}) => {
-  const hrDepartmentIds = getHrDepartmentIds(verticalOptions);
-  const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
-  const departmentAllowsHr = !selectedDepartmentId || hrDepartmentIds.has(selectedDepartmentId);
-  const selectedProject = (projectOptions || []).find((opt) => String(opt.value) === String(cycle?.project || ''));
-  const selectedProjectVertical = String(selectedProject?.vertical?._id || selectedProject?.vertical || '');
-  const projectAllowsHr = !cycle?.project || hrDepartmentIds.has(selectedProjectVertical);
-  const listOk = !listEndpoint || listEndpoint === 'appliedCandidates';
-  const pageOk = page == null || Number(page) === 1;
-  return Boolean(
-    listOk
-    && pageOk
-    && departmentAllowsHr
-    && projectAllowsHr
-    && !filters?.approvalStatus
-    && !filters?.aiLeadStatus
-    && !filters?.subStatuses
-    && !filters?.followupStatus
-    && !cycle?.course
-    && !cycle?.center
-    && !cycle?.batch
-  );
-};
+const shouldIncludeHrLeads = () => false;
 
 const buildHrRequestParams = ({
   filters = {},

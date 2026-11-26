@@ -15501,7 +15501,7 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 		const [allVerticals, allProjects, allCourses, allCenters] = await Promise.all([
 			Vertical.find({ college: collegeId, status: { $ne: false } }).select('_id name').lean(),
 			Project.find({ college: collegeId, status: 'active' }).select('_id name vertical').lean(),
-			Courses.find({ college: collegeId, isDeleted: { $ne: true } }).select('_id name vertical project').lean(),
+			Courses.find({ college: collegeId, status: true, isDeleted: { $ne: true } }).select('_id name vertical project').lean(),
 			Center.find({ college: collegeId, status: true }).select('_id name').lean(),
 		]);
 
