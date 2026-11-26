@@ -3558,6 +3558,9 @@ const CRMDashboard = () => {
         dateOfBirth: dob || '',
         registeredBy,
         source: selectedSource?.name || '',
+        counselorId,
+        ...(leadCoOwnerId ? { leadCoOwner: leadCoOwnerId } : {}),
+        ...(leadCoOwner2Id ? { leadCoOwner2: leadCoOwner2Id } : {}),
       }, {
         headers: {
           'x-auth': token,

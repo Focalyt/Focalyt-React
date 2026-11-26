@@ -1560,11 +1560,18 @@ router.post('/leads', isCollege, async (req, res) => {
 
     const collegeId = req.user?.college?._id || null;
     const defaultStatus = await firstHrStatus(collegeId);
+    // Manual counselor from Add Lead form wins over job HR auto-assign.
+    const manualOwnerId = toCollegeObjectId(
+      req.body.counselorId || req.body.counsellorId || req.body.leadOwner || req.body.owner || req.body.assignedTo
+    );
+    const manualCoOwnerId = toCollegeObjectId(req.body.leadCoOwner);
+    const manualCoOwner2Id = toCollegeObjectId(req.body.leadCoOwner2);
     const jobOwner = await resolveJobHrOwner({
       applyingFor,
       jobId: req.body.jobId || req.body._job,
       collegeId,
     });
+    const resolvedOwnerId = manualOwnerId || jobOwner.hrId || undefined;
 
     const jobId = toCollegeObjectId(jobOwner.jobId);
     const vacancy = jobId ? await Vacancy.findById(jobId).select('_id title _company hr').lean() : null;
@@ -1678,12 +1685,16 @@ router.post('/leads', isCollege, async (req, res) => {
       resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
       leadStatus: defaultStatus?._id || null,
       leadSubstatus: defaultStatus?.substatuses?.[0]?._id || null,
-      leadOwner: jobOwner.hrId || undefined,
-      assignedTo: jobOwner.hrId || undefined,
+      leadOwner: resolvedOwnerId,
+      assignedTo: resolvedOwnerId,
+      leadCoOwner: manualCoOwnerId || undefined,
+      leadCoOwner2: manualCoOwner2Id || undefined,
       logs: [{
         user: req.user?._id,
         action: 'Lead created',
-        remarks: source === 'manual' ? 'Added from HR panel' : source,
+        remarks: source === 'manual'
+          ? (manualOwnerId ? 'Added from HR panel (manual counselor)' : 'Added from HR panel')
+          : source,
       }],
     });
     const loaded = await loadAppliedLead(applied._id, collegeId);
