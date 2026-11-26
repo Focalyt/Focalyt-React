@@ -82,61 +82,61 @@ function createCrmInserter({
     };
   }
 
+  // A person already in the CRM keeps one profile. Each Meta submission still
+  // becomes its own application, including a repeat apply for the same job or course.
+  async function findExistingCandidate(lead) {
+    const byMobile = await candidates.findOne({ mobile: lead.mobile }).select('_id').lean();
+    if (byMobile) return byMobile;
+    if (!lead.email) return null;
+    return candidates.findOne({ email: lead.email }).select('_id').lean();
+  }
+
+  async function saveJobApplication(candidateId, mapping, job) {
+    const created = await jobApplications.create(jobApplicationPayload(candidateId, mapping, job));
+    await linkJob(candidateId, mapping.jobId);
+    return { ok: true, crmLeadId: created._id };
+  }
+
+  async function saveCourseApplication(candidateId, mapping) {
+    const created = await applications.create(applicationPayload(candidateId, mapping));
+    await linkApplication(candidateId, mapping.courseId, created._id);
+    return { ok: true, crmLeadId: created._id };
+  }
+
+  function newProfile(lead, mapping, collegeId) {
+    const profile = {
+      name: lead.name,
+      mobile: lead.mobile,
+      whatsapp: lead.whatsapp || lead.mobile,
+      source: mapping.leadSource,
+      isImported: true,
+      verified: true,
+    };
+    if (lead.email) profile.email = lead.email;
+    if (lead.sex) profile.sex = lead.sex;
+    if (collegeId) profile.college = collegeId;
+    return profile;
+  }
+
   async function insertJobLead(mapping, lead) {
     const job = await vacancies.findById(mapping.jobId).select('title _company status').lean();
     if (!job || job.status === false) {
       return { ok: false, retry: false, message: 'The mapped job was not found.' };
     }
-    const existing = await candidates.findOne({ mobile: lead.mobile }).select('_id').lean();
-    if (existing) {
-      const applied = await jobApplications.findOne({
-        _candidate: existing._id,
-        _job: mapping.jobId,
-        isDeleted: { $ne: true },
-      }).select('_id').lean();
-      if (applied) return { ok: true, duplicate: true, crmLeadId: applied._id };
-      const created = await jobApplications.create(jobApplicationPayload(existing._id, mapping, job));
-      await linkJob(existing._id, mapping.jobId);
-      return { ok: true, crmLeadId: created._id };
-    }
-    if (lead.email) {
-      const byEmail = await candidates.findOne({ email: lead.email }).select('_id').lean();
-      if (byEmail) {
-        return {
-          ok: false,
-          retry: false,
-          message: 'A candidate with this email already exists.',
-        };
-      }
-    }
+    const existing = await findExistingCandidate(lead);
+    if (existing) return saveJobApplication(existing._id, mapping, job);
     await ensureLogin(lead);
     let candidate = null;
     try {
-      const profile = {
-        name: lead.name,
-        mobile: lead.mobile,
-        whatsapp: lead.whatsapp || lead.mobile,
-        source: mapping.leadSource,
-        isImported: true,
-        verified: true,
-      };
-      if (lead.email) profile.email = lead.email;
-      if (lead.sex) profile.sex = lead.sex;
-      if (mapping.collegeId) profile.college = mapping.collegeId;
-      candidate = await candidates.create(profile);
-      const applied = await jobApplications.create(jobApplicationPayload(candidate._id, mapping, job));
-      await linkJob(candidate._id, mapping.jobId);
-      return { ok: true, crmLeadId: applied._id };
+      candidate = await candidates.create(newProfile(lead, mapping, mapping.collegeId));
+      return await saveJobApplication(candidate._id, mapping, job);
     } catch (error) {
       if (candidate && candidate._id) {
         await candidates.deleteOne({ _id: candidate._id });
       }
       if (error && error.code === 11000) {
-        return {
-          ok: false,
-          retry: false,
-          message: 'A candidate with this mobile already exists.',
-        };
+        const again = await findExistingCandidate(lead);
+        if (again) return saveJobApplication(again._id, mapping, job);
       }
       return { ok: false, retry: true, message: 'The CRM lead could not be saved.' };
     }
@@ -156,57 +156,21 @@ function createCrmInserter({
       return { ok: false, retry: false, message: 'The mapped course was not found.' };
     }
 
-    const existing = await candidates.findOne({ mobile: lead.mobile }).select('_id').lean();
-    if (existing) {
-      const applied = await applications.findOne({
-        _candidate: existing._id,
-        _course: mapping.courseId,
-      }).select('_id').lean();
-      if (applied) return { ok: true, duplicate: true, crmLeadId: applied._id };
-      const created = await applications.create(applicationPayload(existing._id, mapping));
-      await linkApplication(existing._id, mapping.courseId, created._id);
-      return { ok: true, crmLeadId: created._id };
-    }
-
-    if (lead.email) {
-      const byEmail = await candidates.findOne({ email: lead.email }).select('_id').lean();
-      if (byEmail) {
-        return {
-          ok: false,
-          retry: false,
-          message: 'A candidate with this email already exists.',
-        };
-      }
-    }
+    const existing = await findExistingCandidate(lead);
+    if (existing) return saveCourseApplication(existing._id, mapping);
 
     await ensureLogin(lead);
     let candidate = null;
     try {
-      const profile = {
-        name: lead.name,
-        mobile: lead.mobile,
-        whatsapp: lead.whatsapp || lead.mobile,
-        source: mapping.leadSource,
-        isImported: true,
-        verified: true,
-      };
-      if (lead.email) profile.email = lead.email;
-      if (lead.sex) profile.sex = lead.sex;
-      if (course.college) profile.college = course.college;
-      candidate = await candidates.create(profile);
-      const applied = await applications.create(applicationPayload(candidate._id, mapping));
-      await linkApplication(candidate._id, mapping.courseId, applied._id);
-      return { ok: true, crmLeadId: applied._id };
+      candidate = await candidates.create(newProfile(lead, mapping, course.college));
+      return await saveCourseApplication(candidate._id, mapping);
     } catch (error) {
       if (candidate && candidate._id) {
         await candidates.deleteOne({ _id: candidate._id });
       }
       if (error && error.code === 11000) {
-        return {
-          ok: false,
-          retry: false,
-          message: 'A candidate with this mobile already exists.',
-        };
+        const again = await findExistingCandidate(lead);
+        if (again) return saveCourseApplication(again._id, mapping);
       }
       return { ok: false, retry: true, message: 'The CRM lead could not be saved.' };
     }
