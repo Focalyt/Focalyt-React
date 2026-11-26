@@ -59,6 +59,7 @@ router.post('/club/register', commonFunc.clubRegister);
 router.post('/club-admin/register', commonFunc.clubRegister);
 router.post('/sendOtptoRegister', commonFunc.sendOtptoRegister);
 router.post('/publicApply', commonFunc.publicApply);
+router.post('/checkCandidateMobile', commonFunc.checkCandidateMobile);
 router.use('/public', publicLrpLeadRoutes);
 
 router.use('/', frontRoutes);

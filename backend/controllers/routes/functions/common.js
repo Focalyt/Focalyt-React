@@ -182,6 +182,21 @@ module.exports.sendCandidateOtp = async (req, res) => {
   }
 };
 
+module.exports.checkCandidateMobile = async (req, res) => {
+  try {
+    const digits = String(req.body?.mobile || '').replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      return res.send({ status: false, message: 'Valid mobile number is required.' });
+    }
+    const mobileValues = mobileLookupValues(digits);
+    const user = await User.findOne({ mobile: { $in: mobileValues }, role: { $in: [3, '3'] } }).select('_id');
+    const candidate = await Candidate.findOne({ mobile: { $in: mobileValues }, isDeleted: { $ne: true } }).select('_id');
+    return res.send({ status: true, newUser: !user && !candidate });
+  } catch (err) {
+    return req.errFunc(err);
+  }
+};
+
 module.exports.sendOtptoRegisterCandidate = async (req, res) => {
   try {
 

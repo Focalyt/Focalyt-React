@@ -198,6 +198,9 @@ function PublicApplyModal() {
   const [rulesLoading, setRulesLoading] = useState(false);
   const [docFiles, setDocFiles] = useState({});
   const [isNewUser, setIsNewUser] = useState(true);
+  const [mobileChecked, setMobileChecked] = useState(false);
+  const [checkingMobile, setCheckingMobile] = useState(false);
+  const [mobileCheckError, setMobileCheckError] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -230,6 +233,9 @@ function PublicApplyModal() {
     setRulesLoading(false);
     setDocFiles({});
     setIsNewUser(true);
+    setMobileChecked(false);
+    setCheckingMobile(false);
+    setMobileCheckError("");
     setOtpSent(false);
     setOtpVerified(false);
     setSendingOtp(false);
@@ -255,7 +261,45 @@ function PublicApplyModal() {
   }, [target, resetForm]);
 
   const otpPassed = !OTP_ENABLED || otpVerified;
-  const showProfileFields = Boolean(target) && otpPassed && isNewUser;
+  const showProfileFields = Boolean(target) && otpPassed && mobileChecked && isNewUser;
+
+  useEffect(() => {
+    if (!target || !/^[6-9]\d{9}$/.test(mobile)) {
+      setCheckingMobile(false);
+      setMobileChecked(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setCheckingMobile(true);
+    setMobileChecked(false);
+    setMobileCheckError("");
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await axios.post(`${backendUrl}/api/checkCandidateMobile`, { mobile });
+        if (cancelled) return;
+        if (!res.data?.status) {
+          const message = res.data?.message;
+          setMobileCheckError(typeof message === "string" ? message : "Could not check this mobile number.");
+          setMobileChecked(false);
+          return;
+        }
+        setIsNewUser(Boolean(res.data.newUser));
+        setMobileChecked(true);
+        setMobileCheckError("");
+      } catch (err) {
+        if (cancelled) return;
+        const message = err.response?.data?.message || "Could not check this mobile number.";
+        setMobileCheckError(typeof message === "string" ? message : "Could not check this mobile number.");
+        setMobileChecked(false);
+      } finally {
+        if (!cancelled) setCheckingMobile(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [mobile, target, backendUrl]);
 
   useEffect(() => {
     if (!target) return undefined;
@@ -588,6 +632,10 @@ function PublicApplyModal() {
       setError("Please enter a valid 10-digit mobile number.");
       return;
     }
+    if (checkingMobile || !mobileChecked) {
+      setError(mobileCheckError || "Please wait while we check your mobile number.");
+      return;
+    }
     // OTP check is skipped while OTP_ENABLED is false.
     if (OTP_ENABLED && !otpVerified) {
       setError("Please verify the OTP before submitting.");
@@ -875,7 +923,11 @@ function PublicApplyModal() {
                   placeholder="Enter mobile number"
                   value={mobile}
                   disabled={OTP_ENABLED && otpSent}
-                  onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => {
+                    setMobile(e.target.value.replace(/\D/g, "").slice(0, 10));
+                    setMobileChecked(false);
+                    setMobileCheckError("");
+                  }}
                 />
               </Field>
               {/* OTP paused. Set OTP_ENABLED to true to show Send OTP again. */}
@@ -922,7 +974,13 @@ function PublicApplyModal() {
             </button>
           ) : null}
 
-          {otpPassed && isNewUser ? (
+          {checkingMobile ? <p className="pam-rules-note">Checking mobile number...</p> : null}
+          {mobileCheckError ? <p className="pam-alert pam-alert--error">{mobileCheckError}</p> : null}
+          {otpPassed && mobileChecked && !isNewUser ? (
+            <p className="pam-rules-note">This number is already registered. Submit to apply with your existing profile.</p>
+          ) : null}
+
+          {showProfileFields ? (
           <>
           <label className="pam-line">
             <span>Full Name <i>*</i></span>
@@ -1003,7 +1061,7 @@ function PublicApplyModal() {
           </>
           ) : null}
 
-          {otpPassed && target.kind === "job" ? (
+          {otpPassed && mobileChecked && target.kind === "job" ? (
             <div className="pam-job-rules">
               {rulesLoading ? <p className="pam-rules-note">Checking this job's requirements...</p> : null}
               {Array.isArray(jobRules?.docs) && jobRules.docs.length ? (
@@ -1028,7 +1086,7 @@ function PublicApplyModal() {
             </div>
           ) : null}
 
-          {otpPassed && isNewUser ? (
+          {showProfileFields ? (
           <>
           <label className="pam-check">
             <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
@@ -1042,7 +1100,7 @@ function PublicApplyModal() {
           </>
           ) : null}
 
-          {otpPassed && !isNewUser ? (
+          {otpPassed && mobileChecked && !isNewUser ? (
             <button type="submit" className="pam-submit" disabled={submitting || applied}>
               {applied ? "Application submitted" : submitting ? "Submitting..." : "Submit Application"}
               <span aria-hidden="true">→</span>

@@ -167,6 +167,7 @@ commonRoutes.post("/otpClubLogin", commonFunc.loginAsClub);
 commonRoutes.post("/clubLogin", commonFunc.clubLogin);
 commonRoutes.post("/clubRegister", commonFunc.clubRegister);
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
+commonRoutes.post("/checkCandidateMobile", commonFunc.checkCandidateMobile);
 commonRoutes.post("/publicApply", commonFunc.publicApply);
 commonRoutes.get("/sectorList", commonFunc.sectorList);
 commonRoutes.get("/centerList", commonFunc.centerList);
