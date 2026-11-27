@@ -813,52 +813,41 @@ const CandidateLogin = () => {
                                     <div className="alert alert-success">{successMessage}</div>
                                 )}
 
-                                {/* Partners Slider */}
+                                {/* Partners Slider — logos duplicated once for a seamless loop */}
                                 <h3 className="my-3">Our Partners</h3>
                                 <div className="slider py-0">
                                     <div className="slide-track-1">
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/cashback-login.png" className="img-fluid login-border" alt="cashback" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/arms.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/utl_solar.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/dixon.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/quess.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/mankind.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/methodex.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/bodycare.jpg" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/htw.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/maple.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/satya.jpg" alt="Focalyt partner" draggable="false" className="px-0" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/arms.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/dixon.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
-                                        <div className="slide">
-                                            <img src="/Assets/images/logo/quess.png" alt="Focalyt partner" draggable="false" />
-                                        </div>
+                                        {[
+                                            'arms.png',
+                                            'utl_solar.png',
+                                            'dixon.png',
+                                            'quess.png',
+                                            'mankind.jpg',
+                                            'methodex.jpg',
+                                            'bodycare.jpg',
+                                            'htw.jpg',
+                                            'maple.jpg',
+                                            'satya.jpg',
+                                        ].concat([
+                                            'arms.png',
+                                            'utl_solar.png',
+                                            'dixon.png',
+                                            'quess.png',
+                                            'mankind.jpg',
+                                            'methodex.jpg',
+                                            'bodycare.jpg',
+                                            'htw.jpg',
+                                            'maple.jpg',
+                                            'satya.jpg',
+                                        ]).map((file, i) => (
+                                            <div className="slide" key={`${file}-${i}`}>
+                                                <img
+                                                    src={`/Assets/images/logo/${file}`}
+                                                    alt="Focalyt partner"
+                                                    draggable="false"
+                                                />
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
 
@@ -877,7 +866,10 @@ const CandidateLogin = () => {
                 {`
                 .marginLeft{
                     margin-left:0px!important;
-                    overflow-x: hidden;
+                    overflow-x: hidden !important;
+                }
+                .blank-page .card.rounded {
+                    overflow: hidden;
                 }
                 .swiper-pagination-bullet{
                     width: 5px;
@@ -945,148 +937,101 @@ const CandidateLogin = () => {
                 {
 
                     `
-                    .blank-page{
-   background:url(/Assets/images/logo/rename.webp) repeat; 
-//   background:url(../../../../../public/Assets/public/images/logo/rename.webp) repeat;
-    background-size: auto;
-  background-size: contain!important;
-  height:100vh;
+.blank-page {
+  background: url(/Assets/images/logo/rename.webp) repeat;
+  background-size: contain !important;
+  min-height: 100vh;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
-/* .blank-page {
-  margin: 0px !important;
-  height: 100vh!important;
-}    */
+.content-wrapper.mt-4 {
+  margin-top: 1rem !important;
+  padding-bottom: 1.5rem;
+}
 
-.text-primary{
-  color: #FC2B5A!important;
+.text-primary {
+  color: #FC2B5A !important;
 }
-/* .btn{
-  border: 1px solid #FC2B5A!important;
-} */
-.card-title.text-center.mb-0{
-    border-top: 3px solid #f2f0f8;
-    border-bottom: 3px solid #f2f0f8;
+
+.card-title.text-center.mb-0 {
+  border-top: 3px solid #f2f0f8;
+  border-bottom: 3px solid #f2f0f8;
 }
+
 .carousel-gallery {
-    margin: 20px 0;
+  margin: 20px 0;
 }
-.carousel-gallery img{
-    border-radius: 10px;
+
+.carousel-gallery img {
+  border-radius: 10px;
 }
-.carousel-gallery .swiper-pagination-horizontal{
-    position: relative;
-    top: 0!important;
+
+.carousel-gallery .swiper-pagination-horizontal {
+  position: relative;
+  top: 0 !important;
 }
 
 .nav.nav-tabs {
-    border: none;
-    margin-bottom: 1rem;
-    position: relative;
-    border-radius: 0;
+  border: none;
+  margin-bottom: 1rem;
+  position: relative;
+  border-radius: 0;
 }
 
-/* login page slider  */
+/* login page partners marquee */
+.slider {
+  background: transparent;
+  margin: 0 auto;
+  overflow: hidden;
+  position: relative;
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+  width: 100%;
+}
 
-#login-partner{
-    font-weight: 600;
-    color: #FC2B5A;
-  }
-  .slider {
-    background: transparent;
-    /* height: 60pt!important; */
-    margin: 0 auto;
-    overflow: hidden;
-    position: relative;
-    cursor: default;
-    user-select: none;
-    touch-action: none;
-  }
-  
-  .slider:before {
-    left: 0;
-    top: 0;
-  }
-  .slider:after,
-  .slider:before {
-    background: transparent;
-    content: "";
-    height: auto;
-    position: absolute;
-    width: 200px;
-    z-index: 2;
-  }
-  .slider:after {
-    right: 0;
-    top: 0;
-    transform: rotateZ(180deg);
-  }
-  .slider:after,
-  .slider:before {
-    background: transparent;
-    content: "";
-    height: auto;
-    position: absolute;
-    width: 200px;
-    z-index: 2;
-  }
-  
-  .slider .slide-track-1 {
-    animation: scroll-l 37s linear infinite;
-    display: flex;
-    width: 3500px;
-  }
-  .slider .slide-track-2 {
-    animation: scroll-r 30s linear infinite;
-    display: flex;
-    width: 3500px;
-  }
-  
-  .slider .slide {
-    height: 45pt;
-    width: 180px!important;
-    display: flex;
-    align-items: center;
-    text-align: center;
-  }
-  .slider .slide img {
-    width: 150px;
-    padding: 0px 10px;
-    vertical-align: middle;
-    margin: 0 auto;
-    display: inline-block;
-    max-width: 100%;
-    height: auto;
-  }
-  
-  @keyframes scroll-l {
-    0% {
-        transform: translateX(0);
-    }
-    100% {
-        transform: translateX(calc(-250px * 7));
-    }
-  }
-  @keyframes scroll-r {
-    100% {
-        transform: translateX(0);
-    }
-    0% {
-        transform: translateX(calc(-250px * 7));
-    }
-  }
-  /* login page slider end */
-  .card-title.text-center.mb-0 {
-    border-top: 3px solid #f2f0f8;
-    border-bottom: 3px solid #f2f0f8;
-  }
-  .readyMinds{
-    margin: 0;
-    padding-block: 5px;
-  }
-    .datepicker-input-wrapper{
-    width: 100%;
-    }
+.slider .slide-track-1 {
+  animation: scroll-l 40s linear infinite;
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.slider .slide {
+  flex: 0 0 180px;
+  width: 180px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.slider .slide img {
+  width: 140px;
+  max-height: 48px;
+  padding: 0 10px;
+  margin: 0 auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* Exactly -50%: logos are duplicated once, so the loop resets seamlessly */
+@keyframes scroll-l {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.readyMinds {
+  margin: 0;
+  padding-block: 5px;
+}
+
+.datepicker-input-wrapper {
+  width: 100%;
+}
                     `
                 }
             </style>

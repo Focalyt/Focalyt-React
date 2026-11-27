@@ -753,9 +753,11 @@ router
 router.get("/login", async (req, res) => {
   let user = req.session.user
   if (user && user.role == 1) {
-    res.redirect("/company/dashboard");
+    return res.redirect("/company/dashboard");
   }
-  res.render(`${req.vPath}/app/corporate/login`);
+  console.log('req.vPath',req.vPath)
+  return res.render(`${req.vPath}/app/corporate/login`);
+  console.log('req.vPath2',req.vPath)
 });
 router.get("/get-all-candidates", [isCompany], async (req, res) => {
   const candidates = await CandidateRegister.find({});

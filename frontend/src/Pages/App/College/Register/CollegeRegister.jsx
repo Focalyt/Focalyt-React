@@ -321,8 +321,7 @@ const CollegeRegister = ({ embedded = false }) => {
                                 // window.location.href = decodeURIComponent(returnUrl);
                                 navigate(decodeURIComponent(returnUrl));
                             } else {
-                                // window.location.href = "/institute/dashboard";
-                                navigate("/institute/dashboard");
+                                navigate("/institute/registration");
                             }
 
                         } else {
