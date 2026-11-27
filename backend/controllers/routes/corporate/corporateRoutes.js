@@ -97,11 +97,9 @@ router.route('/')
   .get(async (req, res) => {
     let user = req.session.user
     if (user && user.role === 1) {
-      res.redirect("/company/dashboard");
+      return res.redirect(`${process.env.MIPIE_BACKEND_URL}/company/dashboard`);
     }
-    else {
-      res.redirect("/company/login");
-    }
+    return res.redirect(`${process.env.MIPIE_BACKEND_URL}/company/login`);
   })
 
 router.route("/dashboard").get(isCompany, async (req, res) => {
@@ -753,11 +751,10 @@ router
 router.get("/login", async (req, res) => {
   let user = req.session.user
   if (user && user.role == 1) {
-    return res.redirect("/company/dashboard");
+    return res.redirect(`${process.env.MIPIE_BACKEND_URL}/company/dashboard`);
   }
   console.log('req.vPath',req.vPath)
   return res.render(`${req.vPath}/app/corporate/login`);
-  console.log('req.vPath2',req.vPath)
 });
 router.get("/get-all-candidates", [isCompany], async (req, res) => {
   const candidates = await CandidateRegister.find({});
