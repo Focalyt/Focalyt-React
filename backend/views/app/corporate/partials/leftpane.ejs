@@ -1,22 +1,22 @@
 <aside class="recruiter-sidebar" id="recruiter-sidebar" aria-label="Company workspace">
   <a class="recruiter-brand" href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">
     <img src="<%= process.env.MIPIE_BACKEND_URL %>/images/logo/logo.png" alt="Focalyt">
-    <small>RECRUITER</small>
+    <small>Recruiter</small>
   </a>
-  <div class="recruiter-nav-label">TALENT ACQUISITION</div>
+  <div class="recruiter-nav-label">Talent acquisition</div>
   <nav aria-label="Company navigation">
     <% const recruiterLinks = [
       ['dashboard', '/dashboard', 'airplay', 'Dashboard'],
-      ['list-candidates', '/list-candidates', 'search', 'Search Candidates'],
-      ['jobs', '/list/jobs', 'file-text', 'Jobs & Responses'],
-      ['interested-candidates', '/interested-candidates', 'heart', 'Interested Candidates'],
-      ['nearbyCandidates', '/nearbyCandidates', 'map-pin', 'Candidates Near Me'],
-      ['shortlisted-candidates', '/candidate/shortlisted', 'award', 'Shortlisted Candidates'],
-      ['ongoing-candidates', '/onGoingHiring', 'briefcase', 'On Going Hiring'],
+      ['list-candidates', '/list-candidates', 'search', 'Search candidates'],
+      ['jobs', '/list/jobs', 'file-text', 'Jobs & responses'],
+      ['interested-candidates', '/interested-candidates', 'heart', 'Interested candidates'],
+      ['nearbyCandidates', '/nearbyCandidates', 'map-pin', 'Candidates near me'],
+      ['shortlisted-candidates', '/candidate/shortlisted', 'award', 'Shortlisted candidates'],
+      ['ongoing-candidates', '/onGoingHiring', 'briefcase', 'Ongoing hiring'],
       ['status', '/status', 'flag', 'Status'],
       ['milestone', '/milestone', 'check-circle', 'Milestones'],
       ['Notifications', '/notifications', 'bell', 'Notifications'],
-      ['myProfile', '/myProfile', 'user', 'Your Profile']
+      ['myProfile', '/myProfile', 'user', 'Your profile']
     ]; %>
     <% recruiterLinks.forEach(function(link) {
       const active = link[0] === 'jobs' ? ['jobList', 'view-jd', 'addjobs', 'edit-jd'].includes(menu) : link[0] === menu;

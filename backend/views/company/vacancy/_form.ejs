@@ -1,0 +1,164 @@
+<% const details = isEditingVacancy ? vacancy : {}; %>
+<form class="form-horizontal company-vacancy-form" action="" method="post" id="formData">
+  <div id="personal-info">
+    <fieldset class="company-vacancy-section">
+      <legend>Role</legend>
+      <div class="company-vacancy-fields">
+        <label>Job name <span class="mandatory">*</span>
+          <input type="text" class="form-control" maxlength="50" name="name" value="<%= details.name %>" required>
+        </label>
+        <label>Type of vacancy <span class="mandatory">*</span>
+          <select class="form-control<%= isEditingVacancy ? ' text-capitalize' : '' %>" name="_vacancyType" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% vacancyType.forEach(v => { %>
+              <option value="<%= v._id %>" class="text-capitalize" <%= isEditingVacancy && String(v._id) === String(details._vacancyType) ? 'selected' : '' %>><%= v.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label for="industry">Industry <span class="mandatory">*</span>
+          <select class="form-control<%= isEditingVacancy ? ' text-capitalize' : '' %>" name="_industry" id="industry" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% industry.forEach(n => { %>
+              <option value="<%= n._id %>" class="text-capitalize" <%= isEditingVacancy && String(n._id) === String(details._industry) ? 'selected' : '' %>><%= n.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label>Number of positions <span class="mandatory">*</span>
+          <select class="form-control" name="noOfPosition" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% for (let i = 1; i <= 20; i++) { %>
+              <option value="<%= i %>" <%= i === details.noOfPosition ? 'selected' : '' %>><%= i %></option>
+            <% } %>
+          </select>
+        </label>
+        <label>Package <span class="mandatory">*</span>
+          <input type="text" class="form-control" maxlength="50" name="package" value="<%= isEditingVacancy ? details.package || 'NA' : '' %>" required>
+        </label>
+        <label class="company-vacancy-wide">Description
+          <textarea class="form-control" maxlength="100" cols="3" rows="3" name="description"><%= isEditingVacancy ? '\n' + (details.description || 'NA') : '' %></textarea>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="company-vacancy-section">
+      <legend>Location</legend>
+      <div class="company-vacancy-fields">
+        <label for="country">Country <span class="mandatory">*</span>
+          <select class="form-control<%= isEditingVacancy ? ' text-capitalize' : '' %>" name="countryId" id="country" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% country.forEach(i => { %>
+              <option value="<%= i.countryId %>" class="text-capitalize" <%= i.countryId === details.countryId ? 'selected' : '' %>><%= i.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label for="state">State <span class="mandatory">*</span>
+          <select class="form-control" name="stateId" id="state" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% if (isEditingVacancy) { state.forEach(s => { %>
+              <option value="<%= s.stateId %>" <%= s.stateId === details.stateId ? 'selected' : '' %>><%= s.name %></option>
+            <% }); } %>
+          </select>
+        </label>
+        <label for="city">City <span class="mandatory">*</span>
+          <select class="form-control" name="cityId" id="city" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% if (isEditingVacancy) { city.forEach(s => { %>
+              <option value="<%= s.cityId %>" <%= s.cityId === details.cityId ? 'selected' : '' %>><%= s.name %></option>
+            <% }); } %>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="company-vacancy-section">
+      <legend>Candidate requirements</legend>
+      <div class="company-vacancy-fields">
+        <label for="qual">Course <span class="mandatory">*</span>
+          <select class="form-control<%= isEditingVacancy ? ' text-capitalize' : '' %>" name="_qualification" id="qual" required>
+            <option value="" <%= isEditingVacancy ? 'disabled' : '' %>>Select option</option>
+            <% qualification.forEach(q => { %>
+              <option value="<%= q._id %>" class="text-capitalize" <%= isEditingVacancy && String(q._id) === String(details._qualification) ? 'selected' : '' %>><%= q.name %></option>
+            <% }); %>
+          </select>
+        </label>
+        <label for="subQua">Stream <span class="mandatory">*</span>
+          <select class="form-control<%= isEditingVacancy ? ' text-capitalize' : '' %>" name="_subQualification" id="subQua" required>
+            <% if (isEditingVacancy) { %>
+              <option disabled>Select option</option>
+              <% subqual.forEach(q => { %>
+                <option value="<%= q._id %>" <%= String(q._id) === String(details._subQualification) ? 'selected' : '' %>><%= q.name %></option>
+              <% }); %>
+            <% } else { %>
+              <option disabled value="-">Select option</option>
+            <% } %>
+          </select>
+        </label>
+        <div class="form-group">
+          <span class="company-vacancy-field-label">Skills <span class="mandatory">*</span></span>
+          <select class="selectpicker form-control<%= isEditingVacancy ? ' text-capitalize' : '' %>" aria-label="Skills" title="Select skills" data-actions-box="true" multiple required name="_skills">
+            <% skill.forEach(s => { %>
+              <option value="<%= s._id %>" class="text-capitalize" <%= isEditingVacancy && (details._skills || []).indexOf(s._id) >= 0 ? 'selected' : '' %>><%= s.name %></option>
+            <% }); %>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="company-vacancy-section">
+      <legend>Contact</legend>
+      <div class="company-vacancy-fields">
+        <label>Concerned person <span class="mandatory">*</span>
+          <input type="text" class="form-control" maxlength="50" name="concernedPerson" value="<%= isEditingVacancy ? details.concernedPerson || 'NA' : '' %>" required>
+        </label>
+        <label>Designation <span class="mandatory">*</span>
+          <input type="text" class="form-control" maxlength="50" name="designation" value="<%= isEditingVacancy ? details.designation || 'NA' : '' %>" required>
+        </label>
+        <label>Email <span class="mandatory">*</span>
+          <input class="form-control" type="email" maxlength="50" name="email" value="<%= isEditingVacancy ? details.email || 'NA' : '' %>" required>
+        </label>
+        <label>Contact number <span class="mandatory">*</span>
+          <input class="form-control" type="text" name="mobile" minlength="10" maxlength="13" pattern="^[\+\d]?(?:[\d-.\s()]*)$" value="<%= isEditingVacancy ? details.mobile || 'NA' : '' %>" required>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="company-vacancy-section">
+      <legend>Dates and image</legend>
+      <div class="company-vacancy-fields">
+        <label>Opening date <span class="mandatory">*</span>
+          <input type="date" class="form-control" name="openingDate" value="<%= isEditingVacancy ? moment(details.openingDate).format('YYYY-MM-DD') : '' %>" required>
+        </label>
+        <label>Closing date <span class="mandatory">*</span>
+          <input type="date" class="form-control" name="closingDate" value="<%= isEditingVacancy ? moment(details.closingDate).format('YYYY-MM-DD') : '' %>" required>
+        </label>
+        <div class="company-vacancy-wide">
+          <div class="row" id="document">
+            <% if (details.document) { %>
+              <div class="col-xl-12 col-md-12 col-sm-12 col-12 mt-1">
+                <img src="https://mmt-alls-1.s3.ap-south-1.amazonaws.com/<%= details.document %>" width="40" height="40" alt="Vacancy image">
+                <input type="hidden" name="document" value="<%= details.document %>">
+                <p class="mt-1 text-left">
+                  <a class="rmvClass text-danger" href="javascript:void(0)">Remove</a>
+                  <a class="text-primary mr-2" target="_blank" href="https://mmt-alls-1.s3.ap-south-1.amazonaws.com/<%= details.document %>">View</a>
+                </p>
+              </div>
+            <% } %>
+            <div class="col-xl-12 col-md-12 col-sm-12 col-12 firstImage <%= details.document ? 'd-none' : '' %>">
+              <div class="image-upload">
+                <label for="filestwo">
+                  <img src="/images/add_receipt.png" width="40" id="outputtwo" alt="">
+                  <span>Upload image</span>
+                </label>
+                <input data-id="document" type="file" id="filestwo" onchange="validateFileType()" name="filebrand" class="my-logo-uploader form-control">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+  </div>
+  <div class="text-right vaccency company-vacancy-actions">
+    <button type="submit" class="btn btn-success">Save</button>
+    <button type="button" onclick="reset()" class="btn btn-danger">Reset</button>
+  </div>
+</form>

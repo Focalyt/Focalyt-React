@@ -1,5 +1,5 @@
 <% include ../partials/header %>
-  <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header row">
     <div class="content-header-left col-md-9 col-12 mb-2">
       <div class="row breadcrumbs-top">
         <div class="col-12">
@@ -18,120 +18,81 @@
   </div>
   <div class="content-body">
     <% include ../partials/flash %>
-      <section class="list-view">
+      <section class="list-view company-vacancy-list">
         <div class="row">
           <div class="col-12 rounded equal-height-2 coloumn-2">
             <div class="card">
-              <div class="row p-1">
-                <div class="col-xl-6">
-                  <div class="row">
-                    <div class="archieve">
-                      <input style="margin-bottom: 4px;" type="checkbox" onclick="archived()" <%- isChecked=="true"
-                        ? "checked" : '' %>
-                      id="checkbox1">
-                      &nbsp;
-                      <p>Show Archived</p>
-                    </div>
-                  </div>
-                </div>
-                <!-- <div class="col-xl-6">
-                  <div class="archieveOuter">
-                    <div class="archieve">
-                      <p>Show Archived</p>
-
-                      <input type="checkbox" onclick="archived()" <%- isChecked=="true" ? "checked" : '' %>
-                      id="checkbox1">
-                    </div>
-                  </div>
-                </div> -->
-                <!-- <div class="col-xl-6">
-             <div class="row">
-                 <div class="col-xl-12 text-right">
-                     <a href="" class="btn btn-outline-success">Import</a>
-                     <a href="" class="btn btn-outline-primary">Export</a>
-                   </div>
-             </div>
-         </div> -->
+              <div class="company-vacancy-toolbar">
+                <label for="checkbox1">
+                  <input type="checkbox" onclick="archived()" <%= isChecked === 'true' ? 'checked' : '' %> id="checkbox1">
+                  Show archived
+                </label>
               </div>
               <div class="card-content">
                 <div class="table-responsive">
-                  <% if (vacancies && vacancies.length> 0) { %>
-                    <table class="table table-hover-animation mb-0 table-hover">
-                      <thead>
-                        <tr>
-                          <th>Name</th>
-                          <th>Company</th>
-                          <th>Industry</th>
-                          <th>Last Date</th>
-                          <th>Type</th>
-                          <th>Action</th>
+                  <% if (vacancies && vacancies.length > 0) { %>
+                    <% const today = moment().startOf('day'); %>
+                    <table class="table table-hover-animation mb-0 table-hover" role="table" aria-label="Vacancies">
+                      <thead role="rowgroup">
+                        <tr role="row">
+                          <th scope="col" role="columnheader">Name</th>
+                          <th scope="col" role="columnheader">Company</th>
+                          <th scope="col" role="columnheader">Industry</th>
+                          <th scope="col" role="columnheader">Closing date</th>
+                          <th scope="col" role="columnheader">Type</th>
+                          <th scope="col" role="columnheader">Actions</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        <% let count=0 %>
-                          <% vacancies.forEach((l, i)=> { %>
-                            <tr>
-                              <td class="text-capitalize">
-                                <%= l.name %>
-                              </td>
-                              <td class="text-capitalize">
-                                <!-- <% if (l._company.logo) { %>
-                                  <img src="https://mmt-all.s3.ap-south-1.amazonaws.com/<%= l._company.logo %>"
-                                    width="60">
-                                  <%} %> -->
-                                <%=l._company.name %>
-                              </td>
-                              <td class="text-capitalize">
-                                <%= l._industry.name %>
-                              </td>
-                              <% const aDate=moment(l.closingDate).format('DD-MM-YYYY'); %>
-                                <td class="text-capitalize">
-                                  <%= aDate %>
-                                </td>
-                                <!-- <%=l._vacancyType.name%> -->
-                                <!-- vacancyType  -->
-                                <td class="text-capitalize">
-                                  <%= l._vacancyType.name %>
-                                </td>
-
-                                <td class="qualification-action-custom-class">
-                                  <% if (isChecked=="true" ){ %>
-                                    <a style="display:flex;align-items:center"><i
-                                        onclick="deleteArchieve('<%= l._id %>', '<%= l.isDeleted%>', 'vacancy');"
-                                        class="feather icon-trash-2 fa-lg primary"></i></a>
-                                    <%}else{%>
-                                      <div class="custom-control custom-switch custom-control-inline"
-                                        style="display:flex;align-items:center">
-                                        <% if(l.status) { %>
-                                          <input type="checkbox"
-                                            onclick="myOnOffFunc('<%= l._id %>', '<%= l.status %>', 'vacancy');"
-                                            class="custom-control-input" id="customSwitch<%= i %>" checked>
-                                          <label class="custom-control-label" for="customSwitch<%= i %>">
-                                          </label>
-                                          <% } else { %>
-                                            <input type="checkbox"
-                                              onclick="myOnOffFunc('<%= l._id %>', '<%= l.status %>', 'vacancy');"
-                                              class="custom-control-input" id="customSwitch<%= i %>">
-                                            <label class="custom-control-label" for="customSwitch<%= i %>">
-                                            </label>
-                                            <% } %>
-                                      </div>
-                                      <a style="padding-right:5px; display:flex;align-items:center"
-                                        href="/panel/company/vacancy/edit/<%= l._id %>">
-                                        <i class="feather icon-edit fa-lg primary"></i>
-                                      </a>
-                                      <a style="display:flex;align-items:center"><i
-                                          onclick="deleteRecord('<%= l._id %>', '<%= l.status %>', 'vacancy');"
-                                          class="feather icon-trash-2 fa-lg primary"></i></a>
-                                      <%};%>
-                                </td>
-                            </tr>
-                            <% }) %>
+                      <tbody role="rowgroup">
+                        <% vacancies.forEach((l, i) => {
+                          const closing = l.closingDate ? moment(l.closingDate).startOf('day') : null;
+                          const hasClosingDate = closing && closing.isValid();
+                          const daysLeft = hasClosingDate ? closing.diff(today, 'days') : null;
+                          const dateStatus = !hasClosingDate || daysLeft < 0 ? 'closed' : daysLeft <= 3 ? 'soon' : 'open';
+                        %>
+                          <tr role="row">
+                            <td class="text-capitalize company-vacancy-name" role="cell"><%= l.name %></td>
+                            <td class="text-capitalize" data-label="Company" role="cell"><%= l._company.name %></td>
+                            <td class="text-capitalize" data-label="Industry" role="cell"><%= l._industry.name %></td>
+                            <td class="company-vacancy-deadline" data-label="Closing date" role="cell">
+                              <div class="company-vacancy-date company-vacancy-date--<%= dateStatus %>">
+                                <% if (hasClosingDate) { %>
+                                  <strong><%= daysLeft < 0 ? 'Closed' : daysLeft + (daysLeft === 1 ? ' day left' : ' days left') %></strong>
+                                  <time datetime="<%= closing.format('YYYY-MM-DD') %>"><%= closing.format('DD-MM-YYYY') %></time>
+                                <% } else { %>
+                                  <strong>Date unavailable</strong>
+                                <% } %>
+                              </div>
+                            </td>
+                            <td class="text-capitalize" data-label="Type" role="cell"><%= l._vacancyType.name %></td>
+                            <td class="qualification-action-custom-class" role="cell">
+                              <% if (isChecked === 'true') { %>
+                                <button type="button" class="company-vacancy-icon" aria-label="Permanently delete <%= l.name %>" title="Delete permanently"
+                                  onclick="deleteArchieve('<%= l._id %>', '<%= l.isDeleted %>', 'vacancy');">
+                                  <i class="feather icon-trash-2 fa-lg primary" aria-hidden="true"></i>
+                                </button>
+                              <% } else { %>
+                                <div class="custom-control custom-switch custom-control-inline">
+                                  <input type="checkbox" onclick="myOnOffFunc('<%= l._id %>', '<%= l.status %>', 'vacancy');"
+                                    class="custom-control-input" id="customSwitch<%= i %>" role="switch" aria-label="Live vacancy: <%= l.name %>" <%= l.status ? 'checked' : '' %>>
+                                  <label class="custom-control-label" for="customSwitch<%= i %>"><%= l.status ? 'Live' : 'Paused' %></label>
+                                </div>
+                                <a class="company-vacancy-icon" href="/panel/company/vacancy/edit/<%= l._id %>" aria-label="Edit <%= l.name %>" title="Edit vacancy">
+                                  <i class="feather icon-edit fa-lg primary" aria-hidden="true"></i>
+                                </a>
+                                <button type="button" class="company-vacancy-icon" aria-label="Delete <%= l.name %>" title="Delete vacancy"
+                                  onclick="deleteRecord('<%= l._id %>', '<%= l.status %>', 'vacancy');">
+                                  <i class="feather icon-trash-2 fa-lg primary" aria-hidden="true"></i>
+                                </button>
+                              <% } %>
+                            </td>
+                          </tr>
+                        <% }); %>
                       </tbody>
                     </table>
-                    <% } else { %>
-                      <p class="text-center mt-3">No result found</p>
-                      <% } %>
+                  <% } else { %>
+                    <p class="text-center mt-3">No vacancies found</p>
+                  <% } %>
 
                         <% if (totalPages> 1) { %>
                           <ul class="pagination justify-content-end ml-2 mb-2">

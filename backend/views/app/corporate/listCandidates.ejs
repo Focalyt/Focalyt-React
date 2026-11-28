@@ -7,29 +7,12 @@
           <div class="content-overlay"></div>
           <div class="header-navbar-shadow"></div>
           <div class="content-wrapper">
-            <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-              <div class="content-header-left col-md-9 col-12 mb-2">
-                <div class="row breadcrumbs-top">
-                  <div class="col-12">
-                    <h3 class="content-header-title float-left mb-0">Search candidates</h3>
-                    <div class="breadcrumb-wrapper col-12">
-                      <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
-                        </li>
-                        <li class="breadcrumb-item active">List Candidates</li>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <section id="Concerned-Person ">
               <div class="row">
                 <div class="col-12">
                   <div class="card recruiter-candidate-search">
                     <div class="card-header border border-top-0 border-left-0 border-right-0">
-                      <div><div class="recruiter-eyebrow">YOUR TALENT POOL</div><p class="recruiter-muted mt-1 mb-0">Find the right candidates for your company's hiring requirements.</p></div>
+                      <h1 class="card-title mb-0">Search candidates</h1>
                       <p id="subscription"></p>
                     </div>
 
@@ -45,7 +28,7 @@
                           <form method="GET">
                             <div class="row">
                               <div class="col-xl-3  col-lg-6 col-md-6 col-sm-6 col-12 mt-1">
-                                <label>Set Location As Per JD</label>
+                                <label for="jdLocation-field">Location by job</label>
                                 <select class="form-control text-capitalize" name="jdLocation"
                                   id="jdLocation-field">
                                   <option value="">Select</option>
@@ -58,7 +41,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3  col-lg-6 col-md-6 col-sm-6 col-12 mt-1">
-                                <label>Qualification</label>
+                                <label for="qualification-field">Qualification</label>
                                 <select class="form-control text-capitalize" name="highestqualification"
                                   id="qualification-field">
                                   <option value="">Select</option>
@@ -75,7 +58,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3 col-lg-6 col-md-6 col-sm-6 col-12 ml-0 mt-1">
-                                <label>Stream</label>
+                                <label for="subQualification">Stream</label>
                                 <select class="form-control text-capitalize" name="subQualification" id="subQualification">
                                   <option value="">Select</option>
                                   <% subQualification?.forEach((subQualification)=> { %>
@@ -84,7 +67,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3 col-lg-6 col-md-6 col-sm-6 col-12 ml-0 mt-1" >
-                                <label>Experience</label>
+                                <label for="exp-field">Experience</label>
                                 <select class="form-control" name="experience" id="exp-field">
                                   <option value="">Select</option>
                                   <option value="0" <% if (data.experience=='0' ) { %> selected <% }%>>0</option>
@@ -94,7 +77,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3 col-lg-6 col-md-6 col-sm-6 col-12 ml-0 mt-1">
-                                <label>Gender</label>
+                                <label for="gender">Gender</label>
                                 <select class="form-control text-capitalize" name="gender" id="gender">
                                   <option value="">Select</option>
                                   <option class="text-capitalize" value="Female" <% if (data.gender=='Female' ) { %> selected <% }%> >Female</option>
@@ -102,7 +85,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3 col-lg-6 col-md-6 col-sm-6 col-12 ml-0 mt-1">
-                                <label>Preferred State</label>
+                                <label for="state">Preferred state</label>
                                 <select class="form-control text-capitalize" name="stateId" id="state"
                                   onchange="stateDropDown(event,'city')">
                                   <option value="">Select</option>
@@ -122,7 +105,7 @@
                             
                             
                               <div class="col-xl-3  col-lg-6 col-md-6 col-sm-6 col-12 mt-xl-2 mt-1">
-                                <label>Preferred City</label>
+                                <label for="city">Preferred city</label>
                                 <select class="form-control text-capitalize" name="cityId" id="city">
                                   <option value="">Select</option>
                                   <% if (data.stateId) { %>
@@ -141,7 +124,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3  col-lg-6 col-md-6 col-sm-6 col-12  mt-xl-2">
-                                <label>Tech Skills</label>
+                                <label for="techSkills">Technical skills</label>
                                 <select class="form-control text-capitalize" name="techSkills" id="techSkills">
                                   <option value="">Select</option>
                                   <% skills.forEach((skills)=> { %>
@@ -153,7 +136,7 @@
                                 </select>
                               </div>
                               <div class="col-xl-3  col-lg-6 col-md-6 col-sm-6 col-12 mr-0 mt-xl-2">
-                                <label>Non Tech Skills</label>
+                                <label for="nonTechSkills">Non-technical skills</label>
                                 <select class="form-control text-capitalize" name="nonTechSkills" id="nonTechSkills">
                                   <option value="">Select</option>
                                   <% skills.forEach((skills)=> { %>
@@ -167,15 +150,15 @@
                                <div class="col-xl-12 mt-xl-3 mt-lg-2 mt-md-3 mt-sm-2 mt-2 text-right recruiter-search-actions">
                                 <button 
                                   class="btn btn-success  waves-effect waves-light  text-white d-inline px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
-                                  id="submit-btn">Go</button>
+                                  id="submit-btn">Search</button>
                                   <a class="extra-ss btn btn-danger d-inline  waves-effect waves-light mb-2 text-white mx-sm-1 mx-0 px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
-                                  href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates">RESET</a>
+                                  href="<%= process.env.MIPIE_BACKEND_URL %>/company/list-candidates">Reset</a>
                                 
                                   <a href="#" class="btn btn-primary  waves-effect waves-light  text-white d-inline  ml-xl-1 px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
                                   data-toggle="modal" data-target="#promote">Promote</a>
 
                                   <a href="#" class="btn btn-success  waves-effect waves-light  text-white d-inline  ml-xl-1 px-xl-3 px-lg-3 px-md-2 px-sm-1 px-1"
-                                  data-toggle="modal" data-target="#bulkAction" id="bulkButton">Bulk Action</a>
+                                  data-toggle="modal" data-target="#bulkAction" id="bulkButton">Bulk action</a>
                                   <input type="hidden" id="pageCount" value="<%= pageCount%>">
                                 </div>
                              
@@ -263,7 +246,6 @@
             </section>
           </div>
 
-        </div>
         </div>
         <div class="sidenav-overlay"></div>
         <div class="drag-target"></div>
@@ -814,115 +796,6 @@
             });
           })();
         </script>
-        <style>
-          #table-body.company-student-list { padding: 0; display: grid; gap: 12px; }
-          #table-body .company-student-card {
-            background: #e8edf3;
-            border: 1px solid #d7dee8;
-            border-radius: 14px;
-            box-shadow: none;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            color: #0f172a;
-          }
-          #table-body .company-student-card:hover { border-color: #d7dee8; box-shadow: none; }
-          #table-body .company-student-company-header { background: transparent; border-bottom: 0; min-height: 0; padding: 8px 8px 0; }
-          #table-body .company-student-company-badge { background: #bbf7d0; color: #2864db; border-radius: 999px; font-weight: 800; }
-          #table-body .company-student-strip { background: transparent; border: 0; border-radius: 0; padding-top: 6px; }
-          #table-body .company-student-profile { background: #fff; border: 1px solid #d7dee8; border-top: 3px solid #2563eb; color: #0f172a; }
-          #table-body .company-student-avatar { background: #eff6ff; color: #2563eb; }
-          #table-body .company-student-contact { background: #f8fafc; border-color: #e2e8f0; color: #334155; }
-          #table-body .company-student-contact > i { color: #2563eb; }
-          #table-body .company-student-panel { background: #fff; border: 1px solid #d7dee8; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); }
-          #table-body .company-student-panel h3 { color: #1e293b; }
-          #table-body .company-student-panel h3 i { color: #3b82f6; }
-          #table-body .company-student-performance { border-top: 3px solid #3b82f6; }
-          #table-body .company-student-status { border-top: 3px solid #f59e0b; }
-          #table-body .company-student-kv > span { color: #64748b; }
-          #table-body .company-student-kv > strong,
-          #table-body .company-student-kv-pill { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 999px; }
-          #table-body .company-student-status-pill { background: #ffedd5; color: #c2410c; border-radius: 999px; }
-          #table-body .company-followup-panel[data-followup-type="Call"] .company-followup-stat { background: rgb(18, 179, 255); color: #fff; border-radius: 10px; }
-          #table-body .company-followup-panel[data-followup-type="Call"] .company-followup-stat--planned { background: rgb(12, 125, 180); }
-          #table-body .company-followup-panel[data-followup-type="Call"] .company-followup-stat--missed { background: rgb(8, 80, 120); }
-          #table-body .company-followup-panel[data-followup-type="Visit"] .company-followup-stat { background: rgb(75, 85, 99); color: #fff; border-radius: 10px; }
-          #table-body .company-followup-panel[data-followup-type="Visit"] .company-followup-stat--planned { background: rgb(55, 65, 81); }
-          #table-body .company-followup-panel[data-followup-type="Visit"] .company-followup-stat--missed { background: rgb(35, 42, 52); }
-          #table-body .company-followup-panel--empty { background: #ff4646; border-color: #ff4646 !important; }
-          #table-body .company-followup-panel--empty h3,
-          #table-body .company-followup-panel--empty h3 > i { color: #fff; }
-          #table-body .company-followup-panel--empty .company-followup-next,
-          #table-body .company-followup-panel--empty .company-followup-next strong { color: #7f1d1d; }
-          #table-body .company-student-card .company-student-icon { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; border-radius: 8px; }
-          #table-body .company-student-card .company-student-icon:hover { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
-          #table-body .company-student-card .company-student-chevron,
-          #table-body .company-student-card .company-student-chevron:hover {  color: #fff; }
-          #table-body .company-student-card .company-student-profile-button {
-            width: 100%; padding: 6px 10px; background: linear-gradient(135deg, #059669, #10b981);
-            border: none; color: #fff; border-radius: 8px; font-size: 11px; font-weight: 700;
-            line-height: 1.25; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28);
-          }
-          #table-body .company-student-actions { border-top: 3px solid #10b981; }
-          @media (max-width: 767px) {
-            body:has(.recruiter-sidebar) .app-content.content {
-              overflow-x: hidden;
-              padding-left: 10px !important;
-              padding-right: 10px !important;
-            }
-            body:has(.recruiter-sidebar) .content-wrapper,
-            .content-wrapper,
-            .content-wrapper > section,
-            .content-wrapper .row,
-            .content-wrapper [class*="col-"],
-            .recruiter-candidate-search,
-            .recruiter-candidate-search > .content-body,
-            .content-body .card,
-            .content-body .table-responsive,
-            #table-body.company-student-list {
-              width: 100% !important;
-              max-width: 100% !important;
-              min-width: 0 !important;
-              box-sizing: border-box;
-            }
-            .content-wrapper .row { margin-left: 0 !important; margin-right: 0 !important; }
-            .content-wrapper [class*="col-"] { flex: 1 1 100%; padding-left: 0; padding-right: 0; }
-            .content-body .table-responsive { overflow: hidden; }
-            #table-body .company-student-card,
-            #table-body .company-student-strip,
-            #table-body .company-student-profile,
-            #table-body .company-student-pair {
-              width: 100%;
-              max-width: 100%;
-              min-width: 0;
-              box-sizing: border-box;
-            }
-            #table-body .company-student-card,
-            #table-body .company-student-strip { overflow-x: hidden; }
-            #table-body .company-student-pair {
-              display: flex;
-              flex-direction: row;
-              flex-wrap: nowrap;
-              overflow-x: hidden;
-            }
-            #table-body .company-student-pair .company-student-performance {
-              flex: 1 1 54% !important;
-              max-width: 54%;
-              min-width: 0 !important;
-            }
-            #table-body .company-student-pair .company-student-status {
-              flex: 1 1 46% !important;
-              max-width: 46%;
-              min-width: 0 !important;
-            }
-            #table-body .company-followup-panel {
-              flex: 1 1 calc(50% - 4px) !important;
-              max-width: calc(50% - 4px);
-              min-width: 0 !important;
-              box-sizing: border-box;
-            }
-          }
-        </style>
         <% include ./partials/footer%>
 
           <script src="https://kit.fontawesome.com/ce5729505d.js" crossorigin="anonymous"></script>

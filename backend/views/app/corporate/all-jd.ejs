@@ -10,30 +10,13 @@
           <div class="content-overlay"></div>
           <div class="header-navbar-shadow"></div>
           <div class="content-wrapper">
-            <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-              <div class="content-header-left col-md-9 col-12 mb-2">
-                <div class="row breadcrumbs-top">
-                  <div class="col-12">
-                    <h3 class="content-header-title float-left mb-0">Jobs &amp; responses</h3>
-                    <div class="breadcrumb-wrapper col-12">
-                      <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
-                        </li>
-                        <li class="breadcrumb-item active">Jobs &amp; Responses</li>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
           <div class="content-body jobs-responses">
             <section class="list-view">
               <div class="row">
                 <div class="col-12">
                   <div class="card mt-1 mb-5">
                     <div class="card-header border border-top-0 border-left-0 border-right-0">
-                      <h4 class="card-title">Your job postings</h4>
+                      <h1 class="card-title mb-0">Jobs &amp; responses</h1>
                       <% if(canAdd && isExist) {%>
                         <a href="<%= process.env.MIPIE_BACKEND_URL %>/company/addjobs" class="btn btn-primary">+ Post a job</a>
                       <%} else if(!canAdd&&isExist){%>
@@ -52,7 +35,7 @@
                                 <h3><%= job.title || 'Job requirement' %></h3>
                                 <p><%= job.displayCompanyName || company?.name || 'Company' %> &middot; <%= job.experience ? job.experience + ' years experience' : 'Fresher' %> &middot; <%= job._qualification?.name || 'Qualification not specified' %></p>
                                 <span class="recruiter-badge <%= expired || !job.status ? 'recruiter-badge-gray' : '' %>"><%= expired ? 'Expired' : job.status ? 'Active' : 'Closed' %></span>
-                                <span class="recruiter-muted" style="font-size:12px;margin-left:8px">Posted <%= moment(job.createdAt).format('DD MMM YYYY') %></span>
+                                <span class="recruiter-muted recruiter-job-date">Posted <%= moment(job.createdAt).format('DD MMM YYYY') %></span>
                               </div>
                               <div class="recruiter-job-actions">
                                 <div class="recruiter-job-count"><strong><%= shortlistedCount %></strong><span class="recruiter-muted">shortlisted</span></div>
@@ -182,47 +165,6 @@
               })
           }
         </script>
-        <style>
-          .jobs-responses,
-          .jobs-responses .row,
-          .jobs-responses [class*="col-"],
-          .jobs-responses .card,
-          .jobs-responses .card-content,
-          .jobs-responses .table-responsive,
-          .jobs-responses .recruiter-job-list,
-          .jobs-responses .recruiter-jobrow {
-            width: 100%;
-            max-width: 100%;
-            min-width: 0;
-            box-sizing: border-box;
-          }
-          .jobs-responses .row { margin-left: 0; margin-right: 0; }
-          .jobs-responses [class*="col-"] { flex: 0 0 100%; padding-left: 0; padding-right: 0; }
-          .jobs-responses .card { margin-left: 0; margin-right: 0; }
-          .jobs-responses .card-header { width: 100%; gap: 12px; padding: 18px 20px; }
-          .jobs-responses .card-header .btn { flex: 0 0 auto; white-space: nowrap; }
-          .jobs-responses .table-responsive { overflow: visible; }
-          .jobs-responses .recruiter-job-list { padding: 0 20px; }
-          .jobs-responses .recruiter-jobrow { align-items: center; }
-          .jobs-responses .recruiter-job-summary { flex: 1 1 auto; min-width: 0; }
-          .jobs-responses .recruiter-job-summary h3,
-          .jobs-responses .recruiter-job-summary p { overflow-wrap: anywhere; }
-          .jobs-responses .recruiter-job-actions { flex: 0 1 auto; max-width: 100%; justify-content: flex-end; }
-          @media (max-width: 767px) {
-            body:has(.recruiter-sidebar) .app-content.content {
-              overflow-x: hidden;
-              padding-left: 10px !important;
-              padding-right: 10px !important;
-            }
-            body:has(.recruiter-sidebar) .content-wrapper { width: 100% !important; max-width: 100% !important; }
-            .jobs-responses .card-header { align-items: flex-start; padding: 14px; }
-            .jobs-responses .card-header .btn { padding: 9px 12px !important; font-size: 12px !important; }
-            .jobs-responses .recruiter-job-list { padding: 0 14px; }
-            .jobs-responses .recruiter-jobrow { align-items: stretch; gap: 8px; padding: 14px 0; }
-            .jobs-responses .recruiter-job-actions { width: 100%; justify-content: space-between; }
-            .jobs-responses .table-responsive { overflow: hidden; }
-          }
-        </style>
         <% include ./partials/footer%>
       </body>
       </html>

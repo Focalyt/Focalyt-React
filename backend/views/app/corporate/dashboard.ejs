@@ -64,18 +64,18 @@
                   ['today', 'Today'],
                   ['yesterday', 'Yesterday'],
                   ['prev3days', 'Previous 3 days'],
-                  ['thisMonth', 'This Month']
+                  ['thisMonth', 'This month']
                 ].forEach(function(item) { %>
                   <button type="button" class="corp-app-filter__pill<%= filters.date === item[0] ? ' is-active' : '' %>" data-date="<%= item[0] %>"><%= item[1] %></button>
                 <% }); %>
                 <div class="corp-app-filter__range">
                   <button type="button" class="corp-app-filter__pill<%= filters.date === 'custom' ? ' is-active' : '' %>" id="corpRangeToggle" aria-expanded="false" aria-controls="corpRangeDropdown">
                     <i class="fas fa-calendar-alt" aria-hidden="true"></i>
-                    Date Range
+                    Date range
                     <i class="fas fa-chevron-down" aria-hidden="true"></i>
                   </button>
                   <div class="corp-app-filter__dropdown" id="corpRangeDropdown" hidden>
-                    <div class="corp-app-filter__dropdown-title">Date Range</div>
+                    <div class="corp-app-filter__dropdown-title">Date range</div>
                     <div class="corp-app-filter__dates">
                       <label>From<input type="date" name="from" value="<%= filters.from %>" max="<%= filters.to || '' %>"></label>
                       <label>To<input type="date" name="to" value="<%= filters.to %>" min="<%= filters.from || '' %>"></label>
@@ -108,7 +108,7 @@
                 </select>
               </div>
               <div class="corp-app-filter__item corp-app-filter__item--job">
-                <label class="corp-app-filter__label" for="corpActiveJob"><i class="fas fa-file-alt" aria-hidden="true"></i> Active Jobs</label>
+                <label class="corp-app-filter__label" for="corpActiveJob"><i class="fas fa-file-alt" aria-hidden="true"></i> Active jobs</label>
                 <select id="corpActiveJob" name="job" aria-label="Active jobs">
                   <option value="">All</option>
                   <% jobs.forEach(function(job) { %>
@@ -124,7 +124,8 @@
             <div class="corp-perf__chips">
               <button type="button" class="corp-perf__chip<%= filters.status ? '' : ' is-active' %>" data-status="">All (<%= performanceTotal || 0 %>)</button>
               <% (performanceChips || []).forEach(function(chip) { %>
-                <button type="button" class="corp-perf__chip<%= filters.status === chip._id ? ' is-active' : '' %>" data-status="<%= chip._id %>"><%= String(chip.title || 'Status').toUpperCase() %> (<%= chip.count || 0 %>)</button>
+                <% const chipTitle = String(chip.title || 'Status'); %>
+                <button type="button" class="corp-perf__chip<%= filters.status === chip._id ? ' is-active' : '' %>" data-status="<%= chip._id %>"><%= chipTitle === chipTitle.toUpperCase() ? chipTitle.charAt(0) + chipTitle.slice(1).toLowerCase() : chipTitle %> (<%= chip.count || 0 %>)</button>
               <% }); %>
               <% if (!(performanceChips || []).length) { %>
                 <span class="corp-perf__empty">No statuses yet. Add them from Status.</span>

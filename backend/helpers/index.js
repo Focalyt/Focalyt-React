@@ -10,6 +10,7 @@ const {
   State,
   SubIndustry,
   SubQualification,
+  QualificationCourse,
   Candidate,
   UserActivityLog,
   User,
@@ -72,6 +73,21 @@ router.route("/getsubQual").post(async (req, res) => {
     res.send(inds);
   } catch (err) {
     req.flash("error", "Something went wrong!");
+  }
+});
+
+router.route("/qualificationCourses").post(async (req, res) => {
+  try {
+    const courses = await QualificationCourse.find({
+      _qualification: req.body._qualification,
+    })
+      .select("name")
+      .sort({ name: 1 })
+      .lean();
+    res.send(courses);
+  } catch (err) {
+    console.error("Error fetching qualification courses:", err);
+    res.status(500).send([]);
   }
 });
 

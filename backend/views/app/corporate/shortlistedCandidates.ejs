@@ -8,47 +8,29 @@
         <div class="content-overlay"></div>
         <div class="header-navbar-shadow"></div>
         <div class="content-wrapper">
-          <div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-            <div class="content-header-left col-md-9 col-12 mb-2">
-              <div class="row breadcrumbs-top">
-                <div class="col-12">
-                  <h2 class="content-header-title float-left mb-0">Shortlisted Candidates</h2>
-                  <div class="breadcrumb-wrapper col-12">
-                    <ol class="breadcrumb">
-                      <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/company/dashboard">Home</a>
-                      </li>
-                      <li class="breadcrumb-item active">Shortlisted Candidates</li>
-                    </ol>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="content-body">
+          <div class="content-body recruiter-candidate-list">
             <section class="list-view">
               <div class="row">
                 <div class="col-12">
                   <div class="card mt-1 mb-5">
                     <div class="card-header border border-top-0 border-left-0 border-right-0">
-                      <h4 class="card-title pb-1">Shortlisted Candidates</h4>
-                      <h6 class="text-bold-500 ">
-                      Candidate Count: <%= countCandidates[0].metadata[0]?.total || 0 %>
-                      </h6 >
+                      <h1 class="card-title mb-0">Shortlisted candidates</h1>
+                      <span class="recruiter-muted">Candidates: <%= countCandidates?.[0]?.metadata?.[0]?.total || 0 %></span>
                     </div>
-                    <div class="col-12 mt-2">
-                      <form method="GET">
+                    <div class="recruiter-candidate-filter-panel">
+                      <form method="GET" class="recruiter-candidate-filters">
                         <div class="row">
                           <div class="col-xl-4">
-                            <label>Name/ Mobile/ Whatsapp</label>
+                            <label for="username">Name, mobile or WhatsApp</label>
                             <input type="text" name="name" class="form-control" id="username" value="<%= data?.name %>"
                              maxlength="25">
                           </div>
                           <div class="col-xl-4">
-                            <h6>Hiring Status</h6>
-                            <select class="form-control" id="status-control" name="filterType" value="">
+                            <label for="status-control">Hiring status</label>
+                            <select class="form-control" id="status-control" name="filterType">
                               <option value="" <% if (filterType=='') { %> selected <% }%>>Select Option</option>
                               <option value="Shortlisted" <% if (filterType=='Shortlisted') { %> selected <% }%>>Shortlisted</option>
-                            <option value="Interview Due" <% if (filterType=='Interview Due') { %> selected <% }%>>Interview Due</option>
+                              <option value="Interview Due" <% if (filterType=='Interview Due') { %> selected <% }%>>Interview Due</option>
                               <option value="interviewed" <% if (filterType=='interviewed') { %> selected <% }%>>Interviewed</option>
                               <option value="On Hold" <% if (filterType=='On Hold') { %> selected <% }%>>On Hold</option>
                               <option value="Offer Letter Rollout" <% if (filterType=='Offer Letter Rollout') { %> selected <% }%>>Offer Letter Rollout</option>
@@ -56,13 +38,12 @@
                               <option value="hired" <% if (filterType=='hired') { %> selected <% }%>>Hired</option>
                               <option value="rejected" <% if (filterType=='rejected') { %> selected <% }%>>Rejected</option>
                             </select>
-                            </div>
-                            <div class="col-xl-2">
-                              <label>&nbsp;</label> <br><button
-                                class="btn btn-success  waves-effect waves-light text-white"
-                                id="submit-btn">SUBMIT</button>
-                            </div>
-                        </div> 
+                          </div>
+                          <div class="col-xl-2">
+                            <button type="submit" class="btn btn-success waves-effect waves-light text-white"
+                              id="submit-btn">Search</button>
+                          </div>
+                        </div>
                       </form>
                     </div>
                     <div class="card-content">
@@ -137,7 +118,6 @@
       </div>
       <div class="sidenav-overlay"></div>
       <div class="drag-target"></div>
-      </div>
       <script>
 
             document.addEventListener("DOMContentLoaded", () => {
@@ -163,119 +143,6 @@
 
         </script>
 
-        <style>
-          #table-body.company-student-list { padding: 0; display: grid; gap: 12px; }
-          #table-body .company-student-card {
-            background: #e8edf3;
-            border: 1px solid #d7dee8;
-            border-radius: 14px;
-            box-shadow: none;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            color: #0f172a;
-          }
-          #table-body .company-student-card:hover { border-color: #d7dee8; box-shadow: none; }
-          #table-body .company-student-company-header { background: transparent; border-bottom: 0; min-height: 0; padding: 8px 8px 0; }
-          #table-body .company-student-company-badge { background: #bbf7d0; color: #fff; border-radius: 999px; font-weight: 800; }
-          #table-body .company-student-strip { background: transparent; border: 0; border-radius: 0; padding-top: 6px; }
-          #table-body .company-student-profile { background: #fff; border: 1px solid #d7dee8; border-top: 3px solid #2563eb; color: #0f172a; }
-          #table-body .company-student-avatar { background: #eff6ff; color: #2563eb; }
-          #table-body .company-student-contact { background: #f8fafc; border-color: #e2e8f0; color: #334155; }
-          #table-body .company-student-contact > i { color: #2563eb; }
-          #table-body .company-student-panel { background: #fff; border: 1px solid #d7dee8; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); }
-          #table-body .company-student-panel h3 { color: #1e293b; }
-          #table-body .company-student-panel h3 i { color: #3b82f6; }
-          #table-body .company-student-performance { border-top: 3px solid #3b82f6; }
-          #table-body .company-student-status { border-top: 3px solid #f59e0b; }
-          #table-body .company-student-kv > span { color: #64748b; }
-          #table-body .company-student-kv > strong,
-          #table-body .company-student-kv-pill { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 999px; }
-          #table-body .company-student-status-pill { background: #ffedd5; color: #c2410c; border-radius: 999px; }
-          #table-body .company-followup-panel[data-followup-type="Call"] .company-followup-stat { background: rgb(18, 179, 255); color: #fff; border-radius: 10px; }
-          #table-body .company-followup-panel[data-followup-type="Call"] .company-followup-stat--planned { background: rgb(12, 125, 180); }
-          #table-body .company-followup-panel[data-followup-type="Call"] .company-followup-stat--missed { background: rgb(8, 80, 120); }
-          #table-body .company-followup-panel[data-followup-type="Visit"] .company-followup-stat { background: rgb(75, 85, 99); color: #fff; border-radius: 10px; }
-          #table-body .company-followup-panel[data-followup-type="Visit"] .company-followup-stat--planned { background: rgb(55, 65, 81); }
-          #table-body .company-followup-panel[data-followup-type="Visit"] .company-followup-stat--missed { background: rgb(35, 42, 52); }
-          #table-body .company-followup-panel--empty { background: #ff4646; border-color: #ff4646 !important; }
-          #table-body .company-followup-panel--empty h3,
-          #table-body .company-followup-panel--empty h3 > i { color: #fff; }
-          #table-body .company-followup-panel--empty .company-followup-next,
-          #table-body .company-followup-panel--empty .company-followup-next strong { color: #7f1d1d; }
-          #table-body .company-student-card .company-student-icon { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; border-radius: 8px; }
-          #table-body .company-student-card .company-student-icon:hover { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
-          #table-body .company-student-card .company-student-chevron,
-          #table-body .company-student-card .company-student-chevron:hover {  color: #fff; }
-          #table-body .company-student-card .company-student-profile-button {
-            width: 100%; padding: 6px 10px; background: linear-gradient(135deg, #059669, #10b981);
-            border: none; color: #fff; border-radius: 8px; font-size: 11px; font-weight: 700;
-            line-height: 1.25; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.28);
-          }
-          #table-body .company-student-actions { border-top: 3px solid #10b981; }
-          @media (max-width: 767px) {
-            body:has(.recruiter-sidebar) .app-content.content {
-              overflow-x: hidden;
-              padding-left: 10px !important;
-              padding-right: 10px !important;
-            }
-            body:has(.recruiter-sidebar) .content-wrapper,
-            .content-wrapper,
-            .content-body,
-            .content-body .row,
-            .content-body [class*="col-"],
-            .content-body .card,
-            .content-body .table-responsive,
-            #table-body.company-student-list {
-              width: 100% !important;
-              max-width: 100% !important;
-              min-width: 0 !important;
-              box-sizing: border-box;
-            }
-            .content-body .row { margin-left: 0 !important; margin-right: 0 !important; }
-            .content-body [class*="col-"] { flex: 1 1 100%; padding-left: 0; padding-right: 0; }
-            .content-body .card { margin-left: 0; margin-right: 0; }
-            .content-body .table-responsive { overflow: hidden; }
-            #table-body .company-student-card,
-            #table-body .company-student-strip,
-            #table-body .company-student-profile,
-            #table-body .company-student-pair {
-              width: 100%;
-              max-width: 100%;
-              min-width: 0;
-              box-sizing: border-box;
-            }
-            #table-body .company-student-card,
-            #table-body .company-student-strip { overflow-x: hidden; }
-            #table-body .company-student-pair {
-              display: flex;
-              flex-direction: row;
-              flex-wrap: nowrap;
-              overflow-x: hidden;
-            }
-            #table-body .company-student-pair .company-student-performance {
-              flex: 1 1 54% !important;
-              max-width: 54%;
-              min-width: 0 !important;
-            }
-            #table-body .company-student-pair .company-student-status {
-              flex: 1 1 46% !important;
-              max-width: 46%;
-              min-width: 0 !important;
-            }
-            #table-body .company-followup-panel {
-              flex: 1 1 calc(50% - 4px) !important;
-              max-width: calc(50% - 4px);
-              min-width: 0 !important;
-              box-sizing: border-box;
-            }
-            #table-body .company-student-profile > .company-student-contact span {
-              white-space: nowrap !important;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-          }
-        </style>
         <% include ./partials/footer%>
 
           <script src="https://kit.fontawesome.com/ce5729505d.js" crossorigin="anonymous"></script>

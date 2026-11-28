@@ -24,7 +24,7 @@
 										<div class="card rounded-0 mb-0 px-2 w-100">
 											<div class="card-header pb-1">
 												<div class="card-title">
-													<h4 class="mb-0">Change Password</h4>
+													<h4 class="mb-0">Change password</h4>
 												</div>
 											</div>
 
@@ -34,42 +34,45 @@
 													<form method="POST" action="" name="change" id="form">
 														<fieldset
 															class="form-label-group form-group position-relative has-icon-left">
+															<label for="user-password1">Current password</label>
 															<input type="password" class="form-control"
-																id="user-password1" placeholder="Old Password"
+																id="user-password1"
 																name="oldpassword" required />
 															<div class="form-control-position">
 																<i class="feather icon-lock"></i>
 															</div>
-															<div class="eyeIcon" onclick="hideUnhide1()">
+															<button type="button" class="eyeIcon" aria-label="Toggle current password visibility" onclick="hideUnhide1()">
 																<i id="hideEye1" class="feather icon-eye"></i>
 																<i id="hideEye2" class="feather icon-eye-off"></i>
-															</div>
+															</button>
 														</fieldset>
 														<fieldset
 															class="form-label-group form-group position-relative has-icon-left">
+															<label for="user-password2">New password</label>
 															<input type="password" class="form-control"
-																id="user-password2" placeholder="New Password"
+																id="user-password2"
 																name="newpassword" required />
 															<div class="form-control-position">
 																<i class="feather icon-lock"></i>
 															</div>
-															<div class="eyeIcon" onclick="hideUnhide2()">
+															<button type="button" class="eyeIcon" aria-label="Toggle new password visibility" onclick="hideUnhide2()">
 																<i id="hideEye3" class="feather icon-eye"></i>
 																<i id="hideEye4" class="feather icon-eye-off"></i>
-															</div>
+															</button>
 														</fieldset>
 														<fieldset
 															class="form-label-group form-group position-relative has-icon-left">
+															<label for="user-password3">Confirm password</label>
 															<input type="password" class="form-control"
-																id="user-password3" placeholder="Confirm Password"
+																id="user-password3"
 																name="confirmpassword" required />
 															<div class="form-control-position">
 																<i class="feather icon-lock"></i>
 															</div>
-															<div class="eyeIcon" onclick="hideUnhide3()">
+															<button type="button" class="eyeIcon" aria-label="Toggle confirm password visibility" onclick="hideUnhide3()">
 																<i id="hideEye5" class="feather icon-eye"></i>
 																<i id="hideEye6" class="feather icon-eye-off"></i>
-															</div>
+															</button>
 														</fieldset>
 
 														<div
@@ -77,7 +80,7 @@
 															<div class="text-left"></div>
 														</div>
 
-														<button href="/changepassword" type="submit"
+														<button type="submit"
 															class="btn btn-primary float-right btn-inline">
 															Update
 														</button>
