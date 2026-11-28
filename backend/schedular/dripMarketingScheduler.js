@@ -11,6 +11,9 @@ const {
   Lead,
   College
 } = require('../controllers/models');
+const { isDripQueueEnabled, isCronSendable, intEnv } = require('../queues/dripFlags');
+const { classifySendError, errorText } = require('../queues/dripErrors');
+const { dripLog } = require('../queues/dripLogger');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
@@ -659,6 +662,96 @@ async function processRule(rule) {
   return { matched };
 }
 
+function sanitizeWhatsAppParam(value, fallback = '-') {
+  const text = String(value == null ? '' : value)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+    .slice(0, 1024);
+  return text || fallback;
+}
+
+function firstFilledText(...values) {
+  for (const value of values) {
+    if (value == null || typeof value === 'object') continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+/** Highest {{n}} in the approved body. Mappings are only a fallback when body text was not stored. */
+function expectedBodyParamCount(template) {
+  const numbered = [...String(template?.messageBody || '').matchAll(/\{\{\s*(\d+)\s*\}\}/g)]
+    .map((match) => parseInt(match[1], 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (numbered.length) return Math.max(...numbered);
+
+  const positions = (template?.variableMappings || [])
+    .map((mapping) => Number(mapping?.position))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return positions.length ? Math.max(...positions) : 0;
+}
+
+function resolveDripTemplateValue(variableName, lead, leadType) {
+  if (!lead) return '';
+  const key = String(variableName || '').trim();
+
+  if (leadType === 'b2b') {
+    const owner = lead.leadOwner && typeof lead.leadOwner === 'object' ? lead.leadOwner : {};
+    const project = lead.b2bProject && typeof lead.b2bProject === 'object' ? lead.b2bProject : {};
+    const values = {
+      name: firstFilledText(lead.concernPersonName, lead.businessName),
+      mobile: firstFilledText(lead.whatsapp, lead.mobile),
+      email: firstFilledText(lead.email),
+      course_name: firstFilledText(project.name, lead.businessName),
+      project_name: firstFilledText(project.name, lead.businessName),
+      counselor_name: firstFilledText(owner.name),
+      lead_owner_name: firstFilledText(owner.name),
+      business_name: firstFilledText(lead.businessName)
+    };
+    return values[key] || firstFilledText(lead[key]);
+  }
+
+  const candidate = lead._candidate && typeof lead._candidate === 'object' ? lead._candidate : {};
+  const course = lead._course && typeof lead._course === 'object' ? lead._course : {};
+  const counsellor = lead.counsellor && typeof lead.counsellor === 'object' ? lead.counsellor : {};
+  const registeredBy = lead.registeredBy && typeof lead.registeredBy === 'object' ? lead.registeredBy : {};
+  const batch = lead.batch && typeof lead.batch === 'object' ? lead.batch : {};
+  const values = {
+    name: firstFilledText(candidate.name),
+    gender: firstFilledText(candidate.gender),
+    mobile: firstFilledText(candidate.mobile),
+    email: firstFilledText(candidate.email),
+    course_name: firstFilledText(course.name, course.courseName),
+    counselor_name: firstFilledText(counsellor.name),
+    lead_owner_name: firstFilledText(registeredBy.name, counsellor.name),
+    batch_name: firstFilledText(batch.name),
+    project_name: firstFilledText(course.project && course.project.name),
+    college_name: firstFilledText(course.college && course.college.name)
+  };
+  return values[key] || firstFilledText(candidate[key], lead[key]);
+}
+
+function buildTemplateBodyParameters(template, lead, leadType) {
+  const count = expectedBodyParamCount(template);
+  if (!count) return [];
+
+  const mappings = Array.isArray(template?.variableMappings) ? template.variableMappings : [];
+  const parameters = [];
+  for (let position = 1; position <= count; position += 1) {
+    const mapping = mappings.find((item) => Number(item?.position) === position);
+    const raw = mapping
+      ? resolveDripTemplateValue(mapping.variableName, lead, leadType)
+      : '';
+    parameters.push({
+      type: 'text',
+      text: sanitizeWhatsAppParam(raw)
+    });
+  }
+  return parameters;
+}
+
 /** Build Meta template components for header/carousel media stored on WhatsAppTemplate */
 async function buildTemplateMediaComponents(template) {
   const { uploadStorageKeyToWhatsApp } = require('../helpers/whatsappMediaUpload');
@@ -714,7 +807,7 @@ async function buildTemplateMediaComponents(template) {
   return components;
 }
 
-async function sendWhatsAppTemplate(to, templateName, collegeId) {
+async function sendWhatsAppTemplate(to, templateName, collegeId, context = {}) {
   if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error('WhatsApp credentials missing');
   }
@@ -734,6 +827,17 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
   }
 
   const components = await buildTemplateMediaComponents(template);
+  const bodyParameters = buildTemplateBodyParameters(
+    template,
+    context.lead,
+    context.leadType
+  );
+  if (bodyParameters.length) {
+    components.push({
+      type: 'body',
+      parameters: bodyParameters
+    });
+  }
 
   const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
   const payload = {
@@ -763,7 +867,7 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
   };
 }
 
-/** Persist drip send so webhook can resolve collegeId and session-window can see history */
+/** Persist drip send so webhook can resolves collegeId and session-window can see history */
 async function saveDripOutgoingMessage({ collegeId, phone, templateName, messageId, lead, leadType }) {
   try {
     const doc = {
@@ -834,13 +938,141 @@ async function cancelJobsForInactiveRules() {
   return cancelled;
 }
 
-async function processDueJobs() {
-  const now = new Date();
+/**
+ * Give abandoned cron claims a terminal or retryable state before the next send.
+ * Queue-owned rows are left untouched so cron cannot take work BullMQ still owns.
+ */
+async function recoverAbandonedCronClaims(now) {
+  const claimTtlMs = intEnv('DRIP_CLAIM_TTL_MS', 120000);
+  const ambiguousAfterMs = intEnv('DRIP_SEND_LOCK_MS', 300000);
+  const staleClaim = new Date(now.getTime() - claimTtlMs);
+  const staleSubmit = new Date(now.getTime() - ambiguousAfterMs);
+
+  const reconciled = await DripMarketingJob.updateMany(
+    {
+      status: 'processing',
+      queueOwned: { $ne: true },
+      sendAttemptedAt: { $ne: null, $lte: staleSubmit },
+      messageId: null
+    },
+    {
+      $set: {
+        status: 'reconciliation',
+        reconciliationReason: 'ambiguous_outcome_after_submit',
+        lastProcessedAt: now
+      }
+    }
+  );
+
+  const released = await DripMarketingJob.updateMany(
+    {
+      status: 'processing',
+      queueOwned: { $ne: true },
+      sendAttemptedAt: null,
+      messageId: null,
+      claimedAt: { $lte: staleClaim }
+    },
+    { $set: { status: 'pending', lastProcessedAt: now } }
+  );
+
+  if ((reconciled.modifiedCount || 0) > 0 || (released.modifiedCount || 0) > 0) {
+    dripLog('drip.cron.recovered_claims', {
+      reconciled: reconciled.modifiedCount || 0,
+      released: released.modifiedCount || 0
+    });
+  }
+}
+
+async function enqueueDueJobsForQueue() {
+  const { enqueueSendJob } = require('../queues/producers/dripProducer');
   const cancelled = await cancelJobsForInactiveRules();
+  const now = new Date();
+  const dueFilter = {
+    status: 'pending',
+    scheduledAt: { $lte: now },
+    sendAttemptedAt: null,
+    messageId: null
+  };
+
+  const fresh = await DripMarketingJob.find({
+    ...dueFilter,
+    queueOwned: { $ne: true }
+  })
+    .sort({ scheduledAt: 1 })
+    .limit(JOBS_PER_TICK)
+    .select('_id');
+
+  let enqueued = 0;
+  for (const job of fresh) {
+    const owned = await DripMarketingJob.findOneAndUpdate(
+      {
+        _id: job._id,
+        status: 'pending',
+        queueOwned: { $ne: true },
+        sendAttemptedAt: null,
+        messageId: null
+      },
+      { $set: { queueOwned: true } },
+      { new: true }
+    );
+    if (!owned) continue;
+
+    try {
+      const result = await enqueueSendJob(String(owned._id));
+      if (result && result.jobId) {
+        await DripMarketingJob.updateOne(
+          { _id: owned._id, status: 'pending', queueOwned: true },
+          { $set: { bullJobId: String(result.jobId) } }
+        );
+      }
+      enqueued += 1;
+    } catch (err) {
+      await DripMarketingJob.updateOne(
+        { _id: owned._id, status: 'pending', queueOwned: true, sendAttemptedAt: null, messageId: null },
+        { $set: { queueOwned: false, bullJobId: null } }
+      );
+      dripLog('drip.send.enqueue_failed', { dripJobId: String(owned._id), error: err.message });
+    }
+  }
+
+  const ownedPending = await DripMarketingJob.find({
+    ...dueFilter,
+    queueOwned: true
+  })
+    .sort({ scheduledAt: 1 })
+    .limit(JOBS_PER_TICK)
+    .select('_id');
+
+  for (const job of ownedPending) {
+    try {
+      const result = await enqueueSendJob(String(job._id), { replaceFinished: true });
+      if (result && !result.duplicate) enqueued += 1;
+    } catch (err) {
+      dripLog('drip.send.enqueue_failed', { dripJobId: String(job._id), error: err.message });
+    }
+  }
+
+  dripLog('drip.evaluate.jobs_enqueued', { enqueued, cancelled, checked: fresh.length + ownedPending.length });
+  return { sent: 0, failed: 0, cancelled, checked: fresh.length, enqueued };
+}
+
+async function processDueJobs() {
+  if (isDripQueueEnabled()) {
+    dripLog('drip.cron.send_blocked', { reason: 'DRIP_QUEUE_ENABLED' });
+    return { sent: 0, failed: 0, cancelled: 0, checked: 0, skipped: 'queue_mode' };
+  }
+
+  const now = new Date();
+  await recoverAbandonedCronClaims(now);
+  const cancelled = await cancelJobsForInactiveRules();
+  const maxAttempts = intEnv('DRIP_SEND_ATTEMPTS', 3);
 
   const jobs = await DripMarketingJob.find({
     status: 'pending',
-    scheduledAt: { $lte: now }
+    scheduledAt: { $lte: now },
+    queueOwned: { $ne: true },
+    sendAttemptedAt: null,
+    messageId: null
   })
     .sort({ scheduledAt: 1 })
     .limit(JOBS_PER_TICK);
@@ -849,77 +1081,136 @@ async function processDueJobs() {
   let failed = 0;
 
   for (const job of jobs) {
+    if (!isCronSendable(job)) continue;
+
+    const claimed = await DripMarketingJob.findOneAndUpdate(
+      {
+        _id: job._id,
+        status: 'pending',
+        queueOwned: { $ne: true },
+        sendAttemptedAt: null,
+        messageId: null
+      },
+      {
+        $set: {
+          status: 'processing',
+          claimedAt: now,
+          lastProcessedAt: now,
+          queueOwned: false
+        }
+      },
+      { new: true }
+    );
+    if (!claimed) continue;
+
     try {
-      const leadType = job.leadType === 'b2b' ? 'b2b' : 'b2c';
+      const leadType = claimed.leadType === 'b2b' ? 'b2b' : 'b2c';
       let lead = null;
       let phone = null;
 
       if (leadType === 'b2b') {
-        lead = await Lead.findById(job.leadId).lean();
+        lead = await Lead.findById(claimed.leadId)
+          .populate('leadOwner', 'name')
+          .populate('b2bProject', 'name')
+          .lean();
         phone = lead?.whatsapp || lead?.mobile;
       } else {
-        lead = await AppliedCourses.findById(job.leadId)
-          .populate('_candidate', 'name mobile email')
+        lead = await AppliedCourses.findById(claimed.leadId)
+          .populate('_candidate', 'name mobile email gender')
+          .populate('_course', 'name')
+          .populate('counsellor', 'name')
+          .populate('registeredBy', 'name')
+          .populate('batch', 'name')
           .lean();
         phone = lead?._candidate?.mobile;
       }
 
       if (!lead) {
-        job.status = 'skipped';
-        job.error = 'Lead not found';
-        await job.save();
+        claimed.status = 'skipped';
+        claimed.error = 'Lead not found';
+        await claimed.save();
         continue;
       }
 
       if (!phone) {
-        job.status = 'failed';
-        job.error = 'Lead has no mobile number';
-        job.attempts += 1;
-        await job.save();
+        claimed.status = 'failed';
+        claimed.error = 'Lead has no mobile number';
+        claimed.attempts += 1;
+        await claimed.save();
         failed += 1;
         continue;
       }
 
-      if (job.mode === 'whatsapp') {
-        const result = await sendWhatsAppTemplate(phone, job.templateId, job.collegeId);
-        job.status = 'sent';
-        job.messageId = result.messageId;
-        job.phone = result.phone;
-        job.sentAt = new Date();
-        job.attempts += 1;
-        job.error = undefined;
-        await job.save();
-        await saveDripOutgoingMessage({
-          collegeId: job.collegeId,
-          phone: result.phone,
-          templateName: result.templateName || job.templateId,
-          messageId: result.messageId,
-          lead,
-          leadType
-        });
-        sent += 1;
-        console.log(`[Drip] WhatsApp sent to ${result.phone} template=${job.templateId} job=${job._id}`);
-      } else {
-        job.status = 'skipped';
-        job.error = `Mode ${job.mode} not implemented`;
-        await job.save();
+      if (claimed.mode !== 'whatsapp') {
+        claimed.status = 'skipped';
+        claimed.error = `Mode ${claimed.mode} not implemented`;
+        await claimed.save();
+        continue;
       }
+
+      claimed.sendAttemptedAt = new Date();
+      await claimed.save();
+
+      const result = await sendWhatsAppTemplate(phone, claimed.templateId, claimed.collegeId, {
+        lead,
+        leadType
+      });
+      if (!result.messageId) {
+        claimed.status = 'reconciliation';
+        claimed.reconciliationReason = 'response_without_message_id';
+        claimed.error = 'WhatsApp response did not include a message id';
+        claimed.attempts += 1;
+        await claimed.save();
+        failed += 1;
+        dripLog('drip.cron.reconciliation', { dripJobId: String(claimed._id), reason: 'response_without_message_id' });
+        continue;
+      }
+
+      claimed.status = 'sent';
+      claimed.messageId = result.messageId;
+      claimed.phone = result.phone;
+      claimed.sentAt = new Date();
+      claimed.attempts += 1;
+      claimed.error = undefined;
+      await claimed.save();
+      await saveDripOutgoingMessage({
+        collegeId: claimed.collegeId,
+        phone: result.phone,
+        templateName: result.templateName || claimed.templateId,
+        messageId: result.messageId,
+        lead,
+        leadType
+      });
+      sent += 1;
+      console.log(`[Drip] WhatsApp sent to ${result.phone} template=${claimed.templateId} job=${claimed._id}`);
     } catch (err) {
-      job.status = 'failed';
-      job.error = err.response?.data
-        ? JSON.stringify(err.response.data)
-        : err.message;
-      job.attempts += 1;
-      await job.save();
-      failed += 1;
-      console.error(`[Drip] Job ${job._id} failed:`, job.error);
+      const classified = classifySendError(err);
+      claimed.attempts += 1;
+      claimed.error = errorText(err);
+      claimed.lastProcessedAt = new Date();
+
+      if (classified.kind === 'retry' && claimed.attempts < maxAttempts) {
+        claimed.status = 'pending';
+        claimed.sendAttemptedAt = null;
+        dripLog('drip.cron.retry', { dripJobId: String(claimed._id), reason: classified.reason, attempt: claimed.attempts });
+      } else if (classified.kind === 'reconciliation') {
+        claimed.status = 'reconciliation';
+        claimed.reconciliationReason = classified.reason;
+        dripLog('drip.cron.reconciliation', { dripJobId: String(claimed._id), reason: classified.reason });
+        failed += 1;
+      } else {
+        claimed.status = 'failed';
+        failed += 1;
+        console.error(`[Drip] Job ${claimed._id} failed:`, claimed.error);
+      }
+      await claimed.save();
     }
   }
 
   return { sent, failed, cancelled, checked: jobs.length };
 }
 
-async function runDripMarketingTick() {
+async function runDripMarketingTick(options = {}) {
   if (isRunning) {
     console.log('[Drip] Previous tick still running — skip');
     return { skipped: true };
@@ -972,10 +1263,12 @@ async function runDripMarketingTick() {
       }
     }
 
-    const jobResult = await processDueJobs();
+    const jobResult = (options.enqueueOnly || isDripQueueEnabled())
+      ? await enqueueDueJobsForQueue()
+      : await processDueJobs();
 
     console.log(
-      `[Drip] Tick done in ${Date.now() - started}ms — activeRules=${rules.length} stoppedByEndDate=${endedRules.length} matched=${totalMatched} jobsSent=${jobResult.sent} jobsFailed=${jobResult.failed} jobsCancelled=${jobResult.cancelled}`
+      `[Drip] Tick done in ${Date.now() - started}ms — activeRules=${rules.length} stoppedByEndDate=${endedRules.length} matched=${totalMatched} jobsSent=${jobResult.sent || 0} jobsFailed=${jobResult.failed || 0} jobsCancelled=${jobResult.cancelled || 0} jobsEnqueued=${jobResult.enqueued || 0}`
     );
 
     return { rules: rules.length, matched: totalMatched, ...jobResult };
@@ -985,16 +1278,26 @@ async function runDripMarketingTick() {
 }
 
 function dripMarketingScheduler() {
-  // Every minute — evaluate rules + send due WhatsApp jobs
-  cron.schedule('*/1 * * * *', async () => {
+  if (isDripQueueEnabled()) {
+    dripLog('drip.cron.not_started', { reason: 'DRIP_QUEUE_ENABLED' });
+    console.log('[Drip] Queue mode is on — node-cron drip scheduler was not started');
+    return null;
+  }
+
+  const task = cron.schedule('*/1 * * * *', async () => {
     try {
+      if (isDripQueueEnabled()) {
+        dripLog('drip.cron.tick_blocked', { reason: 'DRIP_QUEUE_ENABLED' });
+        return;
+      }
       await runDripMarketingTick();
     } catch (err) {
       console.error('[Drip] Scheduler tick error:', err.message);
     }
   });
 
-  console.log('[Drip] Marketing scheduler started (every 30 minutes)');
+  console.log('[Drip] Marketing scheduler started (every 1 minute)');
+  return task;
 }
 
 /**
@@ -1046,3 +1349,6 @@ async function countMatchingLeads({ collegeId, leadType, conditionBlocks, interB
 module.exports = dripMarketingScheduler;
 module.exports.runDripMarketingTick = runDripMarketingTick;
 module.exports.countMatchingLeads = countMatchingLeads;
+module.exports.sendWhatsAppTemplate = sendWhatsAppTemplate;
+module.exports.buildTemplateBodyParameters = buildTemplateBodyParameters;
+module.exports.saveDripOutgoingMessage = saveDripOutgoingMessage;

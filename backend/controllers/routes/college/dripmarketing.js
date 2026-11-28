@@ -10,6 +10,7 @@ const {
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule, DripMarketingJob, WhatsAppTemplate } = require("../../models");
 const { runDripMarketingTick, countMatchingLeads } = require("../../../schedular/dripMarketingScheduler");
+const { isDripQueueEnabled } = require("../../../queues/dripFlags");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -969,6 +970,17 @@ router.post('/preview-match-count', [isCollege], async (req, res) => {
 /** Manually trigger drip evaluation + due WhatsApp sends (for testing) */
 router.post('/run-now', [isCollege], async (req, res) => {
 	try {
+		if (isDripQueueEnabled()) {
+			const { enqueueEvaluation } = require('../../../queues/producers/dripProducer');
+			const job = await enqueueEvaluation({ source: 'run-now' });
+			return res.status(200).json({
+				success: true,
+				message: 'Drip evaluation queued',
+				queued: true,
+				jobId: job.id
+			});
+		}
+
 		const result = await runDripMarketingTick();
 		return res.status(200).json({
 			success: true,

@@ -3,6 +3,40 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
+const textEq = (left, right) => String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase();
+
+const asId = (value) => {
+  if (!value) return '';
+  if (typeof value === 'object') return String(value._id || value.id || '');
+  return String(value);
+};
+
+const sortByLabel = (options) => [...options].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+
+const optionLabel = (options, value) => options.find((option) => option.value === value)?.label || '';
+
+const rememberOption = (map, id, label) => {
+  const name = String(label || '').trim();
+  const key = asId(id);
+  if (key) {
+    const current = map.get(key);
+    if (!current || (name && current.label === key)) map.set(key, { value: key, label: name || current?.label || key });
+    return;
+  }
+  if (!name) return;
+  const named = `name:${name.toLowerCase()}`;
+  const already = [...map.values()].some((option) => textEq(option.label, name));
+  if (!already) map.set(named, { value: named, label: name });
+};
+
+const choiceHits = (selected, options, id, name) => {
+  if (!selected) return true;
+  if (id && selected === String(id)) return true;
+  if (id && !String(selected).startsWith('name:')) return false;
+  const label = optionLabel(options, selected) || (String(selected).startsWith('name:') ? String(selected).slice(5) : '');
+  return Boolean(label) && textEq(name, label);
+};
+
 const todayKey = () => {
   const date = new Date();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -290,7 +324,18 @@ const knownFieldValue = (field, context) => {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [readOnly, setReadOnly] = useState(false);
-  const [search, setSearch] = useState('');
+  const [listFilters, setListFilters] = useState({
+    department: '',
+    project: '',
+    course: '',
+    batch: '',
+    trainer: '',
+  });
+  const [departments, setDepartments] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [courseMeta, setCourseMeta] = useState([]);
+  const [catalogBatches, setCatalogBatches] = useState([]);
   const [screen, setScreen] = useState('add');
   const [form, setForm] = useState(emptyForm);
   const [removedIds, setRemovedIds] = useState([]);
@@ -561,6 +606,47 @@ const knownFieldValue = (field, context) => {
   useEffect(() => {
     if (!token) return undefined;
     let cancelled = false;
+    const headers = { 'x-auth': token };
+    axios.get(`${backendUrl}/college/filters-data`, { headers }).then((response) => {
+      if (cancelled || !response.data?.status) return;
+      setDepartments((response.data.verticals || []).map((item) => ({
+        value: String(item._id),
+        label: item.name || 'Department',
+      })));
+      setProjects((response.data.projects || []).map((item) => ({
+        value: String(item._id),
+        label: item.name || 'Project',
+        vertical: asId(item.vertical),
+      })));
+      setCourses((response.data.courses || []).map((item) => ({
+        value: String(item._id),
+        label: item.name || 'Course',
+      })));
+    }).catch(() => {});
+    axios.get(`${backendUrl}/college/all_courses`, { headers }).then((response) => {
+      if (cancelled || !response.data?.success) return;
+      setCourseMeta(Array.isArray(response.data.data) ? response.data.data : []);
+    }).catch(() => {});
+    axios.get(`${backendUrl}/college/get_batches`, { headers }).then((response) => {
+      if (cancelled || !response.data?.success) return;
+      setCatalogBatches((response.data.data || []).map((batch) => ({
+        id: String(batch._id),
+        name: batch.name || 'Batch',
+        courseId: asId(batch.courseId),
+        trainers: (batch.trainers || []).map((trainer) => ({
+          id: asId(trainer),
+          name: trainer?.name || '',
+        })).filter((trainer) => trainer.id),
+        seniorTrainerId: batch.seniorTrainerId || asId(batch.seniorTrainer),
+        seniorTrainerName: batch.seniorTrainerName || batch.seniorTrainer?.name || '',
+      })));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
     axios.get(`${backendUrl}/college/trainer/daily-report-settings`, {
       headers: { 'x-auth': token },
     }).then((response) => {
@@ -748,19 +834,185 @@ const knownFieldValue = (field, context) => {
     }
   };
 
+  const courseById = useMemo(() => {
+    const map = new Map();
+    courseMeta.forEach((course) => map.set(String(course._id), course));
+    return map;
+  }, [courseMeta]);
+
+  const reportLinks = useCallback((report) => {
+    const course = courseById.get(String(report.courseId || ''));
+    return {
+      departmentId: asId(course?.vertical),
+      departmentName: report.verticalName || course?.vertical?.name || '',
+      projectId: String(report.projectId || asId(course?.project) || ''),
+      projectName: report.projectName || course?.project?.name || '',
+      courseId: String(report.courseId || ''),
+      courseName: report.courseName || report.jobRole || course?.name || '',
+      batchId: String(report.batchId || ''),
+      batchName: report.batchCode || '',
+      trainerId: String(report.trainerId || ''),
+      trainerName: report.trainerName || '',
+    };
+  }, [courseById]);
+
+  const departmentChoices = useMemo(() => {
+    const map = new Map(departments.map((item) => [item.value, item]));
+    reports.forEach((report) => rememberOption(map, reportLinks(report).departmentId, reportLinks(report).departmentName));
+    return sortByLabel([...map.values()]);
+  }, [departments, reportLinks, reports]);
+
+  const projectChoices = useMemo(() => {
+    let list = projects;
+    const selected = listFilters.department;
+    if (selected && !String(selected).startsWith('name:')) {
+      const fromCourses = new Set(
+        courseMeta
+          .filter((course) => asId(course.vertical) === selected)
+          .map((course) => asId(course.project))
+          .filter(Boolean)
+      );
+      list = projects.filter((project) => fromCourses.has(project.value) || project.vertical === selected);
+    } else if (String(selected).startsWith('name:')) {
+      const label = optionLabel(departmentChoices, selected);
+      const fromCourses = new Set(
+        courseMeta
+          .filter((course) => textEq(course?.vertical?.name, label))
+          .map((course) => asId(course.project))
+          .filter(Boolean)
+      );
+      list = projects.filter((project) => fromCourses.has(project.value));
+    }
+    const map = new Map(list.map((item) => [item.value, item]));
+    reports.forEach((report) => {
+      const links = reportLinks(report);
+      if (!choiceHits(selected, departmentChoices, links.departmentId, links.departmentName)) return;
+      rememberOption(map, links.projectId, links.projectName);
+    });
+    return sortByLabel([...map.values()]);
+  }, [courseMeta, departmentChoices, listFilters.department, projects, reportLinks, reports]);
+
+  const courseChoices = useMemo(() => {
+    let ids = null;
+    if (listFilters.department) {
+      const label = optionLabel(departmentChoices, listFilters.department);
+      ids = new Set(
+        courseMeta
+          .filter((course) => (
+            asId(course.vertical) === listFilters.department
+            || textEq(course?.vertical?.name, label)
+          ))
+          .map((course) => String(course._id))
+      );
+    }
+    if (listFilters.project) {
+      const label = optionLabel(projectChoices, listFilters.project);
+      const projectIds = new Set(
+        courseMeta
+          .filter((course) => (
+            asId(course.project) === listFilters.project
+            || textEq(course?.project?.name, label)
+          ))
+          .map((course) => String(course._id))
+      );
+      ids = ids ? new Set([...ids].filter((id) => projectIds.has(id))) : projectIds;
+    }
+    const list = ids ? courses.filter((course) => ids.has(course.value)) : courses;
+    const map = new Map(list.map((item) => [item.value, item]));
+    reports.forEach((report) => {
+      const links = reportLinks(report);
+      if (!choiceHits(listFilters.department, departmentChoices, links.departmentId, links.departmentName)) return;
+      if (!choiceHits(listFilters.project, projectChoices, links.projectId, links.projectName)) return;
+      rememberOption(map, links.courseId, links.courseName);
+    });
+    return sortByLabel([...map.values()]);
+  }, [courseMeta, courses, departmentChoices, listFilters.department, listFilters.project, projectChoices, reportLinks, reports]);
+
+  const batchFilterChoices = useMemo(() => {
+    const selectedCourseIds = new Set(courseChoices.map((course) => course.value).filter((value) => !String(value).startsWith('name:')));
+    const narrowed = Boolean(listFilters.department || listFilters.project || listFilters.course);
+    let list = catalogBatches;
+    if (listFilters.course && !String(listFilters.course).startsWith('name:')) {
+      list = catalogBatches.filter((batch) => batch.courseId === listFilters.course);
+    } else if (narrowed) {
+      list = catalogBatches.filter((batch) => selectedCourseIds.has(batch.courseId));
+    }
+    const map = new Map(list.map((batch) => [batch.id, { value: batch.id, label: batch.name || 'Batch' }]));
+    reports.forEach((report) => {
+      const links = reportLinks(report);
+      if (!choiceHits(listFilters.department, departmentChoices, links.departmentId, links.departmentName)) return;
+      if (!choiceHits(listFilters.project, projectChoices, links.projectId, links.projectName)) return;
+      if (!choiceHits(listFilters.course, courseChoices, links.courseId, links.courseName)) return;
+      rememberOption(map, links.batchId, links.batchName);
+    });
+    return sortByLabel([...map.values()]);
+  }, [catalogBatches, courseChoices, departmentChoices, listFilters.course, listFilters.department, listFilters.project, projectChoices, reportLinks, reports]);
+
+  const trainerChoices = useMemo(() => {
+    const scopedBatches = listFilters.batch
+      ? catalogBatches.filter((batch) => batch.id === listFilters.batch)
+      : catalogBatches.filter((batch) => batchFilterChoices.some((choice) => choice.value === batch.id));
+    const map = new Map();
+    scopedBatches.forEach((batch) => {
+      batch.trainers.forEach((trainer) => rememberOption(map, trainer.id, trainer.name));
+      rememberOption(map, batch.seniorTrainerId, batch.seniorTrainerName);
+    });
+    if (!listFilters.batch && !scopedBatches.length) {
+      const courseIds = new Set(
+        (listFilters.course ? courseChoices.filter((course) => course.value === listFilters.course) : courseChoices)
+          .map((course) => course.value)
+      );
+      courseMeta.forEach((course) => {
+        if (courseIds.size && !courseIds.has(String(course._id))) return;
+        (course.trainers || []).forEach((trainer) => rememberOption(map, trainer?._id, trainer?.name));
+      });
+    }
+    reports.forEach((report) => {
+      const links = reportLinks(report);
+      if (!choiceHits(listFilters.department, departmentChoices, links.departmentId, links.departmentName)) return;
+      if (!choiceHits(listFilters.project, projectChoices, links.projectId, links.projectName)) return;
+      if (!choiceHits(listFilters.course, courseChoices, links.courseId, links.courseName)) return;
+      if (!choiceHits(listFilters.batch, batchFilterChoices, links.batchId, links.batchName)) return;
+      rememberOption(map, links.trainerId, links.trainerName);
+    });
+    return sortByLabel([...map.values()]);
+  }, [batchFilterChoices, catalogBatches, courseChoices, courseMeta, departmentChoices, listFilters.batch, listFilters.course, listFilters.department, listFilters.project, projectChoices, reportLinks, reports]);
+
+  useEffect(() => {
+    if (!listFilters.trainer) return;
+    if (trainerChoices.some((option) => option.value === listFilters.trainer)) return;
+    setListFilters((prev) => ({ ...prev, trainer: '' }));
+  }, [listFilters.trainer, trainerChoices]);
+
+  const handleListFilter = (key, value) => {
+    setListFilters((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'department') {
+        next.project = '';
+        next.course = '';
+        next.batch = '';
+      } else if (key === 'project') {
+        next.course = '';
+        next.batch = '';
+      } else if (key === 'course') {
+        next.batch = '';
+      }
+      return next;
+    });
+  };
+
+  const listFiltersActive = Boolean(
+    listFilters.department || listFilters.project || listFilters.course || listFilters.batch || listFilters.trainer
+  );
+
   const visibleReports = reports.filter((report) => {
-    const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return [
-      report.trainerName,
-      report.verticalName,
-      report.projectName,
-      report.courseName,
-      report.location,
-      report.batchCode,
-      report.jobRole,
-      formatReportDate(report.reportDate),
-    ].join(' ').toLowerCase().includes(query);
+    const links = reportLinks(report);
+    if (!choiceHits(listFilters.department, departmentChoices, links.departmentId, links.departmentName)) return false;
+    if (!choiceHits(listFilters.project, projectChoices, links.projectId, links.projectName)) return false;
+    if (!choiceHits(listFilters.course, courseChoices, links.courseId, links.courseName)) return false;
+    if (!choiceHits(listFilters.batch, batchFilterChoices, links.batchId, links.batchName)) return false;
+    if (!choiceHits(listFilters.trainer, trainerChoices, links.trainerId, links.trainerName)) return false;
+    return true;
   });
 
   const fileRule = (field) => {
@@ -967,8 +1219,14 @@ const knownFieldValue = (field, context) => {
         .dtr-bar { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px; flex-wrap: wrap; }
         .dtr-bar h2 { margin: 0; font-size: 16px; color: #0f172a; }
         .dtr-bar p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
-        .dtr-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .dtr-search { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; min-width: 0; width: min(280px, 100%); font-size: 13px; }
+        .dtr-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 0 14px 12px; }
+        .dtr-filters__item { display: flex; flex-direction: column; gap: 2px; flex: 1 1 120px; min-width: 112px; max-width: 180px; }
+        .dtr-filters__label { margin: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #6b7280; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dtr-filters__label i { margin-right: 3px; color: #fa5579; font-size: 9px; }
+        .dtr-filters select { font-size: 12px; font-weight: 500; line-height: 1.3; padding: 6px 22px 6px 8px; height: 32px; width: 100%; min-width: 0; border: 1.5px solid #e8eaed; border-radius: 8px; background-color: #f9fafb; color: #1f2937; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; background-size: 10px; }
+        .dtr-filters select:hover { border-color: rgba(250, 85, 121, 0.4); background-color: #fff; }
+        .dtr-filters select:focus { outline: none; border-color: #fa5579; background-color: #fff; box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.14); }
+        .dtr-filters__clear { border: 0; background: transparent; color: #be123c; font-size: 12px; font-weight: 700; cursor: pointer; padding: 6px 4px; }
         .dtr-btn { border: 0; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .dtr-btn--primary { background: #fa5579; color: #fff; }
         .dtr-btn--ghost { background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
@@ -1060,7 +1318,7 @@ const knownFieldValue = (field, context) => {
           .dtr-tabs { width: 100%; }
           .dtr-tabs button { flex: 1; padding: 10px 8px; }
           .dtr-bar { align-items: stretch; padding: 12px; }
-          .dtr-actions, .dtr-search { width: 100%; }
+          .dtr-filters__item { max-width: none; flex-basis: calc(50% - 8px); }
           .dtr-form { padding: 12px; }
           .dtr-submit { flex-direction: column-reverse; }
           .dtr-submit .dtr-btn { width: 100%; }
@@ -1089,17 +1347,37 @@ const knownFieldValue = (field, context) => {
             <h2>{screen === 'view' ? 'View reports' : (editingId ? 'Edit daily report' : 'Add daily report')}</h2>
             <p>{screen === 'view' ? `${visibleReports.length} saved report${visibleReports.length === 1 ? '' : 's'}` : (editingId ? 'Update the saved report, then save the row.' : 'Select the date and batch. The fields open below.')}</p>
           </div>
-          <div className="dtr-actions">
-            {screen === 'view' && (
-              <input
-                className="dtr-search"
-                placeholder="Search trainer, course, batch..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+        </div>
+        {screen === 'view' && (
+          <div className="dtr-filters">
+            {[
+              ['department', 'Department', 'fas fa-sitemap', departmentChoices],
+              ['project', 'Project', 'fas fa-project-diagram', projectChoices],
+              ['course', 'Course', 'fas fa-graduation-cap', courseChoices],
+              ['batch', 'Batch', 'fas fa-users', batchFilterChoices],
+              ['trainer', 'Trainer', 'fas fa-user-tie', trainerChoices],
+            ].map(([key, label, icon, options]) => (
+              <label className="dtr-filters__item" key={key}>
+                <span className="dtr-filters__label"><i className={icon} aria-hidden="true" /> {label}</span>
+                <select value={listFilters[key]} onChange={(event) => handleListFilter(key, event.target.value)}>
+                  <option value="">All</option>
+                  {options.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            {listFiltersActive && (
+              <button
+                type="button"
+                className="dtr-filters__clear"
+                onClick={() => setListFilters({ department: '', project: '', course: '', batch: '', trainer: '' })}
+              >
+                Clear
+              </button>
             )}
           </div>
-        </div>
+        )}
         {loading ? (
           <div className="dtr-empty">Loading reports...</div>
         ) : screen === 'add' ? (
@@ -1176,7 +1454,7 @@ const knownFieldValue = (field, context) => {
         ) : (
           <div className="dtr-table-wrap">
             {visibleReports.length === 0 ? (
-              <div className="dtr-empty">No daily reports yet.</div>
+              <div className="dtr-empty">{reports.length ? 'No daily reports match these filters.' : 'No daily reports yet.'}</div>
             ) : (
               <table className="dtr-table">
                 <thead>

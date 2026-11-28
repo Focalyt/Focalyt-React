@@ -3697,6 +3697,13 @@ async function handleStatusUpdates(statuses) {
 				{ new: true }
 			);
 
+			try {
+				const { recordDripProviderStatus } = require('../../../queues/dripProviderStatus');
+				await recordDripProviderStatus(messageId, statusValue, timestamp);
+			} catch (dripStatusErr) {
+				console.error('[Drip] providerStatus update failed:', dripStatusErr.message);
+			}
+
 			if (updatedMessage) {
 				console.log(`✅ Updated message ${messageId} status to ${statusValue}`);
 

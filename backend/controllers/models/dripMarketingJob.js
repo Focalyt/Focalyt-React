@@ -58,7 +58,7 @@ const DripMarketingJobSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'sent', 'failed', 'skipped'],
+    enum: ['pending', 'processing', 'sent', 'failed', 'skipped', 'reconciliation'],
     default: 'pending',
     index: true
   },
@@ -69,7 +69,21 @@ const DripMarketingJobSchema = new mongoose.Schema({
   messageId: String,
   error: String,
   sentAt: Date,
-  phone: String
+  phone: String,
+  /** True once BullMQ owns delivery. Cron will not send these rows. */
+  queueOwned: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  bullJobId: String,
+  claimedAt: Date,
+  sendAttemptedAt: Date,
+  lastProcessedAt: Date,
+  /** Webhook delivery state. Does not replace status=sent (API acceptance). */
+  providerStatus: String,
+  providerStatusAt: Date,
+  reconciliationReason: String
 }, {
   timestamps: true
 });
@@ -79,5 +93,6 @@ DripMarketingJobSchema.index(
   { unique: true }
 );
 DripMarketingJobSchema.index({ status: 1, scheduledAt: 1 });
+DripMarketingJobSchema.index({ status: 1, queueOwned: 1, scheduledAt: 1 });
 
 module.exports = mongoose.model('DripMarketingJob', DripMarketingJobSchema);
