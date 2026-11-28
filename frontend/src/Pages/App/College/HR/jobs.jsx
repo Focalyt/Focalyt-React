@@ -169,7 +169,6 @@ const buildHrRequestParams = ({
     nextActionToDate: toHrFilterYmd(filters?.nextActionToDate),
     owner: listParts.owner,
     counselor: listParts.counselor,
-    scopeToViewer: 'true',
     department: selectedDepartmentId && hrDepartmentIds.has(selectedDepartmentId)
       ? selectedDepartmentId
       : undefined,
@@ -3558,6 +3557,9 @@ const CRMDashboard = () => {
         dateOfBirth: dob || '',
         registeredBy,
         source: selectedSource?.name || '',
+        counselorId,
+        ...(leadCoOwnerId ? { leadCoOwner: leadCoOwnerId } : {}),
+        ...(leadCoOwner2Id ? { leadCoOwner2: leadCoOwner2Id } : {}),
       }, {
         headers: {
           'x-auth': token,

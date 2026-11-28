@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const XLSX = require('xlsx');
 const router = express.Router();
-const { isCollege, getAllTeamMembers } = require('../../../helpers');
+const { isCollege } = require('../../../helpers');
 const StatusHr = require('../../models/statusHr');
 const College = require('../../models/college');
 const User = require('../../models/users');
@@ -511,15 +511,6 @@ const hrLeadPersonIds = (lead) => [
   String(lead?.leadCoOwner2?._id || lead?.leadCoOwner2 || ''),
 ].filter(Boolean);
 
-const resolveHrViewerTeamIds = async (user) => {
-  if (!user?._id) return [];
-  const isAdmin = user?.permissions?.permission_type === 'Admin';
-  if (isAdmin) return [user._id];
-  const team = await getAllTeamMembers(user._id);
-  if (Array.isArray(team) && team.length) return team;
-  return [user._id];
-};
-
 const dayRange = (from, to) => {
   const range = {};
   if (from) {
@@ -984,19 +975,14 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
   const ownerIds = parseIdList(query.owner).map(String);
   const counselorIds = parseIdList(query.counselor).map(String);
   // Match B2C: Owner = primary owner only; Counsellor = owner OR co-owner.
+  // Default (no person filter / no search): only leads where viewer is Owner / CO-1 / CO-2.
   if (ownerIds.length) {
     leads = leads.filter((lead) => ownerIds.includes(hrLeadOwnerId(lead)));
   } else if (counselorIds.length) {
     leads = leads.filter((lead) => counselorIds.some((id) => hrLeadPersonIds(lead).includes(id)));
-  } else if (!q && parseYesNo(query.scopeToViewer) === true && viewer?._id) {
-    const teamIds = await resolveHrViewerTeamIds(viewer);
-    if (teamIds.length) {
-      const teamSet = new Set(teamIds.map((id) => String(id)));
-      leads = leads.filter((lead) => {
-        if (!lead.hasStoredLeadOwner) return true;
-        return hrLeadPersonIds(lead).some((id) => teamSet.has(id));
-      });
-    }
+  } else if (!q && viewer?._id) {
+    const viewerId = String(viewer._id);
+    leads = leads.filter((lead) => hrLeadPersonIds(lead).includes(viewerId));
   }
 
   if (query.project && mongoose.Types.ObjectId.isValid(String(query.project))) {
@@ -1560,11 +1546,18 @@ router.post('/leads', isCollege, async (req, res) => {
 
     const collegeId = req.user?.college?._id || null;
     const defaultStatus = await firstHrStatus(collegeId);
+    // Manual counselor from Add Lead form wins over job HR auto-assign.
+    const manualOwnerId = toCollegeObjectId(
+      req.body.counselorId || req.body.counsellorId || req.body.leadOwner || req.body.owner || req.body.assignedTo
+    );
+    const manualCoOwnerId = toCollegeObjectId(req.body.leadCoOwner);
+    const manualCoOwner2Id = toCollegeObjectId(req.body.leadCoOwner2);
     const jobOwner = await resolveJobHrOwner({
       applyingFor,
       jobId: req.body.jobId || req.body._job,
       collegeId,
     });
+    const resolvedOwnerId = manualOwnerId || jobOwner.hrId || undefined;
 
     const jobId = toCollegeObjectId(jobOwner.jobId);
     const vacancy = jobId ? await Vacancy.findById(jobId).select('_id title _company hr').lean() : null;
@@ -1678,12 +1671,16 @@ router.post('/leads', isCollege, async (req, res) => {
       resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
       leadStatus: defaultStatus?._id || null,
       leadSubstatus: defaultStatus?.substatuses?.[0]?._id || null,
-      leadOwner: jobOwner.hrId || undefined,
-      assignedTo: jobOwner.hrId || undefined,
+      leadOwner: resolvedOwnerId,
+      assignedTo: resolvedOwnerId,
+      leadCoOwner: manualCoOwnerId || undefined,
+      leadCoOwner2: manualCoOwner2Id || undefined,
       logs: [{
         user: req.user?._id,
         action: 'Lead created',
-        remarks: source === 'manual' ? 'Added from HR panel' : source,
+        remarks: source === 'manual'
+          ? (manualOwnerId ? 'Added from HR panel (manual counselor)' : 'Added from HR panel')
+          : source,
       }],
     });
     const loaded = await loadAppliedLead(applied._id, collegeId);
