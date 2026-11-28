@@ -662,6 +662,96 @@ async function processRule(rule) {
   return { matched };
 }
 
+function sanitizeWhatsAppParam(value, fallback = '-') {
+  const text = String(value == null ? '' : value)
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+    .slice(0, 1024);
+  return text || fallback;
+}
+
+function firstFilledText(...values) {
+  for (const value of values) {
+    if (value == null || typeof value === 'object') continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+/** Highest {{n}} in the approved body. Mappings are only a fallback when body text was not stored. */
+function expectedBodyParamCount(template) {
+  const numbered = [...String(template?.messageBody || '').matchAll(/\{\{\s*(\d+)\s*\}\}/g)]
+    .map((match) => parseInt(match[1], 10))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (numbered.length) return Math.max(...numbered);
+
+  const positions = (template?.variableMappings || [])
+    .map((mapping) => Number(mapping?.position))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return positions.length ? Math.max(...positions) : 0;
+}
+
+function resolveDripTemplateValue(variableName, lead, leadType) {
+  if (!lead) return '';
+  const key = String(variableName || '').trim();
+
+  if (leadType === 'b2b') {
+    const owner = lead.leadOwner && typeof lead.leadOwner === 'object' ? lead.leadOwner : {};
+    const project = lead.b2bProject && typeof lead.b2bProject === 'object' ? lead.b2bProject : {};
+    const values = {
+      name: firstFilledText(lead.concernPersonName, lead.businessName),
+      mobile: firstFilledText(lead.whatsapp, lead.mobile),
+      email: firstFilledText(lead.email),
+      course_name: firstFilledText(project.name, lead.businessName),
+      project_name: firstFilledText(project.name, lead.businessName),
+      counselor_name: firstFilledText(owner.name),
+      lead_owner_name: firstFilledText(owner.name),
+      business_name: firstFilledText(lead.businessName)
+    };
+    return values[key] || firstFilledText(lead[key]);
+  }
+
+  const candidate = lead._candidate && typeof lead._candidate === 'object' ? lead._candidate : {};
+  const course = lead._course && typeof lead._course === 'object' ? lead._course : {};
+  const counsellor = lead.counsellor && typeof lead.counsellor === 'object' ? lead.counsellor : {};
+  const registeredBy = lead.registeredBy && typeof lead.registeredBy === 'object' ? lead.registeredBy : {};
+  const batch = lead.batch && typeof lead.batch === 'object' ? lead.batch : {};
+  const values = {
+    name: firstFilledText(candidate.name),
+    gender: firstFilledText(candidate.gender),
+    mobile: firstFilledText(candidate.mobile),
+    email: firstFilledText(candidate.email),
+    course_name: firstFilledText(course.name, course.courseName),
+    counselor_name: firstFilledText(counsellor.name),
+    lead_owner_name: firstFilledText(registeredBy.name, counsellor.name),
+    batch_name: firstFilledText(batch.name),
+    project_name: firstFilledText(course.project && course.project.name),
+    college_name: firstFilledText(course.college && course.college.name)
+  };
+  return values[key] || firstFilledText(candidate[key], lead[key]);
+}
+
+function buildTemplateBodyParameters(template, lead, leadType) {
+  const count = expectedBodyParamCount(template);
+  if (!count) return [];
+
+  const mappings = Array.isArray(template?.variableMappings) ? template.variableMappings : [];
+  const parameters = [];
+  for (let position = 1; position <= count; position += 1) {
+    const mapping = mappings.find((item) => Number(item?.position) === position);
+    const raw = mapping
+      ? resolveDripTemplateValue(mapping.variableName, lead, leadType)
+      : '';
+    parameters.push({
+      type: 'text',
+      text: sanitizeWhatsAppParam(raw)
+    });
+  }
+  return parameters;
+}
+
 /** Build Meta template components for header/carousel media stored on WhatsAppTemplate */
 async function buildTemplateMediaComponents(template) {
   const { uploadStorageKeyToWhatsApp } = require('../helpers/whatsappMediaUpload');
@@ -717,7 +807,7 @@ async function buildTemplateMediaComponents(template) {
   return components;
 }
 
-async function sendWhatsAppTemplate(to, templateName, collegeId) {
+async function sendWhatsAppTemplate(to, templateName, collegeId, context = {}) {
   if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error('WhatsApp credentials missing');
   }
@@ -737,6 +827,17 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
   }
 
   const components = await buildTemplateMediaComponents(template);
+  const bodyParameters = buildTemplateBodyParameters(
+    template,
+    context.lead,
+    context.leadType
+  );
+  if (bodyParameters.length) {
+    components.push({
+      type: 'body',
+      parameters: bodyParameters
+    });
+  }
 
   const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
   const payload = {
@@ -1008,11 +1109,18 @@ async function processDueJobs() {
       let phone = null;
 
       if (leadType === 'b2b') {
-        lead = await Lead.findById(claimed.leadId).lean();
+        lead = await Lead.findById(claimed.leadId)
+          .populate('leadOwner', 'name')
+          .populate('b2bProject', 'name')
+          .lean();
         phone = lead?.whatsapp || lead?.mobile;
       } else {
         lead = await AppliedCourses.findById(claimed.leadId)
-          .populate('_candidate', 'name mobile email')
+          .populate('_candidate', 'name mobile email gender')
+          .populate('_course', 'name')
+          .populate('counsellor', 'name')
+          .populate('registeredBy', 'name')
+          .populate('batch', 'name')
           .lean();
         phone = lead?._candidate?.mobile;
       }
@@ -1043,7 +1151,10 @@ async function processDueJobs() {
       claimed.sendAttemptedAt = new Date();
       await claimed.save();
 
-      const result = await sendWhatsAppTemplate(phone, claimed.templateId, claimed.collegeId);
+      const result = await sendWhatsAppTemplate(phone, claimed.templateId, claimed.collegeId, {
+        lead,
+        leadType
+      });
       if (!result.messageId) {
         claimed.status = 'reconciliation';
         claimed.reconciliationReason = 'response_without_message_id';
@@ -1239,4 +1350,5 @@ module.exports = dripMarketingScheduler;
 module.exports.runDripMarketingTick = runDripMarketingTick;
 module.exports.countMatchingLeads = countMatchingLeads;
 module.exports.sendWhatsAppTemplate = sendWhatsAppTemplate;
+module.exports.buildTemplateBodyParameters = buildTemplateBodyParameters;
 module.exports.saveDripOutgoingMessage = saveDripOutgoingMessage;

@@ -109,12 +109,12 @@ function createMongoRepo() {
   };
 }
 
-function defaultSend(phone, templateId, collegeId) {
+function defaultSend(phone, templateId, collegeId, context) {
   if (process.env.DRIP_WHATSAPP_MOCK === '1') {
     throw new Error('DRIP_WHATSAPP_MOCK=1 refuses a real WhatsApp send');
   }
   const { sendWhatsAppTemplate } = require('../schedular/dripMarketingScheduler');
-  return sendWhatsAppTemplate(phone, templateId, collegeId);
+  return sendWhatsAppTemplate(phone, templateId, collegeId, context);
 }
 
 function defaultSaveOutgoing(payload) {
@@ -142,11 +142,18 @@ async function defaultLoadDelivery(job) {
   let phone = null;
 
   if (leadType === 'b2b') {
-    lead = await Lead.findById(job.leadId).lean();
+    lead = await Lead.findById(job.leadId)
+      .populate('leadOwner', 'name')
+      .populate('b2bProject', 'name')
+      .lean();
     phone = lead ? (lead.whatsapp || lead.mobile) : null;
   } else {
     lead = await AppliedCourses.findById(job.leadId)
-      .populate('_candidate', 'name mobile email')
+      .populate('_candidate', 'name mobile email gender')
+      .populate('_course', 'name')
+      .populate('counsellor', 'name')
+      .populate('registeredBy', 'name')
+      .populate('batch', 'name')
       .lean();
     phone = lead && lead._candidate ? lead._candidate.mobile : null;
   }
@@ -330,7 +337,10 @@ async function claimAndSendDripJob(dripJobId, options = {}) {
   }
 
   try {
-    const result = await send(delivery.phone, claimed.doc.templateId, claimed.doc.collegeId);
+    const result = await send(delivery.phone, claimed.doc.templateId, claimed.doc.collegeId, {
+      lead: delivery.lead,
+      leadType: delivery.leadType
+    });
     const messageId = result && result.messageId ? result.messageId : null;
     if (!messageId) {
       await repo.cas(
