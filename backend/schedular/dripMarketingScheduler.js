@@ -867,7 +867,7 @@ async function sendWhatsAppTemplate(to, templateName, collegeId, context = {}) {
   };
 }
 
-/** Persist drip send so webhook can resolve collegeId and session-window can see history */
+/** Persist drip send so webhook can resolves collegeId and session-window can see history */
 async function saveDripOutgoingMessage({ collegeId, phone, templateName, messageId, lead, leadType }) {
   try {
     const doc = {
