@@ -942,8 +942,17 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
 
   applies = applies.filter((item) => item._candidate && item._candidate._id);
 
-  if (query.applyingFor) {
-    applies = applies.filter((item) => String(item._job?.title || '') === String(query.applyingFor));
+  // Prefer jobId (ObjectId) — same idea as course filter on registration.
+  // Fall back to applyingFor title match (trimmed, case-insensitive) for older clients.
+  const jobId = String(query.jobId || '').trim();
+  if (jobId && mongoose.Types.ObjectId.isValid(jobId)) {
+    applies = applies.filter((item) => String(item._job?._id || item._job || '') === jobId);
+  } else if (query.applyingFor) {
+    const wanted = String(query.applyingFor).trim().toLowerCase();
+    applies = applies.filter((item) => {
+      const title = String(item._job?.title || item.applyingFor || '').trim().toLowerCase();
+      return title && title === wanted;
+    });
   }
 
   const statusIndex = await loadStatusIndex(collegeId);
@@ -974,13 +983,15 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
 
   const ownerIds = parseIdList(query.owner).map(String);
   const counselorIds = parseIdList(query.counselor).map(String);
+  const hasJobFilter = Boolean(String(query.jobId || '').trim() || String(query.applyingFor || '').trim());
   // Match B2C: Owner = primary owner only; Counsellor = owner OR co-owner.
-  // Default (no person filter / no search): only leads where viewer is Owner / CO-1 / CO-2.
+  // Default (no person filter / no search / no job filter): only leads where viewer is Owner / CO-1 / CO-2.
+  // When Job is selected (like Course on registration), show all matching job leads — not only the viewer's.
   if (ownerIds.length) {
     leads = leads.filter((lead) => ownerIds.includes(hrLeadOwnerId(lead)));
   } else if (counselorIds.length) {
     leads = leads.filter((lead) => counselorIds.some((id) => hrLeadPersonIds(lead).includes(id)));
-  } else if (!q && viewer?._id) {
+  } else if (!q && !hasJobFilter && viewer?._id) {
     const viewerId = String(viewer._id);
     leads = leads.filter((lead) => hrLeadPersonIds(lead).includes(viewerId));
   }

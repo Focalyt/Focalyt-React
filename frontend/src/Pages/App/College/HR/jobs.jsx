@@ -173,7 +173,12 @@ const buildHrRequestParams = ({
       ? selectedDepartmentId
       : undefined,
     project: cycle?.project || undefined,
-    applyingFor: cycle?.job || undefined,
+    // Prefer job _id (same pattern as registration course filter). Fall back to title for legacy values.
+    ...(cycle?.job
+      ? (/^[0-9a-fA-F]{24}$/.test(String(cycle.job))
+        ? { jobId: String(cycle.job) }
+        : { applyingFor: String(cycle.job) })
+      : {}),
     statusTitle: selectedStatus?.name && selectedStatus._id !== 'all' ? selectedStatus.name : undefined,
     approvalStatus: filters?.approvalStatus ? String(filters.approvalStatus).toUpperCase() : undefined,
   };
@@ -4260,6 +4265,7 @@ const CRMDashboard = () => {
       batch: '',
       counsellor: '',
       owner: '',
+      job: '',
     });
     resetHeaderDateFilterState();
     setLeadViewTab('all');
@@ -15605,10 +15611,18 @@ useEffect(() => {
         >
           <option value="">All</option>
           {(jobs || []).map((job) => {
-            const label = typeof job === 'string' ? job : (job?.title || job?.name || '');
-            if (!label) return null;
+            if (typeof job === 'string') {
+              const label = job.trim();
+              if (!label) return null;
+              return (
+                <option key={label} value={label}>{label}</option>
+              );
+            }
+            const jobId = String(job?._id || job?.id || '').trim();
+            const label = String(job?.title || job?.name || '').trim();
+            if (!jobId || !label) return null;
             return (
-              <option key={label} value={label}>{label}</option>
+              <option key={jobId} value={jobId}>{label}</option>
             );
           })}
         </select>
