@@ -33,8 +33,13 @@ const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular();
 const dataBaseBackup = require("./schedular/dataBaseBackup");
 dataBaseBackup();
+const { isDripQueueEnabled } = require("./queues/dripFlags");
 const dripMarketingScheduler = require("./schedular/dripMarketingScheduler");
-dripMarketingScheduler();
+if (isDripQueueEnabled()) {
+	console.log("[Drip] DRIP_QUEUE_ENABLED=true — drip node-cron was not started. Start backend/worker.js for queue sending.");
+} else {
+	dripMarketingScheduler();
+}
 // const counselorPerformanceEmailScheduler = require("./schedular/counselorPerformanceEmailScheduler");
 // counselorPerformanceEmailScheduler();
 //upload('
